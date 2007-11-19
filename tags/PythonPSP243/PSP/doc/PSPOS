@@ -1,0 +1,37 @@
+= Additional functions in the os module =
+
+  `freemem`
+
+Returns the total free memory, in bytes.
+
+  `battery`
+
+Returns a tuple (plugged, present, charging, lifep, lifet, temp, volt).
+
+  * plugged is 1 if the PSP is plugged in, 0 else.
+  * present is 1 if the battery is present, 0 else.
+  * charging is 1 if the battery is charging, 0 else.
+  * lifep is the life of the battery in percent.
+  * lifet is the life of the battery in minutes (0 if the PSP is plugged in)
+  * temp is the battery temperature (celsius)
+  * volt is the battery voltage (milliseconds)
+
+  `getclock`
+
+Returns the CPU clock speed in MHz.
+
+  `setclock`
+
+Sets the CPU clock speed. Valid values are 1 to 333; an OSError is raised for other values.
+
+  `getbus'
+
+Returns the bus speed in MHz.
+
+  `setbus`
+
+Sets the bus speed. Valid values are 1 to 167; an OSError is raise for other values.
+
+  `powertick`
+
+Generates a power tick to prevent the PSP from going idle.

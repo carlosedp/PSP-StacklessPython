@@ -1,0 +1,51 @@
+= The pspsnd module =
+
+This module exposes classes for playing music and sound effects.
+
+== Functions ==
+
+  `setMusicVolume(volume)`
+
+Sets the music volume, as played by the Music class. The volume is an integer between 0 and 255 inclusive.
+
+  `setSndFxVolume(volume)`
+
+Sets the sound effects volume, as played by the Sound class. The volume is an integer between 0 and 255 inclusive.
+
+== Classes ==
+
+=== Error ===
+
+Exception type for pspsnd specific errors.
+
+=== Music ===
+
+This class allows you to play any sound format recognized by mikmodlib.
+
+'''Methods'''
+
+  `__init__(self, filename, maxchan = 128, loop = False)`
+
+Constructor.
+
+  `start(self)`
+
+Starts playing the music.
+
+  `stop(self)`
+
+Stops the music being played. Note that this frees all associated resources; you can't call start after that, you have to instantiate a new Music object.
+
+=== Sound ===
+
+This class is used to play sound effects (WAV format).
+
+'''Methods'''
+
+  `__init__(self, filename)`
+
+Constructor.
+
+  `start(self)`
+
+Starts playing the sound. May be called several times.
