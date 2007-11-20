@@ -7,13 +7,12 @@ XXX The functions here don't copy the resource fork or other metadata on Mac.
 import os
 import sys
 import stat
-import exceptions
 from os.path import abspath
 
 __all__ = ["copyfileobj","copyfile","copymode","copystat","copy","copy2",
            "copytree","move","rmtree","Error"]
 
-class Error(exceptions.EnvironmentError):
+class Error(EnvironmentError):
     pass
 
 def copyfileobj(fsrc, fdst, length=16*1024):
@@ -108,7 +107,7 @@ def copytree(src, dst, symlinks=False):
 
     """
     names = os.listdir(src)
-    os.mkdir(dst)
+    os.makedirs(dst)
     errors = []
     for name in names:
         srcname = os.path.join(src, name)
@@ -123,11 +122,18 @@ def copytree(src, dst, symlinks=False):
                 copy2(srcname, dstname)
             # XXX What about devices, sockets etc.?
         except (IOError, os.error), why:
-            errors.append((srcname, dstname, why))
+            errors.append((srcname, dstname, str(why)))
         # catch the Error from the recursive copytree so that we can
         # continue with other files
         except Error, err:
             errors.extend(err.args[0])
+    try:
+        copystat(src, dst)
+    except WindowsError:
+        # can't copy file access times on Windows
+        pass
+    except OSError, why:
+        errors.extend((src, dst, str(why)))
     if errors:
         raise Error, errors
 

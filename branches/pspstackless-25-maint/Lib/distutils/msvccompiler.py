@@ -10,7 +10,7 @@ for the Microsoft Visual Studio.
 
 # This module should be kept compatible with Python 2.1.
 
-__revision__ = "$Id: msvccompiler.py 39263 2005-08-07 20:50:37Z loewis $"
+__revision__ = "$Id: msvccompiler.py 54826 2007-04-14 13:02:57Z richard.tew $"
 
 import sys, os, string
 from distutils.errors import \
@@ -131,8 +131,10 @@ class MacroExpander:
                 self.set_macro("FrameworkSDKDir", net, "sdkinstallroot")
         except KeyError, exc: #
             raise DistutilsPlatformError, \
-                  ("The .NET Framework SDK needs to be installed before "
-                   "building extensions for Python.")
+                  ("""Python was built with Visual Studio 2003;
+extensions must be built with a compiler than can generate compatible binaries.
+Visual Studio 2003 was not found on this system. If you have Cygwin installed,
+you can try compiling with MingW32, by passing "-c mingw32" to setup.py.""")
 
         p = r"Software\Microsoft\NET Framework Setup\Product"
         for base in HKEYS:
@@ -172,6 +174,33 @@ def get_build_version():
     # else we don't know what version of the compiler this is
     return None
 
+def get_build_architecture():
+    """Return the processor architecture.
+
+    Possible results are "Intel", "Itanium", or "AMD64".
+    """
+
+    prefix = " bit ("
+    i = string.find(sys.version, prefix)
+    if i == -1:
+        return "Intel"
+    j = string.find(sys.version, ")", i)
+    return sys.version[i+len(prefix):j]
+
+def normalize_and_reduce_paths(paths):
+    """Return a list of normalized paths with duplicates removed.
+
+    The current order of paths is maintained.
+    """
+    # Paths are normalized so things like:  /a and /a/ aren't both preserved.
+    reduced_paths = []
+    for p in paths:
+        np = os.path.normpath(p)
+        # XXX(nnorwitz): O(n**2), if reduced_paths gets long perhaps use a set.
+        if np not in reduced_paths:
+            reduced_paths.append(np)
+    return reduced_paths
+
 
 class MSVCCompiler (CCompiler) :
     """Concrete class that implements an interface to Microsoft Visual C++,
@@ -206,29 +235,47 @@ class MSVCCompiler (CCompiler) :
     def __init__ (self, verbose=0, dry_run=0, force=0):
         CCompiler.__init__ (self, verbose, dry_run, force)
         self.__version = get_build_version()
-        if self.__version >= 7:
-            self.__root = r"Software\Microsoft\VisualStudio"
-            self.__macros = MacroExpander(self.__version)
+        self.__arch = get_build_architecture()
+        if self.__arch == "Intel":
+            # x86
+            if self.__version >= 7:
+                self.__root = r"Software\Microsoft\VisualStudio"
+                self.__macros = MacroExpander(self.__version)
+            else:
+                self.__root = r"Software\Microsoft\Devstudio"
+            self.__product = "Visual Studio version %s" % self.__version
         else:
-            self.__root = r"Software\Microsoft\Devstudio"
+            # Win64. Assume this was built with the platform SDK
+            self.__product = "Microsoft SDK compiler %s" % (self.__version + 6)
+
         self.initialized = False
 
     def initialize(self):
-        self.__paths = self.get_msvc_paths("path")
+        self.__paths = []
+        if os.environ.has_key("DISTUTILS_USE_SDK") and os.environ.has_key("MSSdk") and self.find_exe("cl.exe"):
+            # Assume that the SDK set up everything alright; don't try to be
+            # smarter
+            self.cc = "cl.exe"
+            self.linker = "link.exe"
+            self.lib = "lib.exe"
+            self.rc = "rc.exe"
+            self.mc = "mc.exe"
+        else:
+            self.__paths = self.get_msvc_paths("path")
 
-        if len (self.__paths) == 0:
-            raise DistutilsPlatformError, \
-                  ("Python was built with version %s of Visual Studio, "
-                   "and extensions need to be built with the same "
-                   "version of the compiler, but it isn't installed." % self.__version)
+            if len (self.__paths) == 0:
+                raise DistutilsPlatformError, \
+                      ("Python was built with %s, "
+                       "and extensions need to be built with the same "
+                       "version of the compiler, but it isn't installed." % self.__product)
 
-        self.cc = self.find_exe("cl.exe")
-        self.linker = self.find_exe("link.exe")
-        self.lib = self.find_exe("lib.exe")
-        self.rc = self.find_exe("rc.exe")   # resource compiler
-        self.mc = self.find_exe("mc.exe")   # message compiler
-        self.set_path_env_var('lib')
-        self.set_path_env_var('include')
+            self.cc = self.find_exe("cl.exe")
+            self.linker = self.find_exe("link.exe")
+            self.lib = self.find_exe("lib.exe")
+            self.rc = self.find_exe("rc.exe")   # resource compiler
+            self.mc = self.find_exe("mc.exe")   # message compiler
+            self.set_path_env_var('lib')
+            self.set_path_env_var('include')
 
         # extend the MSVC path with the current path
         try:
@@ -236,13 +283,21 @@ class MSVCCompiler (CCompiler) :
                 self.__paths.append(p)
         except KeyError:
             pass
+        self.__paths = normalize_and_reduce_paths(self.__paths)
         os.environ['path'] = string.join(self.__paths, ';')
 
         self.preprocess_options = None
-        self.compile_options = [ '/nologo', '/Ox', '/MD', '/W3', '/GX' ,
-                                 '/DNDEBUG']
-        self.compile_options_debug = ['/nologo', '/Od', '/MDd', '/W3', '/GX',
-                                      '/Z7', '/D_DEBUG']
+        if self.__arch == "Intel":
+            self.compile_options = [ '/nologo', '/Ox', '/MD', '/W3', '/GX' ,
+                                     '/DNDEBUG']
+            self.compile_options_debug = ['/nologo', '/Od', '/MDd', '/W3', '/GX',
+                                          '/Z7', '/D_DEBUG']
+        else:
+            # Win64
+            self.compile_options = [ '/nologo', '/Ox', '/MD', '/W3', '/GS-' ,
+                                     '/DNDEBUG']
+            self.compile_options_debug = ['/nologo', '/Od', '/MDd', '/W3', '/GS-',
+                                          '/Z7', '/D_DEBUG']
 
         self.ldflags_shared = ['/DLL', '/nologo', '/INCREMENTAL:NO']
         if self.__version >= 7:
@@ -256,7 +311,6 @@ class MSVCCompiler (CCompiler) :
         self.ldflags_static = [ '/nologo']
 
         self.initialized = True
-
 
     # -- Worker methods ------------------------------------------------
 
@@ -580,7 +634,7 @@ class MSVCCompiler (CCompiler) :
                         "but the expected registry settings are not present.\n"
                         "You must at least run the Visual Studio GUI once "
                         "so that these entries are created.")
-                break
+                    break
         return []
 
     def set_path_env_var(self, name):

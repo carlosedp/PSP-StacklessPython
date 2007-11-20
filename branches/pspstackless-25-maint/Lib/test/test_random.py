@@ -93,9 +93,28 @@ class TestBasicOps(unittest.TestCase):
         self.gen.sample(set(range(20)), 2)
         self.gen.sample(range(20), 2)
         self.gen.sample(xrange(20), 2)
-        self.gen.sample(dict.fromkeys('abcdefghijklmnopqrst'), 2)
         self.gen.sample(str('abcdefghijklmnopqrst'), 2)
         self.gen.sample(tuple('abcdefghijklmnopqrst'), 2)
+
+    def test_sample_on_dicts(self):
+        self.gen.sample(dict.fromkeys('abcdefghijklmnopqrst'), 2)
+
+        # SF bug #1460340 -- random.sample can raise KeyError
+        a = dict.fromkeys(range(10)+range(10,100,2)+range(100,110))
+        self.gen.sample(a, 3)
+
+        # A followup to bug #1460340:  sampling from a dict could return
+        # a subset of its keys or of its values, depending on the size of
+        # the subset requested.
+        N = 30
+        d = dict((i, complex(i, i)) for i in xrange(N))
+        for k in xrange(N+1):
+            samp = self.gen.sample(d, k)
+            # Verify that we got ints back (keys); the values are complex.
+            for x in samp:
+                self.assert_(type(x) is int)
+        samp.sort()
+        self.assertEqual(samp, range(N))
 
     def test_gauss(self):
         # Ensure that the seed() method initializes all the hidden state.  In
@@ -420,6 +439,14 @@ class MersenneTwister_TestBasicOps(TestBasicOps):
             self.assertEqual(k, numbits)        # note the stronger assertion
             self.assert_(2**k > n > 2**(k-1))   # note the stronger assertion
 
+    def test_randrange_bug_1590891(self):
+        start = 1000000000000
+        stop = -100000000000000000000
+        step = -200
+        x = self.gen.randrange(start, stop, step)
+        self.assert_(stop < x <= start)
+        self.assertEqual((x+stop)%step, 0)
+
 _gammacoeff = (0.9999999999995183, 676.5203681218835, -1259.139216722289,
               771.3234287757674,  -176.6150291498386, 12.50734324009056,
               -0.1385710331296526, 0.9934937113930748e-05, 0.1659470187408462e-06)
@@ -488,6 +515,14 @@ class TestModule(unittest.TestCase):
     def test__all__(self):
         # tests validity but not completeness of the __all__ list
         self.failUnless(set(random.__all__) <= set(dir(random)))
+
+    def test_random_subclass_with_kwargs(self):
+        # SF bug #1486663 -- this used to erroneously raise a TypeError
+        class Subclass(random.Random):
+            def __init__(self, newarg=None):
+                random.Random.__init__(self)
+        Subclass(newarg=1)
+
 
 def test_main(verbose=None):
     testclasses =    [WichmannHill_TestBasicOps,

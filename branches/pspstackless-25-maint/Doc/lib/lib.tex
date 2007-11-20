@@ -12,7 +12,7 @@
                                 % .idx file
 \makemodindex                   % ... and the module index as well.
 
-
+ 
 \begin{document}
 
 \maketitle
@@ -66,189 +66,81 @@ and how to embed it in other applications.
 
 \input{libintro}                % Introduction
 
-\input{libobjs}                 % Built-in Types, Exceptions and Functions
+
+% =============
+% BUILT-INs
+% =============
+
+\input{libobjs}                 % Built-in Exceptions and Functions
 \input{libfuncs}
-\input{libstdtypes}
 \input{libexcs}
 \input{libconsts}
 
-\input{libpython}               % Python Runtime Services
-\input{libsys}
-\input{libgc}
-\input{libweakref}
-\input{libfpectl}
-\input{libatexit}
-\input{libtypes}
-\input{libuserdict}
-\input{liboperator}
-\input{libinspect}
-\input{libtraceback}
-\input{liblinecache}
-\input{libpickle}
-\input{libcopyreg}              % really copy_reg
-\input{libshelve}
-\input{libcopy}
-\input{libmarshal}
-\input{libwarnings}
-\input{libimp}
-\input{libzipimport}
-\input{libpkgutil}
-\input{libmodulefinder}
-\input{libcode}
-\input{libcodeop}
-\input{libpprint}
-\input{librepr}
-\input{libnew}
-\input{libsite}
-\input{libuser}
-\input{libbltin}                % really __builtin__
-\input{libmain}                 % really __main__
-\input{libfuture}               % really __future__
+\input{libstdtypes}             % Built-in types
 
+
+% =============
+% BASIC/GENERAL-PURPOSE OBJECTS
+% =============
+
+% Strings
 \input{libstrings}              % String Services
 \input{libstring}
 \input{libre}
-\input{libstruct}
+\input{libstruct}   % XXX also/better in File Formats?
 \input{libdifflib}
-\input{libfpformat}
 \input{libstringio}
 \input{libtextwrap}
 \input{libcodecs}
 \input{libunicodedata}
 \input{libstringprep}
+\input{libfpformat}
 
-\input{libmisc}                 % Miscellaneous Services
-\input{libpydoc}
-\input{libdoctest}
-\input{libunittest}
-\input{libtest}
-\input{libdecimal}
-\input{libmath}
-\input{libcmath}
-\input{librandom}
-\input{libwhrandom}
-\input{libbisect}
+
+\input{datatypes}		% Data types and structures
+\input{libdatetime}
+\input{libcalendar}
 \input{libcollections}
 \input{libheapq}
+\input{libbisect}
 \input{libarray}
 \input{libsets}
-\input{libitertools}
-\input{libcfgparser}
-\input{libfileinput}
-\input{libcalendar}
-\input{libcmd}
-\input{libshlex}
-
-\input{liballos}                % Generic Operating System Services
-\input{libos}
-\input{libposixpath}            % os.path
-\input{libdircache}
-\input{libstat}
-\input{libstatcache}
-\input{libstatvfs}
-\input{libfilecmp}
-\input{libsubprocess}
-\input{libpopen2}
-\input{libdatetime}
-\input{libtime}
 \input{libsched}
 \input{libmutex}
-\input{libgetpass}
-\input{libcurses}
-\input{libascii}                % curses.ascii
-\input{libcursespanel}
-\input{libgetopt}
-\input{liboptparse}
-\input{libtempfile}
-\input{liberrno}
-\input{libglob}
-\input{libfnmatch}
-\input{libshutil}
-\input{liblocale}
-\input{libgettext}
-\input{liblogging}
-\input{libplatform}
-
-\input{libsomeos}               % Optional Operating System Services
-\input{libsignal}
-\input{libsocket}
-\input{libselect}
-\input{libthread}
-\input{libthreading}
-\input{libdummythread}
-\input{libdummythreading}
 \input{libqueue}
-\input{libmmap}
-\input{libanydbm}
-\input{libdbhash}
-\input{libwhichdb}
-\input{libbsddb}
-\input{libdumbdbm}
-\input{libzlib}
-\input{libgzip}
-\input{libbz2}
-\input{libzipfile}
-\input{libtarfile}
-\input{libreadline}
-\input{librlcompleter}
+\input{libweakref}
+\input{libuserdict}
 
-\input{libunix}                 % UNIX Specific Services
-\input{libposix}
-\input{libpwd}
-\input{libgrp}
-\input{libcrypt}
-\input{libdl}
-\input{libdbm}
-\input{libgdbm}
-\input{libtermios}
-\input{libtty}
-\input{libpty}
-\input{libfcntl}
-\input{libpipes}
-\input{libposixfile}
-\input{libresource}
-\input{libnis}
-\input{libsyslog}
-\input{libcommands}
+% General object services
+% XXX intro
+\input{libtypes}
+\input{libnew}
+\input{libcopy}
+\input{libpprint}
+\input{librepr}
 
-\input{libpdb}                  % The Python Debugger
 
-\input{libprofile}              % The Python Profiler
-\input{libhotshot}              % New profiler
-\input{libtimeit}
+\input{numeric}			% Numeric/Mathematical modules
+\input{libmath}
+\input{libcmath}
+\input{libdecimal}
+\input{librandom}
 
-\input{internet}                % Internet Protocols
-\input{libwebbrowser}
-\input{libcgi}
-\input{libcgitb}
-\input{liburllib}
-\input{liburllib2}
-\input{libhttplib}
-\input{libftplib}
-\input{libgopherlib}
-\input{libpoplib}
-\input{libimaplib}
-\input{libnntplib}
-\input{libsmtplib}
-\input{libsmtpd}
-\input{libtelnetlib}
-\input{liburlparse}
-\input{libsocksvr}
-\input{libbasehttp}
-\input{libsimplehttp}
-\input{libcgihttp}
-\input{libcookielib}
-\input{libcookie}
-\input{libxmlrpclib}
-\input{libsimplexmlrpc}
-\input{libdocxmlrpc}
-\input{libasyncore}
-\input{libasynchat}
+% Functions, Functional, Generators and Iterators
+% XXX intro functional
+\input{libitertools}
+\input{libfunctools}
+\input{liboperator}       % from runtime - better with itertools and functools
 
-\input{netdata}                 % Internet Data Handling
-\input{libformatter}
+
+% =============
+% DATA FORMATS
+% =============
+
+% Big move - include all the markup and internet formats here
 
 % MIME & email stuff
+\input{netdata}                 % Internet Data Handling
 \input{email}
 \input{libmailcap}
 \input{libmailbox}
@@ -262,16 +154,10 @@ and how to embed it in other applications.
 
 % encoding stuff
 \input{libbase64}
-\input{libbinascii}
 \input{libbinhex}
+\input{libbinascii}
 \input{libquopri}
 \input{libuu}
-\input{libxdrlib}
-
-% file formats
-\input{libnetrc}
-\input{librobotparser}
-\input{libcsv}
 
 \input{markup}                  % Structured Markup Processing Tools
 \input{libhtmlparser}
@@ -285,7 +171,154 @@ and how to embed it in other applications.
 \input{xmlsaxhandler}
 \input{xmlsaxutils}
 \input{xmlsaxreader}
-\input{libxmllib}
+\input{libetree}
+% \input{libxmllib}
+
+\input{fileformats}		% Miscellaneous file formats
+\input{libcsv}
+\input{libcfgparser}
+\input{librobotparser}
+\input{libnetrc}
+\input{libxdrlib}
+
+\input{libcrypto}               % Cryptographic Services
+\input{libhashlib}
+\input{libhmac}
+\input{libmd5}
+\input{libsha}
+
+% =============
+% FILE & DATABASE STORAGE
+% =============
+
+\input{filesys}			% File/directory support
+\input{libposixpath}            % os.path
+\input{libfileinput}
+\input{libstat}
+\input{libstatvfs}
+\input{libfilecmp}
+\input{libtempfile}
+\input{libglob}
+\input{libfnmatch}
+\input{liblinecache}
+\input{libshutil}
+\input{libdircache}
+
+
+\input{archiving}		% Data compression and archiving
+\input{libzlib}
+\input{libgzip}
+\input{libbz2}
+\input{libzipfile}
+\input{libtarfile}
+
+
+\input{persistence}		% Persistent storage
+\input{libpickle}
+\input{libcopyreg}              % really copy_reg % from runtime...
+\input{libshelve}
+\input{libmarshal}
+\input{libanydbm}
+\input{libwhichdb}
+\input{libdbm}
+\input{libgdbm}
+\input{libdbhash}
+\input{libbsddb}
+\input{libdumbdbm}
+\input{libsqlite3}
+
+
+% =============
+% OS
+% =============
+
+
+\input{liballos}                % Generic Operating System Services
+\input{libos}
+\input{libtime}
+\input{liboptparse}
+\input{libgetopt}
+\input{liblogging}
+\input{libgetpass}
+\input{libcurses}
+\input{libascii}                % curses.ascii
+\input{libcursespanel}
+\input{libplatform}
+\input{liberrno}
+\input{libctypes}
+
+\input{libsomeos}               % Optional Operating System Services
+\input{libselect}
+\input{libthread}
+\input{libthreading}
+\input{libdummythread}
+\input{libdummythreading}
+\input{libmmap}
+\input{libreadline}
+\input{librlcompleter}
+
+\input{libunix}                 % UNIX Specific Services
+\input{libposix}
+\input{libpwd}
+\input{libspwd}
+\input{libgrp}
+\input{libcrypt}
+\input{libdl}
+\input{libtermios}
+\input{libtty}
+\input{libpty}
+\input{libfcntl}
+\input{libpipes}
+\input{libposixfile}
+\input{libresource}
+\input{libnis}
+\input{libsyslog}
+\input{libcommands}
+
+
+% =============
+% NETWORK & COMMUNICATIONS
+% =============
+
+\input{ipc}                     % Interprocess communication/networking
+\input{libsubprocess}
+\input{libsocket}
+\input{libsignal}
+\input{libpopen2}
+\input{libasyncore}
+\input{libasynchat}
+
+\input{internet}                % Internet Protocols
+\input{libwebbrowser}
+\input{libcgi}
+\input{libcgitb}
+\input{libwsgiref}
+\input{liburllib}
+\input{liburllib2}
+\input{libhttplib}
+\input{libftplib}
+\input{libgopherlib}
+\input{libpoplib}
+\input{libimaplib}
+\input{libnntplib}
+\input{libsmtplib}
+\input{libsmtpd}
+\input{libtelnetlib}
+\input{libuuid}
+\input{liburlparse}
+\input{libsocksvr}
+\input{libbasehttp}
+\input{libsimplehttp}
+\input{libcgihttp}
+\input{libcookielib}
+\input{libcookie}
+\input{libxmlrpclib}
+\input{libsimplexmlrpc}
+\input{libdocxmlrpc}
+
+% =============
+% MULTIMEDIA
+% =============
 
 \input{libmm}                   % Multimedia Services
 \input{libaudioop}
@@ -300,16 +333,79 @@ and how to embed it in other applications.
 \input{libsndhdr}
 \input{libossaudiodev}
 
-\input{libcrypto}               % Cryptographic Services
-\input{libhmac}
-\input{libmd5}
-\input{libsha}
-
+% Tkinter is a chapter in its own right.
 \input{tkinter}
 
+%                                % Internationalization
+\input{i18n}
+\input{libgettext}
+\input{liblocale}
+
+% =============
+% PROGRAM FRAMEWORKS
+% =============
+\input{frameworks}
+\input{libcmd}
+\input{libshlex}
+
+
+% =============
+% DEVELOPMENT TOOLS
+% =============
+%                                % Software development support
+\input{development}
+\input{libpydoc}
+\input{libdoctest}
+\input{libunittest}
+\input{libtest}
+
+\input{libpdb}                  % The Python Debugger
+
+\input{libprofile}              % The Python Profiler
+\input{libhotshot}              % unmaintained C profiler
+\input{libtimeit}
+\input{libtrace}
+
+% =============
+% PYTHON ENGINE
+% =============
+
+% Runtime services
+\input{libpython}               % Python Runtime Services
+\input{libsys}
+\input{libbltin}                % really __builtin__
+\input{libmain}                 % really __main__
+\input{libwarnings}
+\input{libcontextlib}
+\input{libatexit}
+\input{libtraceback}
+\input{libfuture}               % really __future__
+\input{libgc}
+\input{libinspect}
+\input{libsite}
+\input{libuser}
+\input{libfpectl}
+
+
+\input{custominterp}		% Custom interpreter
+\input{libcode}
+\input{libcodeop}
 \input{librestricted}           % Restricted Execution
 \input{librexec}
 \input{libbastion}
+
+
+\input{modules}			% Importing Modules
+\input{libimp}
+\input{libzipimport}
+\input{libpkgutil}
+\input{libmodulefinder}
+\input{librunpy}
+
+
+% =============
+% PYTHON LANGUAGE & COMPILER
+% =============
 
 \input{language}                % Python Language Services
 \input{libparser}
@@ -326,6 +422,14 @@ and how to embed it in other applications.
 \input{distutils}
 
 \input{compiler}                % compiler package
+\input{libast}
+
+\input{libmisc}                 % Miscellaneous Services
+\input{libformatter}
+
+% =============
+% OTHER PLATFORM-SPECIFIC STUFF
+% =============
 
 %\input{libamoeba}              % AMOEBA ONLY
 
@@ -345,6 +449,7 @@ and how to embed it in other applications.
 \input{libsunaudio}
 
 \input{windows}                 % MS Windows ONLY
+\input{libmsilib}
 \input{libmsvcrt}
 \input{libwinreg}
 \input{libwinsound}
@@ -356,9 +461,6 @@ and how to embed it in other applications.
 %\input{libcmpcache}
 %\input{libcmp}
 %\input{libni}
-%\input{librand}
-%\input{libregex}
-%\input{libregsub}
 
 \chapter{Reporting Bugs}
 \input{reportingbugs}

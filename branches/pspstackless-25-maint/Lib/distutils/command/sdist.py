@@ -4,7 +4,7 @@ Implements the Distutils 'sdist' command (create a source distribution)."""
 
 # This module should be kept compatible with Python 2.1.
 
-__revision__ = "$Id: sdist.py 37828 2004-11-10 22:23:15Z loewis $"
+__revision__ = "$Id: sdist.py 38697 2005-03-23 18:54:36Z loewis $"
 
 import sys, os, string
 from types import *
@@ -449,6 +449,7 @@ class sdist (Command):
         for fmt in self.formats:
             file = self.make_archive(base_name, fmt, base_dir=base_dir)
             archive_files.append(file)
+            self.distribution.dist_files.append(('sdist', '', file))
 
         self.archive_files = archive_files
 

@@ -188,7 +188,7 @@ complex_subtype_from_c_complex(PyTypeObject *type, Py_complex cval)
 {
 	PyObject *op;
 
-	op = PyType_GenericAlloc(type, 0);
+	op = type->tp_alloc(type, 0);
 	if (op != NULL)
 		((PyComplexObject *)op)->cval = cval;
 	return op;
@@ -274,16 +274,16 @@ complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int precision)
 {
 	char format[32];
 	if (v->cval.real == 0.) {
-		PyOS_snprintf(format, 32, "%%.%ig", precision);
-		PyOS_ascii_formatd(buf, bufsz, format, v->cval.imag);
-		strncat(buf, "j", bufsz);
+		PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
+		PyOS_ascii_formatd(buf, bufsz - 1, format, v->cval.imag);
+		strncat(buf, "j", 1);
 	} else {
 		char re[64], im[64];
 		/* Format imaginary part with sign, real part without */
-		PyOS_snprintf(format, 32, "%%.%ig", precision);
-		PyOS_ascii_formatd(re, 64, format, v->cval.real);
-		PyOS_snprintf(format, 32, "%%+.%ig", precision);
-		PyOS_ascii_formatd(im, 64, format, v->cval.imag);
+		PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
+		PyOS_ascii_formatd(re, sizeof(re), format, v->cval.real);
+		PyOS_snprintf(format, sizeof(format), "%%+.%ig", precision);
+		PyOS_ascii_formatd(im, sizeof(im), format, v->cval.imag);
 		PyOS_snprintf(buf, bufsz, "(%s%sj)", re, im);
 	}
 }
@@ -481,7 +481,7 @@ complex_pow(PyComplexObject *v, PyObject *w, PyComplexObject *z)
 	}
 	else if (errno == ERANGE) {
 		PyErr_SetString(PyExc_OverflowError,
-				"complex exponentiaion");
+				"complex exponentiation");
 		return NULL;
 	}
 	return PyComplex_FromCComplex(p);
@@ -680,7 +680,7 @@ complex_subtype_from_string(PyTypeObject *type, PyObject *v)
 #ifdef Py_USING_UNICODE
 	char s_buffer[256];
 #endif
-	int len;
+	Py_ssize_t len;
 
 	if (PyString_Check(v)) {
 		s = PyString_AS_STRING(v);
@@ -688,7 +688,7 @@ complex_subtype_from_string(PyTypeObject *type, PyObject *v)
 	}
 #ifdef Py_USING_UNICODE
 	else if (PyUnicode_Check(v)) {
-		if (PyUnicode_GET_SIZE(v) >= sizeof(s_buffer)) {
+		if (PyUnicode_GET_SIZE(v) >= (Py_ssize_t)sizeof(s_buffer)) {
 			PyErr_SetString(PyExc_ValueError,
 				 "complex() literal too large to convert");
 			return NULL;
@@ -699,7 +699,7 @@ complex_subtype_from_string(PyTypeObject *type, PyObject *v)
 					    NULL))
 			return NULL;
 		s = s_buffer;
-		len = (int)strlen(s);
+		len = strlen(s);
 	}
 #endif
 	else if (PyObject_AsCharBuffer(v, &s, &len)) {
@@ -962,10 +962,10 @@ static PyNumberMethods complex_as_number = {
 	0,					/* nb_and */
 	0,					/* nb_xor */
 	0,					/* nb_or */
-	(coercion)complex_coerce,		/* nb_coerce */
-	(unaryfunc)complex_int,			/* nb_int */
-	(unaryfunc)complex_long,		/* nb_long */
-	(unaryfunc)complex_float,		/* nb_float */
+	complex_coerce,				/* nb_coerce */
+	complex_int,				/* nb_int */
+	complex_long,				/* nb_long */
+	complex_float,				/* nb_float */
 	0,					/* nb_oct */
 	0,					/* nb_hex */
 	0,					/* nb_inplace_add */
@@ -991,7 +991,7 @@ PyTypeObject PyComplex_Type = {
 	"complex",
 	sizeof(PyComplexObject),
 	0,
-	(destructor)complex_dealloc,		/* tp_dealloc */
+	complex_dealloc,			/* tp_dealloc */
 	(printfunc)complex_print,		/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
@@ -1023,7 +1023,7 @@ PyTypeObject PyComplex_Type = {
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
 	0,					/* tp_init */
-	0,					/* tp_alloc */
+	PyType_GenericAlloc,			/* tp_alloc */
 	complex_new,				/* tp_new */
 	PyObject_Del,           		/* tp_free */
 };

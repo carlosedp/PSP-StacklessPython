@@ -197,10 +197,20 @@ class StrptimeTests(unittest.TestCase):
         """Create testing time tuple."""
         self.time_tuple = time.gmtime()
 
-    def test_TypeError(self):
-        # Make sure ValueError is raised when match fails
+    def test_ValueError(self):
+        # Make sure ValueError is raised when match fails or format is bad
         self.assertRaises(ValueError, _strptime.strptime, data_string="%d",
                           format="%A")
+        for bad_format in ("%", "% ", "%e"):
+            try:
+                _strptime.strptime("2005", bad_format)
+            except ValueError:
+                continue
+            except Exception, err:
+                self.fail("'%s' raised %s, not ValueError" %
+                            (bad_format, err.__class__.__name__))
+            else:
+                self.fail("'%s' did not raise ValueError" % bad_format)
 
     def test_unconverteddata(self):
         # Check ValueError is raised when there is unconverted data
@@ -453,6 +463,10 @@ class CalculationTests(unittest.TestCase):
                                         "of the year")
         test_helper((1917, 12, 31), "Dec 31 on Monday with year starting and "
                                         "ending on Monday")
+        test_helper((2007, 01, 07), "First Sunday of 2007")
+        test_helper((2007, 01, 14), "Second Sunday of 2007")
+        test_helper((2006, 12, 31), "Last Sunday of 2006")
+        test_helper((2006, 12, 24), "Second to last Sunday of 2006")
 
 
 class CacheTests(unittest.TestCase):

@@ -144,14 +144,10 @@ If \var{protocol} is specified as a negative value
 or \constant{HIGHEST_PROTOCOL},
 the highest protocol version available will be used.
 
-\versionchanged[The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
+\versionchanged[Introduced the \var{protocol} parameter]{2.3}
 
 A binary format, which is slightly more efficient, can be chosen by
-specifying a true value for the \var{bin} argument to the
-\class{Pickler} constructor or the \function{dump()} and \function{dumps()}
-functions.  A \var{protocol} version >= 1 implies use of a binary format.
+specifying a \var{protocol} version >= 1.
 
 \subsection{Usage}
 
@@ -179,24 +175,17 @@ as a \var{protocol} value.
 The \module{pickle} module provides the
 following functions to make the pickling process more convenient:
 
-\begin{funcdesc}{dump}{obj, file\optional{, protocol\optional{, bin}}}
+\begin{funcdesc}{dump}{obj, file\optional{, protocol}}
 Write a pickled representation of \var{obj} to the open file object
 \var{file}.  This is equivalent to
-\code{Pickler(\var{file}, \var{protocol}, \var{bin}).dump(\var{obj})}.
+\code{Pickler(\var{file}, \var{protocol}).dump(\var{obj})}.
 
 If the \var{protocol} parameter is omitted, protocol 0 is used.
 If \var{protocol} is specified as a negative value
 or \constant{HIGHEST_PROTOCOL},
 the highest protocol version will be used.
 
-\versionchanged[The \var{protocol} parameter was added.
-The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
-
-If the optional \var{bin} argument is true, the binary pickle format
-is used; otherwise the (less efficient) text pickle format is used
-(for backwards compatibility, this is the default).
+\versionchanged[Introduced the \var{protocol} parameter]{2.3}
 
 \var{file} must have a \method{write()} method that accepts a single
 string argument.  It can thus be a file object opened for writing, a
@@ -220,7 +209,7 @@ This function automatically determines whether the data stream was
 written in binary mode or not.
 \end{funcdesc}
 
-\begin{funcdesc}{dumps}{obj\optional{, protocol\optional{, bin}}}
+\begin{funcdesc}{dumps}{obj\optional{, protocol}}
 Return the pickled representation of the object as a string, instead
 of writing it to a file.
 
@@ -229,14 +218,8 @@ If \var{protocol} is specified as a negative value
 or \constant{HIGHEST_PROTOCOL},
 the highest protocol version will be used.
 
-\versionchanged[The \var{protocol} parameter was added.
-The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
+\versionchanged[The \var{protocol} parameter was added]{2.3}
 
-If the optional \var{bin} argument is
-true, the binary pickle format is used; otherwise the (less efficient)
-text pickle format is used (this is the default).
 \end{funcdesc}
 
 \begin{funcdesc}{loads}{string}
@@ -271,7 +254,7 @@ subclassed.  One common reason to subclass is to control what
 objects can actually be unpickled.  See section~\ref{pickle-sub} for
 more details.}, \class{Pickler} and \class{Unpickler}:
 
-\begin{classdesc}{Pickler}{file\optional{, protocol\optional{, bin}}}
+\begin{classdesc}{Pickler}{file\optional{, protocol}}
 This takes a file-like object to which it will write a pickle data
 stream.  
 
@@ -279,13 +262,7 @@ If the \var{protocol} parameter is omitted, protocol 0 is used.
 If \var{protocol} is specified as a negative value,
 the highest protocol version will be used.
 
-\versionchanged[The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
-
-Optional \var{bin} if true, tells the pickler to use the more
-efficient binary pickle format, otherwise the \ASCII{} format is used
-(this is the default).
+\versionchanged[Introduced the \var{protocol} parameter]{2.3}
 
 \var{file} must have a \method{write()} method that accepts a single
 string argument.  It can thus be an open file object, a
@@ -298,7 +275,7 @@ object that meets this interface.
 \begin{methoddesc}[Pickler]{dump}{obj}
 Write a pickled representation of \var{obj} to the open file object
 given in the constructor.  Either the binary or \ASCII{} format will
-be used, depending on the value of the \var{bin} flag passed to the
+be used, depending on the value of the \var{protocol} argument passed to the
 constructor.
 \end{methoddesc}
 
@@ -464,7 +441,7 @@ method is normally \emph{not} invoked.  If it is desirable that the
 \method{__init__()} method be called on unpickling, an old-style class
 can define a method \method{__getinitargs__()}, which should return a
 \emph{tuple} containing the arguments to be passed to the class
-constructor (i.e. \method{__init__()}).  The
+constructor (\method{__init__()} for example).  The
 \method{__getinitargs__()} method is called at
 pickle time; the tuple it returns is incorporated in the pickle for
 the instance.
@@ -542,7 +519,7 @@ as their value.  The semantics of each element are:
 version of the object.  The next element of the tuple will provide
 arguments for this callable, and later elements provide additional
 state information that will subsequently be used to fully reconstruct
-the pickled date.
+the pickled data.
 
 In the unpickling environment this object must be either a class, a
 callable registered as a ``safe constructor'' (see below), or it must
@@ -551,12 +528,8 @@ Otherwise, an \exception{UnpicklingError} will be raised in the
 unpickling environment.  Note that as usual, the callable itself is
 pickled by name.
 
-\item A tuple of arguments for the callable object, or \code{None}.
-\deprecated{2.3}{If this item is \code{None}, then instead of calling
-the callable directly, its \method{__basicnew__()} method is called
-without arguments; this method should also return the unpickled
-object.  Providing \code{None} is deprecated, however; return a
-tuple of arguments instead.}
+\item A tuple of arguments for the callable object.
+\versionchanged[Formerly, this argument could also be \code{None}]{2.5}
 
 \item Optionally, the object's state, which will be passed to
       the object's \method{__setstate__()} method as described in
@@ -752,7 +725,50 @@ source of the strings your application unpickles.
 
 \subsection{Example \label{pickle-example}}
 
-Here's a simple example of how to modify pickling behavior for a
+For the simplest code, use the \function{dump()} and \function{load()}
+functions.  Note that a self-referencing list is pickled and restored
+correctly.
+
+\begin{verbatim}
+import pickle
+
+data1 = {'a': [1, 2.0, 3, 4+6j],
+         'b': ('string', u'Unicode string'),
+         'c': None}
+
+selfref_list = [1, 2, 3]
+selfref_list.append(selfref_list)
+
+output = open('data.pkl', 'wb')
+
+# Pickle dictionary using protocol 0.
+pickle.dump(data1, output)
+
+# Pickle the list using the highest protocol available.
+pickle.dump(selfref_list, output, -1)
+
+output.close()
+\end{verbatim}
+
+The following example reads the resulting pickled data.  When reading
+a pickle-containing file, you should open the file in binary mode
+because you can't be sure if the ASCII or binary format was used.
+
+\begin{verbatim}
+import pprint, pickle
+
+pkl_file = open('data.pkl', 'rb')
+
+data1 = pickle.load(pkl_file)
+pprint.pprint(data1)
+
+data2 = pickle.load(pkl_file)
+pprint.pprint(data2)
+
+pkl_file.close()
+\end{verbatim}
+
+Here's a larger example that shows how to modify pickling behavior for a
 class.  The \class{TextReader} class opens a text file, and returns
 the line number and line contents each time its \method{readline()}
 method is called. If a \class{TextReader} instance is pickled, all

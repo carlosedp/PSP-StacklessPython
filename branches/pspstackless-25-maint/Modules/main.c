@@ -2,7 +2,7 @@
 
 #include "Python.h"
 #include "osdefs.h"
-#include "compile.h" /* For CO_FUTURE_DIVISION */
+#include "code.h" /* For CO_FUTURE_DIVISION */
 #include "import.h"
 
 #ifdef __VMS
@@ -10,7 +10,9 @@
 #endif
 
 #if defined(MS_WINDOWS) || defined(__CYGWIN__)
+#ifdef HAVE_FCNTL_H
 #include <fcntl.h>
+#endif
 #endif
 
 #if (defined(PYOS_OS2) && !defined(PYCC_GCC)) || defined(MS_WINDOWS)
@@ -29,12 +31,16 @@
     "Type \"help\", \"copyright\", \"credits\" or \"license\" " \
     "for more information."
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* For Py_GetArgcArgv(); set by main() */
 static char **orig_argv;
 static int  orig_argc;
 
 /* command line options */
-#define BASE_OPTS "c:dEhim:OQ:StuUvVW:xX"
+#define BASE_OPTS "c:dEhim:OQ:StuUvVW:xX?"
 
 #ifndef RISCOS
 #define PROGRAM_OPTS BASE_OPTS
@@ -56,7 +62,7 @@ Options and arguments (and corresponding environment variables):\n\
 -c cmd : program passed in as string (terminates option list)\n\
 -d     : debug output from parser (also PYTHONDEBUG=x)\n\
 -E     : ignore environment variables (such as PYTHONPATH)\n\
--h     : print this help message and exit\n\
+-h     : print this help message and exit (also --help)\n\
 -i     : inspect interactively after running script, (also PYTHONINSPECT=x)\n\
          and force prompts, even if stdin does not appear to be a terminal\n\
 ";
@@ -72,7 +78,7 @@ static char *usage_2 = "\
 static char *usage_3 = "\
          see man page for details on internal buffering relating to '-u'\n\
 -v     : verbose (trace import statements) (also PYTHONVERBOSE=x)\n\
--V     : print the Python version number and exit\n\
+-V     : print the Python version number and exit (also --version)\n\
 -W arg : warning control (arg is action:message:category:module:lineno)\n\
 -x     : skip first line of source, allowing use of non-Unix forms of #!cmd\n\
 file   : program read from script file\n\
@@ -132,27 +138,69 @@ static void RunStartupFile(PyCompilerFlags *cf)
 	}
 }
 
-/* Get the path to a top-level module */
-static struct filedescr * FindModule(const char *module,
-				     FILE **fp, char **filename)
+
+static int RunModule(char *module)
 {
-	struct filedescr *fdescr = NULL;
-	*fp = NULL;
-	*filename = malloc(MAXPATHLEN);
-
-	if (*filename == NULL)
-		return NULL;
-
-	/* Find the actual module source code */
-	fdescr = _PyImport_FindModule(module, NULL,
-					*filename, MAXPATHLEN, fp, NULL);
-
-	if (fdescr == NULL) {
-		free(*filename);
-		*filename = NULL;
+	PyObject *runpy, *runmodule, *runargs, *result;
+	runpy = PyImport_ImportModule("runpy");
+	if (runpy == NULL) {
+		fprintf(stderr, "Could not import runpy module\n");
+		return -1;
 	}
+	runmodule = PyObject_GetAttrString(runpy, "run_module");
+	if (runmodule == NULL) {
+		fprintf(stderr, "Could not access runpy.run_module\n");
+		Py_DECREF(runpy);
+		return -1;
+	}
+	runargs = Py_BuildValue("sOsO", module,
+							Py_None, "__main__", Py_True);
+	if (runargs == NULL) {
+		fprintf(stderr,
+				"Could not create arguments for runpy.run_module\n");
+		Py_DECREF(runpy);
+		Py_DECREF(runmodule);
+		return -1;
+	}
+	result = PyObject_Call(runmodule, runargs, NULL);
+	if (result == NULL) {
+		PyErr_Print();
+	}
+	Py_DECREF(runpy);
+	Py_DECREF(runmodule);
+	Py_DECREF(runargs);
+	if (result == NULL) {
+		return -1;
+	}
+	Py_DECREF(result);
+	return 0;
+}
 
-	return fdescr;
+/* Wait until threading._shutdown completes, provided
+   the threading module was imported in the first place.
+   The shutdown routine will wait until all non-daemon
+   "threading" threads have completed. */
+#include "abstract.h"
+static void
+WaitForThreadShutdown()
+{
+#ifdef WITH_THREAD
+	PyObject *result;
+	PyThreadState *tstate = PyThreadState_GET();
+	PyObject *threading = PyMapping_GetItemString(tstate->interp->modules,
+						      "threading");
+	if (threading == NULL) {
+		/* threading not imported */
+		PyErr_Clear();
+		return;
+	}
+	result = PyObject_CallMethod(threading, "_shutdown", "");
+	if (result == NULL)
+		PyErr_WriteUnraisable(threading);
+	else
+		Py_DECREF(result);
+	Py_DECREF(threading);
+#endif
 }
 
 /* Main program */
@@ -193,7 +241,7 @@ Py_Main(int argc, char **argv)
 			/* -c is the last option; following arguments
 			   that look like options are left for the
 			   command to interpret. */
-			command = malloc(strlen(_PyOS_optarg) + 2);
+			command = (char *)malloc(strlen(_PyOS_optarg) + 2);
 			if (command == NULL)
 				Py_FatalError(
 				   "not enough memory to copy -c argument");
@@ -206,7 +254,7 @@ Py_Main(int argc, char **argv)
 			/* -m is the last option; following arguments
 			   that look like options are left for the
 			   module to interpret. */
-			module = malloc(strlen(_PyOS_optarg) + 2);
+			module = (char *)malloc(strlen(_PyOS_optarg) + 2);
 			if (module == NULL)
 				Py_FatalError(
 				   "not enough memory to copy -m argument");
@@ -292,6 +340,7 @@ Py_Main(int argc, char **argv)
 			Py_UnicodeFlag++;
 			break;
 		case 'h':
+		case '?':
 			help++;
 			break;
 		case 'V':
@@ -441,28 +490,10 @@ Py_Main(int argc, char **argv)
 	}
 
 	if (module != NULL) {
-		/* Backup _PyOS_optind and find the real file */
-                struct filedescr *fdescr = NULL;
+		/* Backup _PyOS_optind and force sys.argv[0] = '-c'
+		   so that PySys_SetArgv correctly sets sys.path[0] to ''*/
 		_PyOS_optind--;
-		if ((fdescr = FindModule(module, &fp, &filename))) {
-			argv[_PyOS_optind] = filename;
-		} else {
-			fprintf(stderr, "%s: module %s not found\n",
-				argv[0], module);
-			return 2;
-		}
-		if (!fp) {
-			fprintf(stderr,
-				"%s: module %s has no associated file\n",
-				argv[0], module);
-			return 2;
-		}
-		if (!_PyImport_IsScript(fdescr)) {
-			fprintf(stderr,
-				"%s: module %s not usable as script\n  (%s)\n",
-				argv[0], module, filename);
-			return 2;
-		}
+		argv[_PyOS_optind] = "-c";
 	}
 
 	PySys_SetArgv(argc-_PyOS_optind, argv+_PyOS_optind);
@@ -481,9 +512,8 @@ Py_Main(int argc, char **argv)
 		sts = PyRun_SimpleStringFlags(command, &cf) != 0;
 		free(command);
 	} else if (module) {
-		sts = PyRun_AnyFileExFlags(fp, filename, 1, &cf) != 0;
+		sts = RunModule(module);
 		free(module);
-		free(filename);
 	}
 	else {
 		if (filename == NULL && stdin_is_interactive) {
@@ -509,6 +539,8 @@ Py_Main(int argc, char **argv)
 	    (filename != NULL || command != NULL || module != NULL))
 		/* XXX */
 		sts = PyRun_AnyFileFlags(stdin, "<stdin>", &cf) != 0;
+
+	WaitForThreadShutdown();
 
 	Py_Finalize();
 #ifdef RISCOS
@@ -545,3 +577,8 @@ Py_GetArgcArgv(int *argc, char ***argv)
 	*argc = orig_argc;
 	*argv = orig_argv;
 }
+
+#ifdef __cplusplus
+}
+#endif
+

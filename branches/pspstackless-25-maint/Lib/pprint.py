@@ -103,7 +103,8 @@ class PrettyPrinter:
             self._stream = _sys.stdout
 
     def pprint(self, object):
-        self._stream.write(self.pformat(object) + "\n")
+        self._format(object, self._stream, 0, 0, {}, 0)
+        self._stream.write("\n")
 
     def pformat(self, object):
         sio = _StringIO()
@@ -245,7 +246,7 @@ def _safe_repr(object, context, maxlevels, level):
         append = components.append
         level += 1
         saferepr = _safe_repr
-        for k, v in object.iteritems():
+        for k, v in sorted(object.items()):
             krepr, kreadable, krecur = saferepr(k, context, maxlevels, level)
             vrepr, vreadable, vrecur = saferepr(v, context, maxlevels, level)
             append("%s: %s" % (krepr, vrepr))

@@ -21,7 +21,7 @@ static void initerr(perrdetail *err_ret, const char* filename);
 node *
 PyParser_ParseString(const char *s, grammar *g, int start, perrdetail *err_ret)
 {
-	return PyParser_ParseStringFlags(s, g, start, err_ret, 0);
+	return PyParser_ParseStringFlagsFilename(s, NULL, g, start, err_ret, 0);
 }
 
 node *
@@ -42,7 +42,7 @@ PyParser_ParseStringFlagsFilename(const char *s, const char *filename,
 	initerr(err_ret, filename);
 
 	if ((tok = PyTokenizer_FromString(s)) == NULL) {
-		err_ret->error = E_NOMEM;
+		err_ret->error = PyErr_Occurred() ? E_DECODE : E_NOMEM;
 		return NULL;
 	}
 
@@ -55,7 +55,6 @@ PyParser_ParseStringFlagsFilename(const char *s, const char *filename,
 
 	return parsetok(tok, g, start, err_ret, flags);
 }
-
 
 /* Parse input coming from a file.  Return error code, print some errors. */
 
@@ -93,10 +92,19 @@ PyParser_ParseFileFlags(FILE *fp, const char *filename, grammar *g, int start,
 /* Parse input coming from the given tokenizer structure.
    Return error code. */
 
-#if 0 /* future keyword */
-static char yield_msg[] =
-"%s:%d: Warning: 'yield' will become a reserved keyword in the future\n";
-#endif
+static char with_msg[] =
+"%s:%d: Warning: 'with' will become a reserved keyword in Python 2.6\n";
+
+static char as_msg[] =
+"%s:%d: Warning: 'as' will become a reserved keyword in Python 2.6\n";
+
+static void
+warn(const char *msg, const char *filename, int lineno)
+{
+	if (filename == NULL)
+		filename = "<string>";
+	PySys_WriteStderr(msg, filename, lineno);
+}
 
 static node *
 parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
@@ -104,16 +112,17 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 {
 	parser_state *ps;
 	node *n;
-	int started = 0;
+	int started = 0, handling_import = 0, handling_with = 0;
 
 	if ((ps = PyParser_New(g, start)) == NULL) {
 		fprintf(stderr, "no mem for new parser\n");
 		err_ret->error = E_NOMEM;
+		PyTokenizer_Free(tok);
 		return NULL;
 	}
-#if 0 /* future keyword */
-	if (flags & PyPARSE_YIELD_IS_KEYWORD)
-		ps->p_generators = 1;
+#ifdef PY_PARSER_REQUIRES_FUTURE_KEYWORD
+	if (flags & PyPARSE_WITH_IS_KEYWORD)
+		ps->p_flags |= CO_FUTURE_WITH_STATEMENT;
 #endif
 
 	for (;;) {
@@ -121,6 +130,7 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		int type;
 		size_t len;
 		char *str;
+		int col_offset;
 
 		type = PyTokenizer_Get(tok, &a, &b);
 		if (type == ERRORTOKEN) {
@@ -129,6 +139,7 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		}
 		if (type == ENDMARKER && started) {
 			type = NEWLINE; /* Add an extra newline */
+			handling_with = handling_import = 0;
 			started = 0;
 			/* Add the right number of dedent tokens,
 			   except if a certain flag is given --
@@ -153,21 +164,40 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 			strncpy(str, a, len);
 		str[len] = '\0';
 
-#if 0 /* future keyword */
-		/* Warn about yield as NAME */
-		if (type == NAME && !ps->p_generators &&
-		    len == 5 && str[0] == 'y' && strcmp(str, "yield") == 0)
-			PySys_WriteStderr(yield_msg,
-					  err_ret->filename==NULL ?
-					  "<string>" : err_ret->filename,
-					  tok->lineno);
-#endif
+#ifdef PY_PARSER_REQUIRES_FUTURE_KEYWORD
+		/* This is only necessary to support the "as" warning, but
+		   we don't want to warn about "as" in import statements. */
+		if (type == NAME &&
+		    len == 6 && str[0] == 'i' && strcmp(str, "import") == 0)
+			handling_import = 1;
 
+		/* Warn about with as NAME */
+		if (type == NAME &&
+		    !(ps->p_flags & CO_FUTURE_WITH_STATEMENT)) {
+		    if (len == 4 && str[0] == 'w' && strcmp(str, "with") == 0)
+			warn(with_msg, err_ret->filename, tok->lineno);
+		    else if (!(handling_import || handling_with) &&
+		             len == 2 && str[0] == 'a' &&
+			     strcmp(str, "as") == 0)
+			warn(as_msg, err_ret->filename, tok->lineno);
+		}
+		else if (type == NAME &&
+			 (ps->p_flags & CO_FUTURE_WITH_STATEMENT) &&
+			 len == 4 && str[0] == 'w' && strcmp(str, "with") == 0)
+			handling_with = 1;
+#endif
+		if (a >= tok->line_start)
+			col_offset = a - tok->line_start;
+		else
+			col_offset = -1;
+			
 		if ((err_ret->error =
-		     PyParser_AddToken(ps, (int)type, str, tok->lineno,
+		     PyParser_AddToken(ps, (int)type, str, tok->lineno, col_offset,
 				       &(err_ret->expected))) != E_OK) {
-			if (err_ret->error != E_DONE)
+			if (err_ret->error != E_DONE) {
 				PyObject_FREE(str);
+				err_ret->token = type;
+			}				
 			break;
 		}
 	}
@@ -185,9 +215,11 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		if (tok->lineno <= 1 && tok->done == E_EOF)
 			err_ret->error = E_EOF;
 		err_ret->lineno = tok->lineno;
-		err_ret->offset = tok->cur - tok->buf;
 		if (tok->buf != NULL) {
-			size_t len = tok->inp - tok->buf;
+			size_t len;
+			assert(tok->cur - tok->buf < INT_MAX);
+			err_ret->offset = (int)(tok->cur - tok->buf);
+			len = tok->inp - tok->buf;
 			err_ret->text = (char *) PyObject_MALLOC(len + 1);
 			if (err_ret->text != NULL) {
 				if (len > 0)
@@ -197,6 +229,11 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		}
 	} else if (tok->encoding != NULL) {
 		node* r = PyNode_New(encoding_decl);
+		if (!r) {
+			err_ret->error = E_NOMEM;
+			n = NULL;
+			goto done;
+		}
 		r->n_str = tok->encoding;
 		r->n_nchildren = 1;
 		r->n_child = n;
@@ -204,13 +241,14 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		n = r;
 	}
 
+done:
 	PyTokenizer_Free(tok);
 
 	return n;
 }
 
 static void
-initerr(perrdetail *err_ret, const char* filename)
+initerr(perrdetail *err_ret, const char *filename)
 {
 	err_ret->error = E_OK;
 	err_ret->filename = filename;

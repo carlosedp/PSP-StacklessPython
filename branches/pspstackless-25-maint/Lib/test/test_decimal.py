@@ -23,13 +23,15 @@ or Behaviour) to test each part, or without parameter to test both parts. If
 you're working through IDLE, you can import this test module and call test_main()
 with the corresponding argument.
 """
+from __future__ import with_statement
 
 import unittest
 import glob
 import os, sys
 import pickle, copy
 from decimal import *
-from test.test_support import TestSkipped, run_unittest, run_doctest, is_resource_enabled
+from test.test_support import (TestSkipped, run_unittest, run_doctest,
+                               is_resource_enabled)
 import random
 try:
     import threading
@@ -39,12 +41,15 @@ except ImportError:
 # Useful Test Constant
 Signals = getcontext().flags.keys()
 
-# Tests are built around these assumed context defaults
-DefaultContext.prec=9
-DefaultContext.rounding=ROUND_HALF_EVEN
-DefaultContext.traps=dict.fromkeys(Signals, 0)
-setcontext(DefaultContext)
-
+# Tests are built around these assumed context defaults.
+# test_main() restores the original context.
+def init():
+    global ORIGINAL_CONTEXT
+    ORIGINAL_CONTEXT = getcontext().copy()
+    DefaultContext.prec = 9
+    DefaultContext.rounding = ROUND_HALF_EVEN
+    DefaultContext.traps = dict.fromkeys(Signals, 0)
+    setcontext(DefaultContext)
 
 TESTDATADIR = 'decimaltestdata'
 if __name__ == '__main__':
@@ -503,16 +508,22 @@ class DecimalImplicitConstructionTest(unittest.TestCase):
         self.assertEqual(eval('Decimal(10) != E()'), 'ne 10')
 
         # insert operator methods and then exercise them
-        for sym, lop, rop in (
-                ('+', '__add__', '__radd__'),
-                ('-', '__sub__', '__rsub__'),
-                ('*', '__mul__', '__rmul__'),
-                ('/', '__div__', '__rdiv__'),
-                ('%', '__mod__', '__rmod__'),
-                ('//', '__floordiv__', '__rfloordiv__'),
-                ('**', '__pow__', '__rpow__'),
-            ):
+        oplist = [
+            ('+', '__add__', '__radd__'),
+            ('-', '__sub__', '__rsub__'),
+            ('*', '__mul__', '__rmul__'),
+            ('%', '__mod__', '__rmod__'),
+            ('//', '__floordiv__', '__rfloordiv__'),
+            ('**', '__pow__', '__rpow__')
+        ]
+        if 1/2 == 0:
+            # testing with classic division, so add __div__
+            oplist.append(('/', '__div__', '__rdiv__'))
+        else:
+            # testing with -Qnew, so add __truediv__
+            oplist.append(('/', '__truediv__', '__rtruediv__'))
 
+        for sym, lop, rop in oplist:
             setattr(E, lop, lambda self, other: 'str' + lop + str(other))
             setattr(E, rop, lambda self, other: str(other) + rop + 'str')
             self.assertEqual(eval('E()' + sym + 'Decimal(10)'),
@@ -1054,6 +1065,32 @@ class ContextAPItests(unittest.TestCase):
         self.assertNotEqual(id(c.flags), id(d.flags))
         self.assertNotEqual(id(c.traps), id(d.traps))
 
+class WithStatementTest(unittest.TestCase):
+    # Can't do these as docstrings until Python 2.6
+    # as doctest can't handle __future__ statements
+
+    def test_localcontext(self):
+        # Use a copy of the current context in the block
+        orig_ctx = getcontext()
+        with localcontext() as enter_ctx:
+            set_ctx = getcontext()
+        final_ctx = getcontext()
+        self.assert_(orig_ctx is final_ctx, 'did not restore context correctly')
+        self.assert_(orig_ctx is not set_ctx, 'did not copy the context')
+        self.assert_(set_ctx is enter_ctx, '__enter__ returned wrong context')
+
+    def test_localcontextarg(self):
+        # Use a copy of the supplied context in the block
+        orig_ctx = getcontext()
+        new_ctx = Context(prec=42)
+        with localcontext(new_ctx) as enter_ctx:
+            set_ctx = getcontext()
+        final_ctx = getcontext()
+        self.assert_(orig_ctx is final_ctx, 'did not restore context correctly')
+        self.assert_(set_ctx.prec == new_ctx.prec, 'did not set correct context')
+        self.assert_(new_ctx is not set_ctx, 'did not copy the context')
+        self.assert_(set_ctx is enter_ctx, '__enter__ returned wrong context')
+
 def test_main(arith=False, verbose=None):
     """ Execute the tests.
 
@@ -1061,6 +1098,7 @@ def test_main(arith=False, verbose=None):
     is enabled in regrtest.py
     """
 
+    init()
     global TEST_ALL
     TEST_ALL = arith or is_resource_enabled('decimal')
 
@@ -1073,12 +1111,15 @@ def test_main(arith=False, verbose=None):
         DecimalPythonAPItests,
         ContextAPItests,
         DecimalTest,
+        WithStatementTest,
     ]
 
-    run_unittest(*test_classes)
-    import decimal as DecimalModule
-    run_doctest(DecimalModule, verbose)
-
+    try:
+        run_unittest(*test_classes)
+        import decimal as DecimalModule
+        run_doctest(DecimalModule, verbose)
+    finally:
+        setcontext(ORIGINAL_CONTEXT)
 
 if __name__ == '__main__':
     # Calling with no arguments runs all tests.

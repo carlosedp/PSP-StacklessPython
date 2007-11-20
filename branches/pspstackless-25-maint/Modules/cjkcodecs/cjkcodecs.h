@@ -2,17 +2,20 @@
  * cjkcodecs.h: common header for cjkcodecs
  *
  * Written by Hye-Shik Chang <perky@FreeBSD.org>
- * $CJKCodecs: cjkcodecs.h,v 1.6 2004/07/18 15:22:31 perky Exp $
  */
 
 #ifndef _CJKCODECS_H_
 #define _CJKCODECS_H_
 
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "multibytecodec.h"
 
 
-#define UNIINV	Py_UNICODE_REPLACEMENT_CHARACTER
+/* a unicode "undefined" codepoint */
+#define UNIINV	0xFFFE
+
+/* internal-use DBCS codepoints which aren't used by any charsets */
 #define NOCHAR	0xFFFF
 #define MULTIC	0xFFFE
 #define DBCINV	0xFFFD
@@ -67,25 +70,25 @@ static const struct dbcs_map *mapping_list;
 	static int encoding##_encode_init(				\
 		MultibyteCodec_State *state, const void *config)
 #define ENCODER(encoding)						\
-	static int encoding##_encode(					\
+	static Py_ssize_t encoding##_encode(				\
 		MultibyteCodec_State *state, const void *config,	\
-		const Py_UNICODE **inbuf, size_t inleft,		\
-		unsigned char **outbuf, size_t outleft, int flags)
+		const Py_UNICODE **inbuf, Py_ssize_t inleft,		\
+		unsigned char **outbuf, Py_ssize_t outleft, int flags)
 #define ENCODER_RESET(encoding)						\
-	static int encoding##_encode_reset(				\
+	static Py_ssize_t encoding##_encode_reset(			\
 		MultibyteCodec_State *state, const void *config,	\
-		unsigned char **outbuf, size_t outleft)
+		unsigned char **outbuf, Py_ssize_t outleft)
 
 #define DECODER_INIT(encoding)						\
 	static int encoding##_decode_init(				\
 		MultibyteCodec_State *state, const void *config)
 #define DECODER(encoding)						\
-	static int encoding##_decode(					\
+	static Py_ssize_t encoding##_decode(				\
 		MultibyteCodec_State *state, const void *config,	\
-		const unsigned char **inbuf, size_t inleft,		\
-		Py_UNICODE **outbuf, size_t outleft)
+		const unsigned char **inbuf, Py_ssize_t inleft,		\
+		Py_UNICODE **outbuf, Py_ssize_t outleft)
 #define DECODER_RESET(encoding)						\
-	static int encoding##_decode_reset(				\
+	static Py_ssize_t encoding##_decode_reset(			\
 		MultibyteCodec_State *state, const void *config)
 
 #if Py_UNICODE_SIZE == 4
@@ -156,29 +159,32 @@ static const struct dbcs_map *mapping_list;
 #endif
 
 #define _TRYMAP_ENC(m, assi, val)				\
-	if ((m)->map != NULL && (val) >= (m)->bottom &&		\
+	((m)->map != NULL && (val) >= (m)->bottom &&		\
 	    (val)<= (m)->top && ((assi) = (m)->map[(val) -	\
 	    (m)->bottom]) != NOCHAR)
-#define TRYMAP_ENC(charset, assi, uni)				\
+#define TRYMAP_ENC_COND(charset, assi, uni)			\
 	_TRYMAP_ENC(&charset##_encmap[(uni) >> 8], assi, (uni) & 0xff)
+#define TRYMAP_ENC(charset, assi, uni)				\
+	if TRYMAP_ENC_COND(charset, assi, uni)
+
 #define _TRYMAP_DEC(m, assi, val)				\
-	if ((m)->map != NULL && (val) >= (m)->bottom &&		\
+	((m)->map != NULL && (val) >= (m)->bottom &&		\
 	    (val)<= (m)->top && ((assi) = (m)->map[(val) -	\
 	    (m)->bottom]) != UNIINV)
 #define TRYMAP_DEC(charset, assi, c1, c2)			\
-	_TRYMAP_DEC(&charset##_decmap[c1], assi, c2)
+	if _TRYMAP_DEC(&charset##_decmap[c1], assi, c2)
 
 #define _TRYMAP_ENC_MPLANE(m, assplane, asshi, asslo, val)	\
-	if ((m)->map != NULL && (val) >= (m)->bottom &&		\
+	((m)->map != NULL && (val) >= (m)->bottom &&		\
 	    (val)<= (m)->top &&					\
 	    ((assplane) = (m)->map[((val) - (m)->bottom)*3]) != 0 && \
 	    (((asshi) = (m)->map[((val) - (m)->bottom)*3 + 1]), 1) && \
 	    (((asslo) = (m)->map[((val) - (m)->bottom)*3 + 2]), 1))
 #define TRYMAP_ENC_MPLANE(charset, assplane, asshi, asslo, uni)	\
-	_TRYMAP_ENC_MPLANE(&charset##_encmap[(uni) >> 8], \
+	if _TRYMAP_ENC_MPLANE(&charset##_encmap[(uni) >> 8], \
 			   assplane, asshi, asslo, (uni) & 0xff)
 #define TRYMAP_DEC_MPLANE(charset, assi, plane, c1, c2)		\
-	_TRYMAP_DEC(&charset##_decmap[plane][c1], assi, c2)
+	if _TRYMAP_DEC(&charset##_decmap[plane][c1], assi, c2)
 
 #if Py_UNICODE_SIZE == 2
 #define DECODE_SURROGATE(c)					\
@@ -385,7 +391,8 @@ errorexit:
 	init_codecs_##loc(void)						\
 	{								\
 		PyObject *m = Py_InitModule("_codecs_" #loc, __methods);\
-		(void)register_maps(m);					\
+		if (m != NULL)						\
+			(void)register_maps(m);				\
 	}
 
 #endif

@@ -20,6 +20,8 @@
 
 #include "Python.h"
 
+#define SYNCSTDOUT
+
 PSP_MODULE_INFO("Python", 0x1000, 1, 1);
 PSP_MAIN_THREAD_ATTR(0);
 
@@ -186,7 +188,7 @@ int main(int argc, char *argv[])
 #ifndef WITH_OSLIB
     SceUID thid;
 #endif
-
+    tzset();
     time_t now;
 
     save_argv0 = strdup(argv[0]);

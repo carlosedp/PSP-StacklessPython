@@ -1,9 +1,7 @@
 /* This module makes GNU readline available to Python.  It has ideas
  * contributed by Lee Busby, LLNL, and William Magro, Cornell Theory
- * Center.  The completer interface was inspired by Lele Gaifax.
- *
- * More recently, it was largely rewritten by Guido van Rossum who is
- * now maintaining it.
+ * Center.  The completer interface was inspired by Lele Gaifax.  More
+ * recently, it was largely rewritten by Guido van Rossum.
  */
 
 /* Standard definitions */
@@ -20,6 +18,12 @@
  */
 #define SAVE_LOCALE
 #include <locale.h>
+#endif
+
+#ifdef SAVE_LOCALE
+#  define RESTORE_LOCALE(sl) { setlocale(LC_CTYPE, sl); free(sl); }
+#else
+#  define RESTORE_LOCALE(sl) 
 #endif
 
 /* GNU readline definitions */
@@ -725,10 +729,7 @@ setup_readline(void)
 	 */
 	rl_initialize();
 
-#ifdef SAVE_LOCALE
-	setlocale(LC_CTYPE, saved_locale); /* Restore locale */
-	free(saved_locale);
-#endif
+	RESTORE_LOCALE(saved_locale)
 }
 
 /* Wrapper around GNU readline that handles signals differently. */
@@ -767,10 +768,16 @@ readline_until_enter_or_signal(char *prompt, int *signal)
 
 		while (!has_input)
 		{	struct timeval timeout = {0, 100000}; /* 0.1 seconds */
+
+			/* [Bug #1552726] Only limit the pause if an input hook has been 
+			   defined.  */
+		 	struct timeval *timeoutp = NULL;
+			if (PyOS_InputHook) 
+				timeoutp = &timeout;
 			FD_SET(fileno(rl_instream), &selectset);
 			/* select resets selectset if no input was available */
 			has_input = select(fileno(rl_instream) + 1, &selectset,
-					   NULL, NULL, &timeout);
+					   NULL, NULL, timeoutp);
 			if(PyOS_InputHook) PyOS_InputHook();
 		}
 
@@ -866,7 +873,8 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 	p = readline_until_enter_or_signal(prompt, &signal);
 	
 	/* we got an interrupt signal */
-	if(signal) {
+	if (signal) {
+		RESTORE_LOCALE(saved_locale)
 		return NULL;
 	}
 
@@ -875,6 +883,7 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 		p = PyMem_Malloc(1);
 		if (p != NULL)
 			*p = '\0';
+		RESTORE_LOCALE(saved_locale)
 		return p;
 	}
 
@@ -907,10 +916,7 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 		p[n+1] = '\0';
 	}
 	free(q);
-#ifdef SAVE_LOCALE
-	setlocale(LC_CTYPE, saved_locale); /* Restore locale */
-	free(saved_locale);
-#endif
+	RESTORE_LOCALE(saved_locale)
 	return p;
 }
 
@@ -927,6 +933,8 @@ initreadline(void)
 
 	m = Py_InitModule4("readline", readline_methods, doc_module,
 			   (PyObject *)NULL, PYTHON_API_VERSION);
+	if (m == NULL)
+		return;
 
 	PyOS_ReadlineFunctionPointer = call_readline;
 	setup_readline();

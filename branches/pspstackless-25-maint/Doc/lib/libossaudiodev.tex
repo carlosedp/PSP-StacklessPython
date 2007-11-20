@@ -68,7 +68,7 @@ raises \exception{IOError}.  Errors detected directly by
 Open an audio device and return an OSS audio device object.  This
 object supports many file-like methods, such as \method{read()},
 \method{write()}, and \method{fileno()} (although there are subtle
-differences between conventional Unix read/write semantics and those of
+differences between conventional \UNIX{} read/write semantics and those of
 OSS audio devices).  It also supports a number of audio-specific
 methods; see below for the complete list of methods.
 
@@ -115,7 +115,7 @@ three audio parameters at once.  This is more convenient, but may not be
 as flexible in all cases.
 
 The audio device objects returned by \function{open()} define the
-following methods:
+following methods and (read-only) attributes:
 
 \begin{methoddesc}[audio device]{close}{}
 Explicitly close the audio device.  When you are done writing to or
@@ -290,13 +290,28 @@ Returns the number of samples that could be queued into the hardware
 buffer to be played without blocking.
 \end{methoddesc}
 
+Audio device objects also support several read-only attributes:
+
+\begin{memberdesc}[audio device]{closed}{}
+Boolean indicating whether the device has been closed.
+\end{memberdesc}
+
+\begin{memberdesc}[audio device]{name}{}
+String containing the name of the device file.
+\end{memberdesc}
+
+\begin{memberdesc}[audio device]{mode}{}
+The I/O mode for the file, either \code{"r"}, \code{"rw"}, or \code{"w"}.
+\end{memberdesc}
+
+
 \subsection{Mixer Device Objects \label{mixer-device-objects}}
 
 The mixer object provides two file-like methods:
 
 \begin{methoddesc}[mixer device]{close}{}
 This method closes the open mixer device file.  Any further attempts to
-use the mixer after this file is closed will raise an IOError.
+use the mixer after this file is closed will raise an \exception{IOError}.
 \end{methoddesc}
 
 \begin{methoddesc}[mixer device]{fileno}{}

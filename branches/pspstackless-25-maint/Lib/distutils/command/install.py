@@ -6,7 +6,7 @@ from distutils import log
 
 # This module should be kept compatible with Python 2.1.
 
-__revision__ = "$Id: install.py 38350 2005-01-20 19:15:39Z theller $"
+__revision__ = "$Id: install.py 43363 2006-03-27 21:55:21Z phillip.eby $"
 
 import sys, os, string
 from types import *
@@ -601,6 +601,7 @@ class install (Command):
                     ('install_headers', has_headers),
                     ('install_scripts', has_scripts),
                     ('install_data',    has_data),
+                    ('install_egg_info', lambda self:True),
                    ]
 
 # class install

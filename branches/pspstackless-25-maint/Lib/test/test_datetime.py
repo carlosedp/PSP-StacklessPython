@@ -3,6 +3,7 @@
 See http://www.zope.org/Members/fdrake/DateTimeWiki/TestCases
 """
 
+import os
 import sys
 import pickle
 import cPickle
@@ -446,9 +447,9 @@ class TestTimeDelta(HarmlessMixedComparison):
     def test_subclass_timedelta(self):
 
         class T(timedelta):
+            @staticmethod
             def from_td(td):
                 return T(td.days, td.seconds, td.microseconds)
-            from_td = staticmethod(from_td)
 
             def as_hours(self):
                 sum = (self.days * 24 +
@@ -844,6 +845,7 @@ class TestDate(HarmlessMixedComparison):
         t = self.theclass(2005, 3, 2)
         self.assertEqual(t.strftime("m:%m d:%d y:%y"), "m:03 d:02 y:05")
         self.assertEqual(t.strftime(""), "") # SF bug #761337
+        self.assertEqual(t.strftime('x'*1000), 'x'*1000) # SF bug #1556784
 
         self.assertRaises(TypeError, t.strftime) # needs an arg
         self.assertRaises(TypeError, t.strftime, "one", "two") # too many args
@@ -1400,6 +1402,12 @@ class TestDateTime(TestDate):
         got = self.theclass.utcfromtimestamp(ts)
         self.verify_field_equality(expected, got)
 
+    def test_microsecond_rounding(self):
+        # Test whether fromtimestamp "rounds up" floats that are less
+        # than one microsecond smaller than an integer.
+        self.assertEquals(self.theclass.fromtimestamp(0.9999999),
+                          self.theclass.fromtimestamp(1))
+
     def test_insane_fromtimestamp(self):
         # It's possible that some platform maps time_t to double,
         # and that this test will fail there.  This test should
@@ -1418,6 +1426,21 @@ class TestDateTime(TestDate):
             self.assertRaises(ValueError, self.theclass.utcfromtimestamp,
                               insane)
 
+    def test_negative_float_fromtimestamp(self):
+        # Windows doesn't accept negative timestamps
+        if os.name == "nt":
+            return
+        # The result is tz-dependent; at least test that this doesn't
+        # fail (like it did before bug 1646728 was fixed).
+        self.theclass.fromtimestamp(-1.05)
+
+    def test_negative_float_utcfromtimestamp(self):
+        # Windows doesn't accept negative timestamps
+        if os.name == "nt":
+            return
+        d = self.theclass.utcfromtimestamp(-1.05)
+        self.assertEquals(d, self.theclass(1969, 12, 31, 23, 59, 58, 950000))
+
     def test_utcnow(self):
         import time
 
@@ -1431,6 +1454,15 @@ class TestDateTime(TestDate):
                 break
             # Else try again a few times.
         self.failUnless(abs(from_timestamp - from_now) <= tolerance)
+
+    def test_strptime(self):
+        import time
+
+        string = '2004-12-01 13:02:47'
+        format = '%Y-%m-%d %H:%M:%S'
+        expected = self.theclass(*(time.strptime(string, format)[0:6]))
+        got = self.theclass.strptime(string, format)
+        self.assertEqual(expected, got)
 
     def test_more_timetuple(self):
         # This tests fields beyond those tested by the TestDate.test_timetuple.
@@ -1831,6 +1863,13 @@ class TestTime(HarmlessMixedComparison):
         self.assertEqual(dt2.extra, 7)
         self.assertEqual(dt1.isoformat(), dt2.isoformat())
         self.assertEqual(dt2.newmeth(-7), dt1.hour + dt1.second - 7)
+
+    def test_backdoor_resistance(self):
+        # see TestDate.test_backdoor_resistance().
+        base = '2:59.0'
+        for hour_byte in ' ', '9', chr(24), '\xff':
+            self.assertRaises(TypeError, self.theclass,
+                                         hour_byte + base[1:])
 
 # A mixin for classes with a tzinfo= argument.  Subclasses must define
 # theclass as a class atribute, and theclass(1, 1, 1, tzinfo=whatever)

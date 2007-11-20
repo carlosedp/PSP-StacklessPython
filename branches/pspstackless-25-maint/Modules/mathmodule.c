@@ -1,7 +1,7 @@
 /* Math module -- standard C math library functions, pi and e */
 
 #include "Python.h"
-#include "longintrepr.h"
+#include "longintrepr.h" /* just for SHIFT */
 
 #ifndef _MSC_VER
 #ifndef __STDC__
@@ -355,6 +355,8 @@ initmath(void)
 	PyObject *m, *d, *v;
 
 	m = Py_InitModule3("math", math_methods, module_doc);
+	if (m == NULL)
+		goto finally;
 	d = PyModule_GetDict(m);
 
         if (!(v = PyFloat_FromDouble(atan(1.0) * 4.0)))

@@ -5,12 +5,10 @@ from test.test_support import verify, verbose
 import sys
 import warnings
 
-warnings.filterwarnings("ignore", ".* 'pre' .*", DeprecationWarning,
-                        r'pre$')
-warnings.filterwarnings("ignore", ".* regsub .*", DeprecationWarning,
-                        r'^regsub$')
-warnings.filterwarnings("ignore", ".* statcache .*", DeprecationWarning,
-                        r'statcache$')
+warnings.filterwarnings("ignore",
+                        "the gopherlib module is deprecated",
+                        DeprecationWarning,
+                        "<string>")
 
 class AllTest(unittest.TestCase):
 
@@ -120,7 +118,6 @@ class AllTest(unittest.TestCase):
         self.check_all("poplib")
         self.check_all("posixpath")
         self.check_all("pprint")
-        self.check_all("pre")  # deprecated
         self.check_all("profile")
         self.check_all("pstats")
         self.check_all("pty")
@@ -129,8 +126,6 @@ class AllTest(unittest.TestCase):
         self.check_all("quopri")
         self.check_all("random")
         self.check_all("re")
-        self.check_all("reconvert")
-        self.check_all("regsub")
         self.check_all("repr")
         self.check_all("rexec")
         self.check_all("rfc822")
@@ -146,9 +141,7 @@ class AllTest(unittest.TestCase):
         self.check_all("smtplib")
         self.check_all("sndhdr")
         self.check_all("socket")
-        self.check_all("sre")
         self.check_all("_strptime")
-        self.check_all("statcache")
         self.check_all("symtable")
         self.check_all("tabnanny")
         self.check_all("tarfile")

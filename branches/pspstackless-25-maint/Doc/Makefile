@@ -122,7 +122,7 @@ EMACS=     emacs
 
 # The end of this should reflect the major/minor version numbers of
 # the release:
-WHATSNEW=whatsnew24
+WHATSNEW=whatsnew25
 
 # what's what
 MANDVIFILES=	paper-$(PAPER)/api.dvi paper-$(PAPER)/ext.dvi \
@@ -691,7 +691,7 @@ distlatex:	bziplatex ziplatex
 # The small amount of additional work is a small price to pay for not
 # having to remember which order to do it in. ;)
 paperdist:	distpdf distps pkglist
-edist:		disthtml distinfo pkglist #zipisilo 
+edist:		disthtml pkglist
 
 # The pkglist.html file is used as part of the download.html page on
 # python.org; it is not used as intermediate input here or as part of
@@ -700,7 +700,7 @@ pkglist:
 	$(TOOLSDIR)/mkpkglist >pkglist.html
 
 distfiles:	paperdist edist
-	$(TOOLSDIR)/mksourcepkg --all $(RELEASE)
+	$(TOOLSDIR)/mksourcepkg --bzip2 --zip $(RELEASE)
 	$(TOOLSDIR)/mkpkglist >pkglist.html
 
 

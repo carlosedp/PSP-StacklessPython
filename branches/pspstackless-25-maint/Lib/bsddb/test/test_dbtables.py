@@ -18,7 +18,7 @@
 #
 #   --  Gregory P. Smith <greg@electricrain.com>
 #
-# $Id: test_dbtables.py 35267 2004-02-12 17:35:32Z doerwalter $
+# $Id: test_dbtables.py 46737 2006-06-08 05:38:11Z gregory.p.smith $
 
 import sys, os, re
 try:
@@ -338,6 +338,16 @@ class TableDBTestCase(unittest.TestCase):
         self.tdb.Modify(tabname,
                         conditions={'Name': dbtables.LikeCond('%')},
                         mappings={'Access': increment_access})
+
+        try:
+            self.tdb.Modify(tabname,
+                            conditions={'Name': dbtables.LikeCond('%')},
+                            mappings={'Access': 'What is your quest?'})
+        except TypeError:
+            # success, the string value in mappings isn't callable
+            pass
+        else:
+            raise RuntimeError, "why was TypeError not raised for bad callable?"
 
         # Delete key in select conditions
         values = self.tdb.Select(

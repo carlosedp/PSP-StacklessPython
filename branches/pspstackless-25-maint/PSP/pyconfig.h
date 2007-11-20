@@ -5,7 +5,14 @@
 #ifndef Py_PYCONFIG_H
 #define Py_PYCONFIG_H
 
+/* PSP Configuration Definitions */
+typedef int ssize_t;
 #define PLATFORM "psp"
+#define HAVE_ERRNO_H
+#define HAVE_SSIZE_T 1
+#define PY_FORMAT_SIZE_T "z"
+#define SIZEOF_SIZE_T 4
+#define HAVE_SIGNAL_H
 
 /* Define for AIX if your compiler is a genuine IBM xlC/xlC_r and you want
    support for AIX C++ shared extension modules. */

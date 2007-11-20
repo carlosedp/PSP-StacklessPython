@@ -5,7 +5,7 @@ exe-program."""
 
 # This module should be kept compatible with Python 2.1.
 
-__revision__ = "$Id: bdist_wininst.py 37828 2004-11-10 22:23:15Z loewis $"
+__revision__ = "$Id: bdist_wininst.py 38697 2005-03-23 18:54:36Z loewis $"
 
 import sys, os, string
 from distutils.core import Command
@@ -162,6 +162,12 @@ class bdist_wininst (Command):
                                     root_dir=self.bdist_dir)
         # create an exe containing the zip-file
         self.create_exe(arcname, fullname, self.bitmap)
+        if self.distribution.has_ext_modules():
+            pyversion = get_python_version()
+        else:
+            pyversion = 'any'
+        self.distribution.dist_files.append(('bdist_wininst', pyversion,
+                                             self.get_installer_filename(fullname)))
         # remove the zip-file again
         log.debug("removing temporary file '%s'", arcname)
         os.remove(arcname)

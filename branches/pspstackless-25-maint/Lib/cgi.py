@@ -34,13 +34,17 @@ __version__ = "2.6"
 # Imports
 # =======
 
+from operator import attrgetter
 import sys
 import os
 import urllib
 import mimetools
 import rfc822
 import UserDict
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 __all__ = ["MiniFieldStorage", "FieldStorage", "FormContentDict",
            "SvFormContentDict", "InterpFormContentDict", "FormContent",
@@ -233,7 +237,7 @@ def parse_multipart(fp, pdict):
 
     Arguments:
     fp   : input file
-    pdict: dictionary containing other parameters of conten-type header
+    pdict: dictionary containing other parameters of content-type header
 
     Returns a dictionary just like parse_qs(): keys are the field names, each
     value is a list of values for that field.  This is easy to use but not
@@ -247,6 +251,10 @@ def parse_multipart(fp, pdict):
 
     XXX This should really be subsumed by FieldStorage altogether -- no
     point in having two implementations of the same parsing algorithm.
+    Also, FieldStorage protects itself better against certain DoS attacks
+    by limiting the size of the data read in one chunk.  The API here
+    does not support that kind of protection.  This also affects parse()
+    since it can call parse_multipart().
 
     """
     boundary = ""
@@ -328,7 +336,7 @@ def parse_header(line):
     Return the main content-type and a dictionary of options.
 
     """
-    plist = map(lambda x: x.strip(), line.split(';'))
+    plist = [x.strip() for x in line.split(';')]
     key = plist.pop(0).lower()
     pdict = {}
     for p in plist:
@@ -567,7 +575,7 @@ class FieldStorage:
         if key in self:
             value = self[key]
             if type(value) is type([]):
-                return map(lambda v: v.value, value)
+                return map(attrgetter('value'), value)
             else:
                 return value.value
         else:
@@ -589,7 +597,7 @@ class FieldStorage:
         if key in self:
             value = self[key]
             if type(value) is type([]):
-                return map(lambda v: v.value, value)
+                return map(attrgetter('value'), value)
             else:
                 return [value.value]
         else:
@@ -695,7 +703,7 @@ class FieldStorage:
     def read_lines_to_eof(self):
         """Internal: read lines until EOF."""
         while 1:
-            line = self.fp.readline()
+            line = self.fp.readline(1<<16)
             if not line:
                 self.done = -1
                 break
@@ -706,12 +714,13 @@ class FieldStorage:
         next = "--" + self.outerboundary
         last = next + "--"
         delim = ""
+        last_line_lfend = True
         while 1:
-            line = self.fp.readline()
+            line = self.fp.readline(1<<16)
             if not line:
                 self.done = -1
                 break
-            if line[:2] == "--":
+            if line[:2] == "--" and last_line_lfend:
                 strippedline = line.strip()
                 if strippedline == next:
                     break
@@ -722,11 +731,14 @@ class FieldStorage:
             if line[-2:] == "\r\n":
                 delim = "\r\n"
                 line = line[:-2]
+                last_line_lfend = True
             elif line[-1] == "\n":
                 delim = "\n"
                 line = line[:-1]
+                last_line_lfend = True
             else:
                 delim = ""
+                last_line_lfend = False
             self.__write(odelim + line)
 
     def skip_lines(self):
@@ -735,18 +747,20 @@ class FieldStorage:
             return
         next = "--" + self.outerboundary
         last = next + "--"
+        last_line_lfend = True
         while 1:
-            line = self.fp.readline()
+            line = self.fp.readline(1<<16)
             if not line:
                 self.done = -1
                 break
-            if line[:2] == "--":
+            if line[:2] == "--" and last_line_lfend:
                 strippedline = line.strip()
                 if strippedline == next:
                     break
                 if strippedline == last:
                     self.done = 1
                     break
+            last_line_lfend = line.endswith('\n')
 
     def make_file(self, binary=None):
         """Overridable: return a readable & writable file.
@@ -1035,7 +1049,9 @@ environment as well.  Here are some common variable names:
 # =========
 
 def escape(s, quote=None):
-    """Replace special characters '&', '<' and '>' by SGML entities."""
+    '''Replace special characters "&", "<" and ">" to HTML-safe sequences.
+    If the optional flag quote is true, the quotation mark character (")
+    is also translated.'''
     s = s.replace("&", "&amp;") # Must be done first!
     s = s.replace("<", "&lt;")
     s = s.replace(">", "&gt;")

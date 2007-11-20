@@ -3,7 +3,7 @@
 <intro stuff goes here>
 <other stuff, too>
 
-HTTPConnection go through a number of "states", which defines when a client
+HTTPConnection goes through a number of "states", which define when a client
 may legally make another request or fetch the response for a particular
 request. This diagram details these state transitions:
 
@@ -81,7 +81,7 @@ __all__ = ["HTTP", "HTTPResponse", "HTTPConnection", "HTTPSConnection",
            "UnknownTransferEncoding", "UnimplementedFileMode",
            "IncompleteRead", "InvalidURL", "ImproperConnectionState",
            "CannotSendRequest", "CannotSendHeader", "ResponseNotReady",
-           "BadStatusLine", "error"]
+           "BadStatusLine", "error", "responses"]
 
 HTTP_PORT = 80
 HTTPS_PORT = 443
@@ -152,6 +152,55 @@ GATEWAY_TIMEOUT = 504
 HTTP_VERSION_NOT_SUPPORTED = 505
 INSUFFICIENT_STORAGE = 507
 NOT_EXTENDED = 510
+
+# Mapping status codes to official W3C names
+responses = {
+    100: 'Continue',
+    101: 'Switching Protocols',
+
+    200: 'OK',
+    201: 'Created',
+    202: 'Accepted',
+    203: 'Non-Authoritative Information',
+    204: 'No Content',
+    205: 'Reset Content',
+    206: 'Partial Content',
+
+    300: 'Multiple Choices',
+    301: 'Moved Permanently',
+    302: 'Found',
+    303: 'See Other',
+    304: 'Not Modified',
+    305: 'Use Proxy',
+    306: '(Unused)',
+    307: 'Temporary Redirect',
+
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    402: 'Payment Required',
+    403: 'Forbidden',
+    404: 'Not Found',
+    405: 'Method Not Allowed',
+    406: 'Not Acceptable',
+    407: 'Proxy Authentication Required',
+    408: 'Request Timeout',
+    409: 'Conflict',
+    410: 'Gone',
+    411: 'Length Required',
+    412: 'Precondition Failed',
+    413: 'Request Entity Too Large',
+    414: 'Request-URI Too Long',
+    415: 'Unsupported Media Type',
+    416: 'Requested Range Not Satisfiable',
+    417: 'Expectation Failed',
+
+    500: 'Internal Server Error',
+    501: 'Not Implemented',
+    502: 'Bad Gateway',
+    503: 'Service Unavailable',
+    504: 'Gateway Timeout',
+    505: 'HTTP Version Not Supported',
+}
 
 # maximal amount of data to read at one time in _safe_read
 MAXAMOUNT = 1048576
@@ -747,11 +796,20 @@ class HTTPConnection:
                     nil, netloc, nil, nil, nil = urlsplit(url)
 
                 if netloc:
-                    self.putheader('Host', netloc.encode("idna"))
-                elif self.port == HTTP_PORT:
-                    self.putheader('Host', self.host.encode("idna"))
+                    try:
+                        netloc_enc = netloc.encode("ascii")
+                    except UnicodeEncodeError:
+                        netloc_enc = netloc.encode("idna")
+                    self.putheader('Host', netloc_enc)
                 else:
-                    self.putheader('Host', "%s:%s" % (self.host.encode("idna"), self.port))
+                    try:
+                        host_enc = self.host.encode("ascii")
+                    except UnicodeEncodeError:
+                        host_enc = self.host.encode("idna")
+                    if self.port == HTTP_PORT:
+                        self.putheader('Host', host_enc)
+                    else:
+                        self.putheader('Host', "%s:%s" % (host_enc, self.port))
 
             # note: we are assuming that clients will not attempt to set these
             #       headers since *this* library must deal with the
@@ -876,7 +934,7 @@ class HTTPConnection:
 
         return response
 
-# The next several classes are used to define FakeSocket,a socket-like
+# The next several classes are used to define FakeSocket, a socket-like
 # interface to an SSL connection.
 
 # The primary complexity comes from faking a makefile() method.  The

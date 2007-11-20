@@ -32,7 +32,9 @@ use a so-called \emph{shadow password} system.  On those unices the
 \var{pw_passwd} field only contains an asterisk (\code{'*'}) or the 
 letter \character{x} where the encrypted password is stored in a file
 \file{/etc/shadow} which is not world readable.  Whether the \var{pw_passwd}
-field contains anything useful is system-dependent.}
+field contains anything useful is system-dependent.  If available, the
+\module{spwd} module should be used where access to the encrypted password
+is required.}
 
 It defines the following items:
 
@@ -51,4 +53,5 @@ Return a list of all available password database entries, in arbitrary order.
 
 \begin{seealso}
   \seemodule{grp}{An interface to the group database, similar to this.}
+  \seemodule{spwd}{An interface to the shadow password database, similar to this.}
 \end{seealso}

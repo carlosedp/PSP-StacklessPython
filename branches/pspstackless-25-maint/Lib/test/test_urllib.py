@@ -122,6 +122,15 @@ class urlopen_HttpTests(unittest.TestCase):
         finally:
             self.unfakehttp()
 
+    def test_empty_socket(self):
+        """urlopen() raises IOError if the underlying socket does not send any
+        data. (#1680230) """
+        self.fakehttp('')
+        try:
+            self.assertRaises(IOError, urllib.urlopen, 'http://something')
+        finally:
+            self.unfakehttp()
+
 class urlretrieve_FileTests(unittest.TestCase):
     """Test urllib.urlretrieve() on local files"""
 
@@ -352,6 +361,12 @@ class QuotingTests(unittest.TestCase):
         result = urllib.quote_plus(given)
         self.assertEqual(expect, result,
                          "using quote_plus(): %s != %s" % (expect, result))
+
+    def test_quoting_plus(self):
+        self.assertEqual(urllib.quote_plus('alpha+beta gamma'),
+                         'alpha%2Bbeta+gamma')
+        self.assertEqual(urllib.quote_plus('alpha+beta gamma', '+'),
+                         'alpha+beta+gamma')
 
 class UnquotingTests(unittest.TestCase):
     """Tests for unquote() and unquote_plus()

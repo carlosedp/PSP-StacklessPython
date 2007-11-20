@@ -40,6 +40,10 @@ def read_sound_file(path):
     data = audioop.ulaw2lin(data, 2)
     return (data, rate, 16, nchannels)
 
+# version of assert that still works with -O
+def _assert(expr, message=None):
+    if not expr:
+        raise AssertionError(message or "assertion failed")
 
 def play_sound_file(data, rate, ssize, nchannels):
     try:
@@ -56,14 +60,36 @@ def play_sound_file(data, rate, ssize, nchannels):
     dsp.getptr()
     dsp.fileno()
 
+    # Make sure the read-only attributes work.
+    _assert(dsp.closed is False, "dsp.closed is not False")
+    _assert(dsp.name == "/dev/dsp")
+    _assert(dsp.mode == 'w', "bad dsp.mode: %r" % dsp.mode)
+
+    # And make sure they're really read-only.
+    for attr in ('closed', 'name', 'mode'):
+        try:
+            setattr(dsp, attr, 42)
+            raise RuntimeError("dsp.%s not read-only" % attr)
+        except TypeError:
+            pass
+
+    # Compute expected running time of sound sample (in seconds).
+    expected_time = float(len(data)) / (ssize/8) / nchannels / rate
+
     # set parameters based on .au file headers
     dsp.setparameters(AFMT_S16_NE, nchannels, rate)
+    print ("playing test sound file (expected running time: %.2f sec)"
+           % expected_time)
     t1 = time.time()
-    print "playing test sound file..."
     dsp.write(data)
     dsp.close()
     t2 = time.time()
-    print "elapsed time: %.1f sec" % (t2-t1)
+    elapsed_time = t2 - t1
+
+    percent_diff = (abs(elapsed_time - expected_time) / expected_time) * 100
+    _assert(percent_diff <= 10.0, \
+            ("elapsed time (%.2f sec) > 10%% off of expected time (%.2f sec)"
+             % (elapsed_time, expected_time)))
 
 def test_setparameters(dsp):
     # Two configurations for testing:
@@ -88,11 +114,11 @@ def test_setparameters(dsp):
     # setparameters() should be able to set this configuration in
     # either strict or non-strict mode.
     result = dsp.setparameters(fmt, channels, rate, False)
-    assert result == (fmt, channels, rate), \
-           "setparameters%r: returned %r" % (config + result)
+    _assert(result == (fmt, channels, rate),
+            "setparameters%r: returned %r" % (config, result))
     result = dsp.setparameters(fmt, channels, rate, True)
-    assert result == (fmt, channels, rate), \
-           "setparameters%r: returned %r" % (config + result)
+    _assert(result == (fmt, channels, rate),
+            "setparameters%r: returned %r" % (config, result))
 
 def test_bad_setparameters(dsp):
 
@@ -110,8 +136,8 @@ def test_bad_setparameters(dsp):
                   ]:
         (fmt, channels, rate) = config
         result = dsp.setparameters(fmt, channels, rate, False)
-        assert result != config, \
-               "setparameters: unexpectedly got requested configuration"
+        _assert(result != config,
+                "setparameters: unexpectedly got requested configuration")
 
         try:
             result = dsp.setparameters(fmt, channels, rate, True)
@@ -132,5 +158,6 @@ def test():
         #test_bad_setparameters(dsp)
     finally:
         dsp.close()
+        _assert(dsp.closed is True, "dsp.closed is not True")
 
 test()

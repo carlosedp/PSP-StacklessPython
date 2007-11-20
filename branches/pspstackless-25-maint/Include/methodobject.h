@@ -35,15 +35,15 @@ PyAPI_FUNC(int) PyCFunction_GetFlags(PyObject *);
 PyAPI_FUNC(PyObject *) PyCFunction_Call(PyObject *, PyObject *, PyObject *);
 
 struct PyMethodDef {
-    char	*ml_name;	/* The name of the built-in function/method */
+    const char	*ml_name;	/* The name of the built-in function/method */
     PyCFunction  ml_meth;	/* The C function that implements it */
     int		 ml_flags;	/* Combination of METH_xxx flags, which mostly
 				   describe the args expected by the C func */
-    char	*ml_doc;	/* The __doc__ attribute, or NULL */
+    const char	*ml_doc;	/* The __doc__ attribute, or NULL */
 };
 typedef struct PyMethodDef PyMethodDef;
 
-PyAPI_FUNC(PyObject *) Py_FindMethod(PyMethodDef[], PyObject *, char *);
+PyAPI_FUNC(PyObject *) Py_FindMethod(PyMethodDef[], PyObject *, const char *);
 
 #define PyCFunction_New(ML, SELF) PyCFunction_NewEx((ML), (SELF), NULL)
 PyAPI_FUNC(PyObject *) PyCFunction_NewEx(PyMethodDef *, PyObject *, 
@@ -70,13 +70,19 @@ PyAPI_FUNC(PyObject *) PyCFunction_NewEx(PyMethodDef *, PyObject *,
 
 #define METH_COEXIST   0x0040
 
+#ifdef STACKLESS
+#define METH_STACKLESS 0x0080
+#else
+#define METH_STACKLESS 0x0000
+#endif
+
 typedef struct PyMethodChain {
     PyMethodDef *methods;		/* Methods of this type */
     struct PyMethodChain *link;	/* NULL or base type */
 } PyMethodChain;
 
 PyAPI_FUNC(PyObject *) Py_FindMethodInChain(PyMethodChain *, PyObject *,
-                                                  char *);
+                                            const char *);
 
 typedef struct {
     PyObject_HEAD

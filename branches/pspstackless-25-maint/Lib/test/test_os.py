@@ -5,10 +5,24 @@
 import os
 import unittest
 import warnings
+import sys
 from test import test_support
 
 warnings.filterwarnings("ignore", "tempnam", RuntimeWarning, __name__)
 warnings.filterwarnings("ignore", "tmpnam", RuntimeWarning, __name__)
+
+# Tests creating TESTFN
+class FileTests(unittest.TestCase):
+    def setUp(self):
+        if os.path.exists(test_support.TESTFN):
+            os.unlink(test_support.TESTFN)
+    tearDown = setUp
+
+    def test_access(self):
+        f = os.open(test_support.TESTFN, os.O_CREAT|os.O_RDWR)
+        os.close(f)
+        self.assert_(os.access(test_support.TESTFN, os.W_OK))
+
 
 class TemporaryFileTests(unittest.TestCase):
     def setUp(self):
@@ -111,7 +125,11 @@ class StatAttributeTests(unittest.TestCase):
         for name in dir(stat):
             if name[:3] == 'ST_':
                 attr = name.lower()
-                self.assertEquals(getattr(result, attr),
+                if name.endswith("TIME"):
+                    def trunc(x): return int(x)
+                else:
+                    def trunc(x): return x
+                self.assertEquals(trunc(getattr(result, attr)),
                                   result[getattr(stat, name)])
                 self.assert_(attr in members)
 
@@ -205,6 +223,23 @@ class StatAttributeTests(unittest.TestCase):
         except TypeError:
             pass
 
+    # Restrict test to Win32, since there is no guarantee other
+    # systems support centiseconds
+    if sys.platform == 'win32':
+        def test_1565150(self):
+            t1 = 1159195039.25
+            os.utime(self.fname, (t1, t1))
+            self.assertEquals(os.stat(self.fname).st_mtime, t1)
+
+        def test_1686475(self):
+            # Verify that an open file can be stat'ed
+            try:
+                os.stat(r"c:\pagefile.sys")
+            except WindowsError, e:
+                if e == 2: # file does not exist; cannot run test
+                    return
+                self.fail("Could not stat pagefile.sys")
+
 from test import mapping_tests
 
 class EnvironTests(mapping_tests.BasicTestMappingProtocol):
@@ -221,6 +256,13 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
     def tearDown(self):
         os.environ.clear()
         os.environ.update(self.__save)
+
+    # Bug 1110478
+    def test_update2(self):
+        if os.path.exists("/bin/sh"):
+            os.environ.update(HELLO="World")
+            value = os.popen("/bin/sh -c 'echo $HELLO'").read().strip()
+            self.assertEquals(value, "World")
 
 class WalkTests(unittest.TestCase):
     """Tests for os.walk()."""
@@ -353,15 +395,43 @@ class URandomTests (unittest.TestCase):
         except NotImplementedError:
             pass
 
+class Win32ErrorTests(unittest.TestCase):
+    def test_rename(self):
+        self.assertRaises(WindowsError, os.rename, test_support.TESTFN, test_support.TESTFN+".bak")
+
+    def test_remove(self):
+        self.assertRaises(WindowsError, os.remove, test_support.TESTFN)
+
+    def test_chdir(self):
+        self.assertRaises(WindowsError, os.chdir, test_support.TESTFN)
+
+    def test_mkdir(self):
+        self.assertRaises(WindowsError, os.chdir, test_support.TESTFN)
+
+    def test_utime(self):
+        self.assertRaises(WindowsError, os.utime, test_support.TESTFN, None)
+
+    def test_access(self):
+        self.assertRaises(WindowsError, os.utime, test_support.TESTFN, 0)
+
+    def test_chmod(self):
+        self.assertRaises(WindowsError, os.utime, test_support.TESTFN, 0)
+
+if sys.platform != 'win32':
+    class Win32ErrorTests(unittest.TestCase):
+        pass
+
 def test_main():
     test_support.run_unittest(
+        FileTests,
         TemporaryFileTests,
         StatAttributeTests,
         EnvironTests,
         WalkTests,
         MakedirTests,
         DevNullTests,
-        URandomTests
+        URandomTests,
+        Win32ErrorTests
     )
 
 if __name__ == "__main__":

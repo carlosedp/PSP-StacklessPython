@@ -10,7 +10,7 @@
 /*
  * Written by Thomas Heller, May 2000
  *
- * $Id: install.c 38415 2005-02-03 20:37:04Z theller $
+ * $Id: install.c 38414 2005-02-03 20:35:10Z theller $
  */
 
 /*

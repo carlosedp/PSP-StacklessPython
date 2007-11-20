@@ -11,6 +11,7 @@ import string
 import tempfile
 from pprint import pprint
 import unittest
+import time
 
 try:
     # For Pythons w/distutils pybsddb
@@ -64,6 +65,8 @@ class BasicTestCase(unittest.TestCase):
             try:
                 self.env = db.DBEnv()
                 self.env.set_lg_max(1024*1024)
+                self.env.set_tx_max(30)
+                self.env.set_tx_timestamp(int(time.time()))
                 self.env.set_flags(self.envsetflags, 1)
                 self.env.open(homeDir, self.envflags | db.DB_CREATE)
                 tempfile.tempdir = homeDir
@@ -397,10 +400,14 @@ class BasicTestCase(unittest.TestCase):
         try:
             rec = c.current()
         except db.DBKeyEmptyError, val:
-            assert val[0] == db.DB_KEYEMPTY
-            if verbose: print val
+            if get_raises_error:
+                assert val[0] == db.DB_KEYEMPTY
+                if verbose: print val
+            else:
+                self.fail("unexpected DBKeyEmptyError")
         else:
-            self.fail('exception expected')
+            if get_raises_error:
+                self.fail('DBKeyEmptyError exception expected')
 
         c.next()
         c2 = c.dup(db.DB_POSITION)
@@ -555,6 +562,9 @@ class BasicTestCase(unittest.TestCase):
         num = d.truncate()
         assert num == 0, "truncate on empty DB returned nonzero (%r)" % (num,)
 
+    #----------------------------------------
+
+
 #----------------------------------------------------------------------
 
 
@@ -576,18 +586,40 @@ class BasicHashWithThreadFlagTestCase(BasicTestCase):
     dbopenflags = db.DB_THREAD
 
 
-class BasicBTreeWithEnvTestCase(BasicTestCase):
+class BasicWithEnvTestCase(BasicTestCase):
+    dbopenflags = db.DB_THREAD
+    useEnv = 1
+    envflags = db.DB_THREAD | db.DB_INIT_MPOOL | db.DB_INIT_LOCK
+
+    #----------------------------------------
+
+    def test07_EnvRemoveAndRename(self):
+        if not self.env:
+            return
+
+        if verbose:
+            print '\n', '-=' * 30
+            print "Running %s.test07_EnvRemoveAndRename..." % self.__class__.__name__
+
+        # can't rename or remove an open DB
+        self.d.close()
+
+        newname = self.filename + '.renamed'
+        self.env.dbrename(self.filename, None, newname)
+        self.env.dbremove(newname)
+
+    # dbremove and dbrename are in 4.1 and later
+    if db.version() < (4,1):
+        del test07_EnvRemoveAndRename
+
+    #----------------------------------------
+
+class BasicBTreeWithEnvTestCase(BasicWithEnvTestCase):
     dbtype = db.DB_BTREE
-    dbopenflags = db.DB_THREAD
-    useEnv = 1
-    envflags = db.DB_THREAD | db.DB_INIT_MPOOL | db.DB_INIT_LOCK
 
 
-class BasicHashWithEnvTestCase(BasicTestCase):
+class BasicHashWithEnvTestCase(BasicWithEnvTestCase):
     dbtype = db.DB_HASH
-    dbopenflags = db.DB_THREAD
-    useEnv = 1
-    envflags = db.DB_THREAD | db.DB_INIT_MPOOL | db.DB_INIT_LOCK
 
 
 #----------------------------------------------------------------------
@@ -610,7 +642,6 @@ class BasicTransactionTestCase(BasicTestCase):
         BasicTestCase.populateDB(self, _txn=txn)
 
         self.txn = self.env.txn_begin()
-
 
 
     def test06_Transactions(self):
@@ -653,12 +684,22 @@ class BasicTransactionTestCase(BasicTestCase):
         except db.DBIncompleteError:
             pass
 
+        if db.version() >= (4,0):
+            statDict = self.env.log_stat(0);
+            assert statDict.has_key('magic')
+            assert statDict.has_key('version')
+            assert statDict.has_key('cur_file')
+            assert statDict.has_key('region_nowait')
+
         # must have at least one log file present:
         logs = self.env.log_archive(db.DB_ARCH_ABS | db.DB_ARCH_LOG)
         assert logs != None
         for log in logs:
             if verbose:
                 print 'log file: ' + log
+        if db.version() >= (4,2):
+            logs = self.env.log_archive(db.DB_ARCH_REMOVE)
+            assert not logs
 
         self.txn = self.env.txn_begin()
 

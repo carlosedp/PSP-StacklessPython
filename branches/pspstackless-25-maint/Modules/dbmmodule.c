@@ -70,7 +70,7 @@ dbm_dealloc(register dbmobject *dp)
 	PyObject_Del(dp);
 }
 
-static int
+static Py_ssize_t
 dbm_length(dbmobject *dp)
 {
         if (dp->di_dbm == NULL) {
@@ -162,16 +162,14 @@ dbm_ass_sub(dbmobject *dp, PyObject *v, PyObject *w)
 }
 
 static PyMappingMethods dbm_as_mapping = {
-	(inquiry)dbm_length,		/*mp_length*/
+	(lenfunc)dbm_length,		/*mp_length*/
 	(binaryfunc)dbm_subscript,	/*mp_subscript*/
 	(objobjargproc)dbm_ass_sub,	/*mp_ass_subscript*/
 };
 
 static PyObject *
-dbm__close(register dbmobject *dp, PyObject *args)
+dbm__close(register dbmobject *dp, PyObject *unused)
 {
-	if (!PyArg_ParseTuple(args, ":close"))
-		return NULL;
         if (dp->di_dbm)
 		dbm_close(dp->di_dbm);
 	dp->di_dbm = NULL;
@@ -180,14 +178,12 @@ dbm__close(register dbmobject *dp, PyObject *args)
 }
 
 static PyObject *
-dbm_keys(register dbmobject *dp, PyObject *args)
+dbm_keys(register dbmobject *dp, PyObject *unused)
 {
 	register PyObject *v, *item;
 	datum key;
 	int err;
 
-	if (!PyArg_ParseTuple(args, ":keys"))
-		return NULL;
         check_dbmobject_open(dp);
 	v = PyList_New(0);
 	if (v == NULL)
@@ -277,9 +273,9 @@ dbm_setdefault(register dbmobject *dp, PyObject *args)
 }
 
 static PyMethodDef dbm_methods[] = {
-	{"close",	(PyCFunction)dbm__close,	METH_VARARGS,
+	{"close",	(PyCFunction)dbm__close,	METH_NOARGS,
 	 "close()\nClose the database."},
-	{"keys",	(PyCFunction)dbm_keys,		METH_VARARGS,
+	{"keys",	(PyCFunction)dbm_keys,		METH_NOARGS,
 	 "keys() -> list\nReturn a list of all keys in the database."},
 	{"has_key",	(PyCFunction)dbm_has_key,	METH_VARARGS,
 	 "has_key(key} -> boolean\nReturn true iff key is in the database."},
@@ -359,6 +355,8 @@ initdbm(void) {
 
 	Dbmtype.ob_type = &PyType_Type;
 	m = Py_InitModule("dbm", dbmmodule_methods);
+	if (m == NULL)
+		return;
 	d = PyModule_GetDict(m);
 	if (DbmError == NULL)
 		DbmError = PyErr_NewException("dbm.error", NULL, NULL);

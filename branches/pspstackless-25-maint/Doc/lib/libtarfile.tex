@@ -32,7 +32,7 @@ Some facts and figures:
     it defaults to \code{'r'}. Here is a full list of mode combinations:
 
     \begin{tableii}{c|l}{code}{mode}{action}
-    \lineii{'r'}{Open for reading with transparent compression (recommended).}
+    \lineii{'r' or 'r:*'}{Open for reading with transparent compression (recommended).}
     \lineii{'r:'}{Open for reading exclusively without compression.}
     \lineii{'r:gz'}{Open for reading with gzip compression.}
     \lineii{'r:bz2'}{Open for reading with bzip2 compression.}
@@ -48,8 +48,8 @@ Some facts and figures:
     avoid this.  If a compression method is not supported,
     \exception{CompressionError} is raised.
 
-    If \var{fileobj} is specified, it is used as an alternative to
-    a file object opened for \var{name}.
+    If \var{fileobj} is specified, it is used as an alternative to a file
+    object opened for \var{name}. It is supposed to be at position 0.
 
     For special purposes, there is a second format for \var{mode}:
     \code{'filemode|[compression]'}.  \function{open()} will return a
@@ -65,6 +65,7 @@ Some facts and figures:
     (section~\ref{tar-examples}).  The currently possible modes:
 
     \begin{tableii}{c|l}{code}{Mode}{Action}
+    \lineii{'r|*'}{Open a \emph{stream} of tar blocks for reading with transparent compression.}
     \lineii{'r|'}{Open a \emph{stream} of uncompressed tar blocks for reading.}
     \lineii{'r|gz'}{Open a gzip compressed \emph{stream} for reading.}
     \lineii{'r|bz2'}{Open a bzip2 compressed \emph{stream} for reading.}
@@ -127,7 +128,7 @@ Some facts and figures:
     \seemodule{zipfile}{Documentation of the \refmodule{zipfile}
     standard module.}
 
-    \seetitle[http://www.gnu.org/software/tar/manual/html_chapter/tar_8.html\#SEC134]
+    \seetitle[http://www.gnu.org/software/tar/manual/html_node/tar_134.html\#SEC134]
     {GNU tar manual, Basic Tar Format}{Documentation for tar archive files,
     including GNU tar extensions.}
 \end{seealso}
@@ -154,6 +155,7 @@ tar archive several times. Each archive member is represented by a
 
     If \var{fileobj} is given, it is used for reading or writing data.
     If it can be determined, \var{mode} is overridden by \var{fileobj}'s mode.
+    \var{fileobj} will be used from position 0.
     \begin{notice}
         \var{fileobj} is not closed, when \class{TarFile} is closed.
     \end{notice}
@@ -196,12 +198,29 @@ tar archive several times. Each archive member is represented by a
     more available.
 \end{methoddesc}
 
+\begin{methoddesc}{extractall}{\optional{path\optional{, members}}}
+    Extract all members from the archive to the current working directory
+    or directory \var{path}. If optional \var{members} is given, it must be
+    a subset of the list returned by \method{getmembers()}.
+    Directory informations like owner, modification time and permissions are
+    set after all members have been extracted. This is done to work around two
+    problems: A directory's modification time is reset each time a file is
+    created in it. And, if a directory's permissions do not allow writing,
+    extracting files to it will fail.
+    \versionadded{2.5}
+\end{methoddesc}
+
 \begin{methoddesc}{extract}{member\optional{, path}}
     Extract a member from the archive to the current working directory,
     using its full name. Its file information is extracted as accurately as
     possible.
     \var{member} may be a filename or a \class{TarInfo} object.
     You can specify a different directory using \var{path}.
+    \begin{notice}
+    Because the \method{extract()} method allows random access to a tar
+    archive there are some issues you must take care of yourself. See the
+    description for \method{extractall()} above.
+    \end{notice}
 \end{methoddesc}
 
 \begin{methoddesc}{extractfile}{member}
@@ -316,8 +335,12 @@ the file's data itself.
     Create and return a \class{TarInfo} object from a string buffer.
 \end{methoddesc}
 
-\begin{methoddesc}{tobuf}{}
+\begin{methoddesc}{tobuf}{posix}
     Create a string buffer from a \class{TarInfo} object.
+    See \class{TarFile}'s \member{posix} attribute for information
+    on the \var{posix} argument. It defaults to \constant{False}.
+
+    \versionadded[The \var{posix} parameter]{2.5}
 \end{methoddesc}
 
 A \code{TarInfo} object has the following public data attributes:
@@ -415,6 +438,14 @@ A \class{TarInfo} object also provides some convenient query methods:
 %------------------------
 
 \subsection{Examples \label{tar-examples}}
+
+How to extract an entire tar archive to the current working directory:
+\begin{verbatim}
+import tarfile
+tar = tarfile.open("sample.tar.gz")
+tar.extractall()
+tar.close()
+\end{verbatim}
 
 How to create an uncompressed tar archive from a list of filenames:
 \begin{verbatim}

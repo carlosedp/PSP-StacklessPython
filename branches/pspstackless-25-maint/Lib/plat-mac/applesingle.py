@@ -25,14 +25,14 @@ class Error(ValueError):
     pass
 
 # File header format: magic, version, unused, number of entries
-AS_HEADER_FORMAT="LL16sh"
+AS_HEADER_FORMAT=">LL16sh"
 AS_HEADER_LENGTH=26
 # The flag words for AppleSingle
 AS_MAGIC=0x00051600
 AS_VERSION=0x00020000
 
 # Entry header format: id, offset, length
-AS_ENTRY_FORMAT="lll"
+AS_ENTRY_FORMAT=">lll"
 AS_ENTRY_LENGTH=12
 
 # The id values
@@ -119,8 +119,8 @@ def decode(infile, outpath, resonly=False, verbose=False):
             infile = infile.as_pathname()
         infile = open(infile, 'rb')
 
-    as = AppleSingle(infile, verbose=verbose)
-    as.tofile(outpath, resonly=resonly)
+    asfile = AppleSingle(infile, verbose=verbose)
+    asfile.tofile(outpath, resonly=resonly)
 
 def _test():
     if len(sys.argv) < 3 or sys.argv[1] == '-r' and len(sys.argv) != 4:

@@ -1,18 +1,9 @@
+# Tkinter font wrapper
 #
-# Tkinter
-# $Id: tkFont.py 37069 2004-08-20 06:19:23Z loewis $
-#
-# font wrapper
-#
-# written by Fredrik Lundh <fredrik@pythonware.com>, February 1998
+# written by Fredrik Lundh, February 1998
 #
 # FIXME: should add 'displayof' option where relevant (actual, families,
 #        measure, and metrics)
-#
-# Copyright (c) Secret Labs AB 1998.
-#
-# info@pythonware.com
-# http://www.pythonware.com
 #
 
 __version__ = "0.9"
@@ -117,7 +108,9 @@ class Font:
         try:
             if self.delete_font:
                 self._call("font", "delete", self.name)
-        except (AttributeError, Tkinter.TclError):
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
             pass
 
     def copy(self):

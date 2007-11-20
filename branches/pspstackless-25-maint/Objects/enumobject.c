@@ -9,8 +9,6 @@ typedef struct {
 	PyObject* en_result;	   /* result tuple  */
 } enumobject;
 
-PyTypeObject PyEnum_Type;
-
 static PyObject *
 enum_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -33,7 +31,6 @@ enum_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 	en->en_result = PyTuple_Pack(2, Py_None, Py_None);
 	if (en->en_result == NULL) {
-		Py_DECREF(en->en_sit);
 		Py_DECREF(en);
 		return NULL;
 	}
@@ -52,18 +49,8 @@ enum_dealloc(enumobject *en)
 static int
 enum_traverse(enumobject *en, visitproc visit, void *arg)
 {
-	int err;
-
-	if (en->en_sit) {
-		err = visit(en->en_sit, arg);
-		if (err)
-			return err;
-	}
-	if (en->en_result) {
-		err = visit(en->en_result, arg);
-		if (err)
-			return err;
-	}
+	Py_VISIT(en->en_sit);
+	Py_VISIT(en->en_result);
 	return 0;
 }
 
@@ -74,6 +61,12 @@ enum_next(enumobject *en)
 	PyObject *next_item;
 	PyObject *result = en->en_result;
 	PyObject *it = en->en_sit;
+
+	if (en->en_index == LONG_MAX) {
+		PyErr_SetString(PyExc_OverflowError,
+			"enumerate() is limited to LONG_MAX items");                
+		return NULL;         
+	}
 
 	next_item = (*it->ob_type->tp_iternext)(it);
 	if (next_item == NULL)
@@ -160,14 +153,14 @@ PyTypeObject PyEnum_Type = {
 
 typedef struct {
 	PyObject_HEAD
-	long      index;
+	Py_ssize_t      index;
 	PyObject* seq;
 } reversedobject;
 
 static PyObject *
 reversed_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	long n;
+	Py_ssize_t n;
 	PyObject *seq;
 	reversedobject *ro;
 
@@ -208,8 +201,7 @@ reversed_dealloc(reversedobject *ro)
 static int
 reversed_traverse(reversedobject *ro, visitproc visit, void *arg)
 {
-	if (ro->seq)
-		return visit((PyObject *)(ro->seq), arg);
+	Py_VISIT(ro->seq);
 	return 0;
 }
 
@@ -217,7 +209,7 @@ static PyObject *
 reversed_next(reversedobject *ro)
 {
 	PyObject *item;
-	long index = ro->index;
+	Py_ssize_t index = ro->index;
 
 	if (index >= 0) {
 		item = PySequence_GetItem(ro->seq, index);
@@ -239,23 +231,25 @@ PyDoc_STRVAR(reversed_doc,
 "\n"
 "Return a reverse iterator");
 
-static int
+static PyObject *
 reversed_len(reversedobject *ro)
 {
-	int position, seqsize;
+	Py_ssize_t position, seqsize;
 
 	if (ro->seq == NULL)
-		return 0;
+		return PyInt_FromLong(0);
 	seqsize = PySequence_Size(ro->seq);
 	if (seqsize == -1)
-		return -1;
+		return NULL;
 	position = ro->index + 1;
-	return (seqsize < position)  ?  0  :  position;
+	return PyInt_FromSsize_t((seqsize < position)  ?  0  :  position);
 }
 
-static PySequenceMethods reversed_as_sequence = {
-	(inquiry)reversed_len,		/* sq_length */
-	0,				/* sq_concat */
+PyDoc_STRVAR(length_hint_doc, "Private method returning an estimate of len(list(it)).");
+
+static PyMethodDef reversediter_methods[] = {
+	{"__length_hint__", (PyCFunction)reversed_len, METH_NOARGS, length_hint_doc},
+ 	{NULL,		NULL}		/* sentinel */
 };
 
 PyTypeObject PyReversed_Type = {
@@ -272,7 +266,7 @@ PyTypeObject PyReversed_Type = {
 	0,                              /* tp_compare */
 	0,                              /* tp_repr */
 	0,                              /* tp_as_number */
-	&reversed_as_sequence,          /* tp_as_sequence */
+	0,				/* tp_as_sequence */
 	0,                              /* tp_as_mapping */
 	0,                              /* tp_hash */
 	0,                              /* tp_call */
@@ -289,7 +283,7 @@ PyTypeObject PyReversed_Type = {
 	0,                              /* tp_weaklistoffset */
 	PyObject_SelfIter,		/* tp_iter */
 	(iternextfunc)reversed_next,    /* tp_iternext */
-	0,				/* tp_methods */
+	reversediter_methods,		/* tp_methods */
 	0,                              /* tp_members */
 	0,                              /* tp_getset */
 	0,                              /* tp_base */

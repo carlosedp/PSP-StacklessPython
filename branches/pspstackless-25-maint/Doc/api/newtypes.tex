@@ -11,7 +11,7 @@ defining new object types.
 \begin{cfuncdesc}{PyObject*}{_PyObject_New}{PyTypeObject *type}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{PyVarObject*}{_PyObject_NewVar}{PyTypeObject *type, int size}
+\begin{cfuncdesc}{PyVarObject*}{_PyObject_NewVar}{PyTypeObject *type, Py_ssize_t size}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{_PyObject_Del}{PyObject *op}
@@ -27,7 +27,7 @@ defining new object types.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyVarObject*}{PyObject_InitVar}{PyVarObject *op,
-						  PyTypeObject *type, int size}
+						  PyTypeObject *type, Py_ssize_t size}
   This does everything \cfunction{PyObject_Init()} does, and also
   initializes the length information for a variable-size object.
 \end{cfuncdesc}
@@ -42,7 +42,7 @@ defining new object types.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{\var{TYPE}*}{PyObject_NewVar}{TYPE, PyTypeObject *type,
-                                                int size}
+                                                Py_ssize_t size}
   Allocate a new Python object using the C structure type \var{TYPE}
   and the Python type object \var{type}.  Fields not defined by the
   Python object header are not initialized.  The allocated memory
@@ -60,23 +60,6 @@ defining new object types.
   is normally called from the \member{tp_dealloc} handler specified in
   the object's type.  The fields of the object should not be accessed
   after this call as the memory is no longer a valid Python object.
-\end{cfuncdesc}
-
-\begin{cfuncdesc}{\var{TYPE}*}{PyObject_NEW}{TYPE, PyTypeObject *type}
-  Macro version of \cfunction{PyObject_New()}, to gain performance at
-  the expense of safety.  This does not check \var{type} for a \NULL{}
-  value.
-\end{cfuncdesc}
-
-\begin{cfuncdesc}{\var{TYPE}*}{PyObject_NEW_VAR}{TYPE, PyTypeObject *type,
-                                                int size}
-  Macro version of \cfunction{PyObject_NewVar()}, to gain performance
-  at the expense of safety.  This does not check \var{type} for a
-  \NULL{} value.
-\end{cfuncdesc}
-
-\begin{cfuncdesc}{void}{PyObject_DEL}{PyObject *op}
-  Macro version of \cfunction{PyObject_Del()}.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{Py_InitModule}{char *name,
@@ -119,8 +102,6 @@ defining new object types.
   \versionchanged[Older versions of Python did not support \NULL{} as
                   the value for the \var{methods} argument]{2.3}
 \end{cfuncdesc}
-
-DL_IMPORT
 
 \begin{cvardesc}{PyObject}{_Py_NoneStruct}
   Object which is visible in Python as \code{None}.  This should only
@@ -170,13 +151,13 @@ These macros are used in the definition of \ctype{PyObject} and
   \csimplemacro{Py_TRACE_REFS}.  By default, that macro is not
   defined, and \csimplemacro{PyObject_HEAD} expands to:
   \begin{verbatim}
-    int ob_refcnt;
+    Py_ssize_t ob_refcnt;
     PyTypeObject *ob_type;
   \end{verbatim}
   When \csimplemacro{Py_TRACE_REFS} is defined, it expands to:
   \begin{verbatim}
     PyObject *_ob_next, *_ob_prev;
-    int ob_refcnt;
+    Py_ssize_t ob_refcnt;
     PyTypeObject *ob_type;
   \end{verbatim}
 \end{csimplemacrodesc}
@@ -188,10 +169,10 @@ These macros are used in the definition of \ctype{PyObject} and
   instance.  This macro always expands to:
   \begin{verbatim}
     PyObject_HEAD
-    int ob_size;
+    Py_ssize_t ob_size;
   \end{verbatim}
   Note that \csimplemacro{PyObject_HEAD} is part of the expansion, and
-  that it's own expansion varies depending on the definition of
+  that its own expansion varies depending on the definition of
   \csimplemacro{Py_TRACE_REFS}.
 \end{csimplemacrodesc}
 
@@ -383,7 +364,7 @@ objects) \emph{must} have the \member{ob_size} field.
   These fields are not inherited by subtypes.
 \end{cmemberdesc}
 
-\begin{cmemberdesc}{PyObject}{int}{ob_refcnt}
+\begin{cmemberdesc}{PyObject}{Py_ssize_t}{ob_refcnt}
   This is the type object's reference count, initialized to \code{1}
   by the \code{PyObject_HEAD_INIT} macro.  Note that for statically
   allocated type objects, the type's instances (objects whose
@@ -421,7 +402,7 @@ Foo_Type.ob_type = &PyType_Type;
   and in 2.3 and beyond, it is inherited by subtypes.
 \end{cmemberdesc}
 
-\begin{cmemberdesc}{PyVarObject}{int}{ob_size}
+\begin{cmemberdesc}{PyVarObject}{Py_ssize_t}{ob_size}
   For statically allocated type objects, this should be initialized
   to zero.  For dynamically allocated type objects, this field has a
   special internal meaning.
@@ -457,8 +438,8 @@ Foo_Type.ob_type = &PyType_Type;
   This field is not inherited by subtypes.
 \end{cmemberdesc}
 
-\begin{cmemberdesc}{PyTypeObject}{int}{tp_basicsize}
-\cmemberline{PyTypeObject}{int}{tp_itemsize}
+\begin{cmemberdesc}{PyTypeObject}{Py_ssize_t}{tp_basicsize}
+\cmemberline{PyTypeObject}{Py_ssize_t}{tp_itemsize}
   These fields allow calculating the size in bytes of instances of
   the type.
 
@@ -525,7 +506,7 @@ Foo_Type.ob_type = &PyType_Type;
   \member{tp_free}.  The object deallocator should be the one used to
   allocate the instance; this is normally \cfunction{PyObject_Del()}
   if the instance was allocated using \cfunction{PyObject_New()} or
-  \cfunction{PyOject_VarNew()}, or \cfunction{PyObject_GC_Del()} if
+  \cfunction{PyObject_VarNew()}, or \cfunction{PyObject_GC_Del()} if
   the instance was allocated using \cfunction{PyObject_GC_New()} or
   \cfunction{PyObject_GC_VarNew()}.
 
@@ -900,8 +881,39 @@ The following three fields only exist if the
 \begin{cmemberdesc}{PyTypeObject}{traverseproc}{tp_traverse}
   An optional pointer to a traversal function for the garbage
   collector.  This is only used if the \constant{Py_TPFLAGS_HAVE_GC}
-  flag bit is set.  More information in section
-  \ref{supporting-cycle-detection} about garbage collection.
+  flag bit is set.  More information about Python's garbage collection
+  scheme can be found in section \ref{supporting-cycle-detection}.
+
+  The \member{tp_traverse} pointer is used by the garbage collector
+  to detect reference cycles. A typical implementation of a
+  \member{tp_traverse} function simply calls \cfunction{Py_VISIT()} on
+  each of the instance's members that are Python objects.  For exampe, this
+  is function \cfunction{local_traverse} from the \module{thread} extension
+  module:
+
+  \begin{verbatim}
+  static int
+  local_traverse(localobject *self, visitproc visit, void *arg)
+  {
+      Py_VISIT(self->args);
+      Py_VISIT(self->kw);
+      Py_VISIT(self->dict);
+      return 0;
+  }
+  \end{verbatim}
+
+  Note that \cfunction{Py_VISIT()} is called only on those members that can
+  participate in reference cycles.  Although there is also a
+  \samp{self->key} member, it can only be \NULL{} or a Python string and
+  therefore cannot be part of a reference cycle.
+
+  On the other hand, even if you know a member can never be part of a cycle,
+  as a debugging aid you may want to visit it anyway just so the
+  \module{gc} module's \function{get_referents()} function will include it.
+
+  Note that \cfunction{Py_VISIT()} requires the \var{visit} and \var{arg}
+  parameters to \cfunction{local_traverse} to have these specific names;
+  don't name them just anything.
 
   This field is inherited by subtypes together with \member{tp_clear}
   and the \constant{Py_TPFLAGS_HAVE_GC} flag bit: the flag bit,
@@ -913,10 +925,59 @@ The following three fields only exist if the
 \begin{cmemberdesc}{PyTypeObject}{inquiry}{tp_clear}
   An optional pointer to a clear function for the garbage collector.
   This is only used if the \constant{Py_TPFLAGS_HAVE_GC} flag bit is
-  set.  More information in section
-  \ref{supporting-cycle-detection} about garbage collection.
+  set.
 
-  This field is inherited by subtypes together with \member{tp_clear}
+  The \member{tp_clear} member function is used to break reference
+  cycles in cyclic garbage detected by the garbage collector.  Taken
+  together, all \member{tp_clear} functions in the system must combine to
+  break all reference cycles.  This is subtle, and if in any doubt supply a
+  \member{tp_clear} function.  For example, the tuple type does not
+  implement a \member{tp_clear} function, because it's possible to prove
+  that no reference cycle can be composed entirely of tuples.  Therefore
+  the \member{tp_clear} functions of other types must be sufficient to
+  break any cycle containing a tuple.  This isn't immediately obvious, and
+  there's rarely a good reason to avoid implementing \member{tp_clear}.
+
+  Implementations of \member{tp_clear} should drop the instance's
+  references to those of its members that may be Python objects, and set
+  its pointers to those members to \NULL{}, as in the following example:
+
+  \begin{verbatim}
+  static int
+  local_clear(localobject *self)
+  {
+      Py_CLEAR(self->key);
+      Py_CLEAR(self->args);
+      Py_CLEAR(self->kw);
+      Py_CLEAR(self->dict);
+      return 0;
+  }
+  \end{verbatim}
+
+  The \cfunction{Py_CLEAR()} macro should be used, because clearing
+  references is delicate:  the reference to the contained object must not be
+  decremented until after the pointer to the contained object is set to
+  \NULL{}.  This is because decrementing the reference count may cause
+  the contained object to become trash, triggering a chain of reclamation
+  activity that may include invoking arbitrary Python code (due to
+  finalizers, or weakref callbacks, associated with the contained object).
+  If it's possible for such code to reference \var{self} again, it's
+  important that the pointer to the contained object be \NULL{} at that
+  time, so that \var{self} knows the contained object can no longer be
+  used.  The \cfunction{Py_CLEAR()} macro performs the operations in a
+  safe order.
+
+  Because the goal of \member{tp_clear} functions is to break reference
+  cycles, it's not necessary to clear contained objects like Python strings
+  or Python integers, which can't participate in reference cycles.
+  On the other hand, it may be convenient to clear all contained Python
+  objects, and write the type's \member{tp_dealloc} function to
+  invoke \member{tp_clear}.
+
+  More information about Python's garbage collection
+  scheme can be found in section \ref{supporting-cycle-detection}.
+
+  This field is inherited by subtypes together with \member{tp_traverse}
   and the \constant{Py_TPFLAGS_HAVE_GC} flag bit: the flag bit,
   \member{tp_traverse}, and \member{tp_clear} are all inherited from
   the base type if they are all zero in the subtype \emph{and} the
@@ -927,10 +988,10 @@ The following three fields only exist if the
   An optional pointer to the rich comparison function.
 
   The signature is the same as for \cfunction{PyObject_RichCompare()}.
-  The function should return \code{1} if the requested comparison
-  returns true, \code{0} if it returns false.  It should return
-  \code{-1} and set an exception condition when an error occurred
-  during the comparison.
+  The function should return the result of the comparison (usually
+  \code{Py_True} or \code{Py_False}).  If the comparison is undefined,
+  it must return \code{Py_NotImplemented}, if another error occurred
+  it must return \code{NULL} and set an exception condition.
 
   This field is inherited by subtypes together with
   \member{tp_compare} and \member{tp_hash}: a subtype inherits all
@@ -1106,6 +1167,13 @@ typedef struct PyGetSetDef {
 \begin{cmemberdesc}{PyTypeObject}{descrgetfunc}{tp_descr_get}
   An optional pointer to a "descriptor get" function.
 
+
+  The function signature is
+
+\begin{verbatim}
+PyObject * tp_descr_get(PyObject *self, PyObject *obj, PyObject *type);
+\end{verbatim}
+
   XXX blah, blah.
 
   This field is inherited by subtypes.
@@ -1114,9 +1182,16 @@ typedef struct PyGetSetDef {
 \begin{cmemberdesc}{PyTypeObject}{descrsetfunc}{tp_descr_set}
   An optional pointer to a "descriptor set" function.
 
-  XXX blah, blah.
+  The function signature is
+
+\begin{verbatim}
+int tp_descr_set(PyObject *self, PyObject *obj, PyObject *value);
+\end{verbatim}
 
   This field is inherited by subtypes.
+
+  XXX blah, blah.
+
 \end{cmemberdesc}
 
 \begin{cmemberdesc}{PyTypeObject}{long}{tp_dictoffset}
@@ -1220,7 +1295,7 @@ int tp_init(PyObject *self, PyObject *args, PyObject *kwds)
   The function signature is
 
 \begin{verbatim}
-PyObject *tp_alloc(PyTypeObject *self, int nitems)
+PyObject *tp_alloc(PyTypeObject *self, Py_ssize_t nitems)
 \end{verbatim}
 
   The purpose of this function is to separate memory allocation from
@@ -1372,15 +1447,15 @@ The remaining fields are only defined if the feature test macro
 They are documented here for completeness.  None of these fields are
 inherited by subtypes.
 
-\begin{cmemberdesc}{PyTypeObject}{int}{tp_allocs}
+\begin{cmemberdesc}{PyTypeObject}{Py_ssize_t}{tp_allocs}
   Number of allocations.
 \end{cmemberdesc}
 
-\begin{cmemberdesc}{PyTypeObject}{int}{tp_frees}
+\begin{cmemberdesc}{PyTypeObject}{Py_ssize_t}{tp_frees}
   Number of frees.
 \end{cmemberdesc}
 
-\begin{cmemberdesc}{PyTypeObject}{int}{tp_maxalloc}
+\begin{cmemberdesc}{PyTypeObject}{Py_ssize_t}{tp_maxalloc}
   Maximum simultaneously allocated objects.
 \end{cmemberdesc}
 
@@ -1472,7 +1547,9 @@ to be able to test for its presence before using it.}
   Before using this slot, the caller should test whether it is present
   by using the
   \cfunction{PyType_HasFeature()}\ttindex{PyType_HasFeature()}
-  function.  If present, it may be \NULL, indicating that the object's
+  function.  If the flag is present, \member{bf_getcharbuffer} may be
+  \NULL,
+  indicating that the object's
   contents cannot be used as \emph{8-bit characters}.
   The slot function may also raise an error if the object's contents
   cannot be interpreted as 8-bit characters.  For example, if the
@@ -1495,19 +1572,20 @@ to be able to test for its presence before using it.}
   \member{bf_getcharbuffer} slot is non-\NULL.
 \end{datadesc}
 
-\begin{ctypedesc}[getreadbufferproc]{int (*getreadbufferproc)
-                            (PyObject *self, int segment, void **ptrptr)}
-  Return a pointer to a readable segment of the buffer.  This function
+\begin{ctypedesc}[getreadbufferproc]{Py_ssize_t (*readbufferproc)
+                            (PyObject *self, Py_ssize_t segment, void **ptrptr)}
+  Return a pointer to a readable segment of the buffer in
+  \code{*\var{ptrptr}}.  This function
   is allowed to raise an exception, in which case it must return
-  \code{-1}.  The \var{segment} which is passed must be zero or
+  \code{-1}.  The \var{segment} which is specified must be zero or
   positive, and strictly less than the number of segments returned by
   the \member{bf_getsegcount} slot function.  On success, it returns
-  the length of the buffer memory, and sets \code{*\var{ptrptr}} to a
+  the length of the segment, and sets \code{*\var{ptrptr}} to a
   pointer to that memory.
 \end{ctypedesc}
 
-\begin{ctypedesc}[getwritebufferproc]{int (*getwritebufferproc)
-                            (PyObject *self, int segment, void **ptrptr)}
+\begin{ctypedesc}[getwritebufferproc]{Py_ssize_t (*writebufferproc)
+                            (PyObject *self, Py_ssize_t segment, void **ptrptr)}
   Return a pointer to a writable memory buffer in
   \code{*\var{ptrptr}}, and the length of that segment as the function
   return value.  The memory buffer must correspond to buffer segment
@@ -1521,18 +1599,19 @@ to be able to test for its presence before using it.}
 %      code.
 \end{ctypedesc}
 
-\begin{ctypedesc}[getsegcountproc]{int (*getsegcountproc)
-                            (PyObject *self, int *lenp)}
+\begin{ctypedesc}[getsegcountproc]{Py_ssize_t (*segcountproc)
+                            (PyObject *self, Py_ssize_t *lenp)}
   Return the number of memory segments which comprise the buffer.  If
   \var{lenp} is not \NULL, the implementation must report the sum of
   the sizes (in bytes) of all segments in \code{*\var{lenp}}.
   The function cannot fail.
 \end{ctypedesc}
 
-\begin{ctypedesc}[getcharbufferproc]{int (*getcharbufferproc)
-                            (PyObject *self, int segment, const char **ptrptr)}
-  Return the size of the memory buffer in \var{ptrptr} for segment
-  \var{segment}.  \code{*\var{ptrptr}} is set to the memory buffer.
+\begin{ctypedesc}[getcharbufferproc]{Py_ssize_t (*charbufferproc)
+                            (PyObject *self, Py_ssize_t segment, const char **ptrptr)}
+  Return the size of the segment \var{segment} that \var{ptrptr} 
+  is set to.  \code{*\var{ptrptr}} is set to the memory buffer.
+  Returns \code{-1} on error.
 \end{ctypedesc}
 
 
@@ -1585,12 +1664,12 @@ Constructors for container types must conform to two rules:
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{\var{TYPE}*}{PyObject_GC_NewVar}{TYPE, PyTypeObject *type,
-                                                   int size}
+                                                   Py_ssize_t size}
   Analogous to \cfunction{PyObject_NewVar()} but for container objects
   with the \constant{Py_TPFLAGS_HAVE_GC} flag set.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{PyVarObject *}{PyObject_GC_Resize}{PyVarObject *op, int}
+\begin{cfuncdesc}{PyVarObject *}{PyObject_GC_Resize}{PyVarObject *op, Py_ssize_t}
   Resize an object allocated by \cfunction{PyObject_NewVar()}.  Returns
   the resized object or \NULL{} on failure.
 \end{cfuncdesc}
@@ -1619,12 +1698,12 @@ pair of rules:
        \cfunction{PyObject_GC_Del()}.
 \end{enumerate}
 
-\begin{cfuncdesc}{void}{PyObject_GC_Del}{PyObject *op}
+\begin{cfuncdesc}{void}{PyObject_GC_Del}{void *op}
   Releases memory allocated to an object using
   \cfunction{PyObject_GC_New()} or \cfunction{PyObject_GC_NewVar()}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{void}{PyObject_GC_UnTrack}{PyObject *op}
+\begin{cfuncdesc}{void}{PyObject_GC_UnTrack}{void *op}
   Remove the object \var{op} from the set of container objects tracked
   by the collector.  Note that \cfunction{PyObject_GC_Track()} can be
   called again on this object to add it back to the set of tracked

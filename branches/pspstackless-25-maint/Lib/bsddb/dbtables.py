@@ -15,7 +15,7 @@
 # This provides a simple database table interface built on top of
 # the Python BerkeleyDB 3 interface.
 #
-_cvsid = '$Id: dbtables.py 36901 2004-08-08 00:54:21Z tim_one $'
+_cvsid = '$Id: dbtables.py 46858 2006-06-11 08:35:14Z neal.norwitz $'
 
 import re
 import sys
@@ -32,6 +32,12 @@ except ImportError:
     # For Python 2.3
     from bsddb.db import *
 
+# XXX(nnorwitz): is this correct? DBIncompleteError is conditional in _bsddb.c
+try:
+    DBIncompleteError
+except NameError:
+    class DBIncompleteError(Exception):
+        pass
 
 class TableDBError(StandardError):
     pass
@@ -131,7 +137,8 @@ def contains_metastrings(s) :
 class bsdTableDB :
     def __init__(self, filename, dbhome, create=0, truncate=0, mode=0600,
                  recover=0, dbflags=0):
-        """bsdTableDB.open(filename, dbhome, create=0, truncate=0, mode=0600)
+        """bsdTableDB(filename, dbhome, create=0, truncate=0, mode=0600)
+
         Open database name in the dbhome BerkeleyDB directory.
         Use keyword arguments when calling this constructor.
         """
@@ -218,7 +225,8 @@ class bsdTableDB :
 
 
     def CreateTable(self, table, columns):
-        """CreateTable(table, columns) - Create a new table in the database
+        """CreateTable(table, columns) - Create a new table in the database.
+
         raises TableDBError if it already exists or for other DB errors.
         """
         assert isinstance(columns, ListType)
@@ -286,7 +294,8 @@ class bsdTableDB :
     def CreateOrExtendTable(self, table, columns):
         """CreateOrExtendTable(table, columns)
 
-        - Create a new table in the database.
+        Create a new table in the database.
+
         If a table of this name already exists, extend it to have any
         additional columns present in the given list as well as
         all of its current columns.
@@ -411,14 +420,15 @@ class bsdTableDB :
 
 
     def Modify(self, table, conditions={}, mappings={}):
-        """Modify(table, conditions) - Modify in rows matching 'conditions'
-        using mapping functions in 'mappings'
-        * conditions is a dictionary keyed on column names
-        containing condition functions expecting the data string as an
-        argument and returning a boolean.
-        * mappings is a dictionary keyed on column names containint condition
-        functions expecting the data string as an argument and returning the
-        new string for that column.
+        """Modify(table, conditions={}, mappings={}) - Modify items in rows matching 'conditions' using mapping functions in 'mappings'
+
+        * table - the table name
+        * conditions - a dictionary keyed on column names containing
+          a condition callable expecting the data string as an
+          argument and returning a boolean.
+        * mappings - a dictionary keyed on column names containing a
+          condition callable expecting the data string as an argument and
+          returning the new string for that column.
         """
         try:
             matching_rowids = self.__Select(table, [], conditions)
@@ -450,7 +460,8 @@ class bsdTableDB :
                         txn.commit()
                         txn = None
 
-                except DBError, dberror:
+                # catch all exceptions here since we call unknown callables
+                except:
                     if txn:
                         txn.abort()
                     raise
@@ -461,9 +472,10 @@ class bsdTableDB :
     def Delete(self, table, conditions={}):
         """Delete(table, conditions) - Delete items matching the given
         conditions from the table.
-        * conditions is a dictionary keyed on column names
-        containing condition functions expecting the data string as an
-        argument and returning a boolean.
+
+        * conditions - a dictionary keyed on column names containing
+          condition functions expecting the data string as an
+          argument and returning a boolean.
         """
         try:
             matching_rowids = self.__Select(table, [], conditions)
@@ -499,11 +511,12 @@ class bsdTableDB :
 
 
     def Select(self, table, columns, conditions={}):
-        """Select(table, conditions) - retrieve specific row data
+        """Select(table, columns, conditions) - retrieve specific row data
         Returns a list of row column->value mapping dictionaries.
-        * columns is a list of which column data to return.  If
+
+        * columns - a list of which column data to return.  If
           columns is None, all columns will be returned.
-        * conditions is a dictionary keyed on column names
+        * conditions - a dictionary keyed on column names
           containing callable conditions expecting the data string as an
           argument and returning a boolean.
         """

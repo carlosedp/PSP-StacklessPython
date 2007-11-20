@@ -44,8 +44,7 @@ class TestModule(unittest.TestCase):
 
     def test_warn_specific_category(self):
         text = 'None'
-        # XXX OverflowWarning should go away for Python 2.5.
-        for category in [DeprecationWarning, FutureWarning, OverflowWarning,
+        for category in [DeprecationWarning, FutureWarning,
                     PendingDeprecationWarning, RuntimeWarning,
                     SyntaxWarning, UserWarning, Warning]:
             if category.__name__ in self.ignored:
@@ -82,7 +81,24 @@ class TestModule(unittest.TestCase):
         self.assertEqual(msg.message, text)
         self.assertEqual(msg.category, 'UserWarning')
 
+    def test_options(self):
+        # Uses the private _setoption() function to test the parsing
+        # of command-line warning arguments
+        self.assertRaises(warnings._OptionError,
+                          warnings._setoption, '1:2:3:4:5:6')
+        self.assertRaises(warnings._OptionError,
+                          warnings._setoption, 'bogus::Warning')
+        self.assertRaises(warnings._OptionError,
+                          warnings._setoption, 'ignore:2::4:-5')
+        warnings._setoption('error::Warning::0')
+        self.assertRaises(UserWarning, warnings.warn, 'convert to error')
+
+
 def test_main(verbose=None):
+    # Obscure hack so that this test passes after reloads or repeated calls
+    # to test_main (regrtest -R).
+    if '__warningregistry__' in globals():
+        del globals()['__warningregistry__']
     test_support.run_unittest(TestModule)
 
 if __name__ == "__main__":

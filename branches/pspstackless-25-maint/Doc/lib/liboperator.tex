@@ -162,7 +162,7 @@ Return \var{a} \code{-} \var{b}.
 \begin{funcdesc}{truediv}{a, b}
 \funcline{__truediv__}{a, b}
 Return \var{a} \code{/} \var{b} when \code{__future__.division} is in
-effect.  This is also known as division.
+effect.  This is also known as ``true'' division.
 \versionadded{2.2}
 \end{funcdesc}
 
@@ -171,6 +171,11 @@ effect.  This is also known as division.
 Return the bitwise exclusive or of \var{a} and \var{b}.
 \end{funcdesc}
 
+\begin{funcdesc}{index}{a}
+\funcline{__index__}{a}
+Return \var{a} converted to an integer.  Equivalent to \var{a}\code{.__index__()}.
+\versionadded{2.5}
+\end{funcdesc}
 
 Operations which work with sequences include:
 
@@ -234,6 +239,108 @@ Set the value of \var{a} at index \var{b} to \var{c}.
 \funcline{__setslice__}{a, b, c, v}
 Set the slice of \var{a} from index \var{b} to index \var{c}\code{-1} to the
 sequence \var{v}.
+\end{funcdesc}
+
+
+Many operations have an ``in-place'' version.  The following functions
+provide a more primitive access to in-place operators than the usual
+syntax does; for example, the statement \code{x += y} is equivalent to
+\code{x = operator.iadd(x, y)}.  Another way to put it is to say that
+\code{z = operator.iadd(x, y)} is equivalent to the compound statement
+\code{z = x; z += y}.
+
+\begin{funcdesc}{iadd}{a, b}
+\funcline{__iadd__}{a, b}
+\code{a = iadd(a, b)} is equivalent to \code{a += b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{iand}{a, b}
+\funcline{__iand__}{a, b}
+\code{a = iand(a, b)} is equivalent to \code{a \&= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{iconcat}{a, b}
+\funcline{__iconcat__}{a, b}
+\code{a = iconcat(a, b)} is equivalent to \code{a += b} for \var{a}
+and \var{b} sequences.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{idiv}{a, b}
+\funcline{__idiv__}{a, b}
+\code{a = idiv(a, b)} is equivalent to \code{a /= b} when
+\code{__future__.division} is not in effect.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{ifloordiv}{a, b}
+\funcline{__ifloordiv__}{a, b}
+\code{a = ifloordiv(a, b)} is equivalent to \code{a //= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{ilshift}{a, b}
+\funcline{__ilshift__}{a, b}
+\code{a = ilshift(a, b)} is equivalent to \code{a <}\code{<= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{imod}{a, b}
+\funcline{__imod__}{a, b}
+\code{a = imod(a, b)} is equivalent to \code{a \%= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{imul}{a, b}
+\funcline{__imul__}{a, b}
+\code{a = imul(a, b)} is equivalent to \code{a *= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{ior}{a, b}
+\funcline{__ior__}{a, b}
+\code{a = ior(a, b)} is equivalent to \code{a |= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{ipow}{a, b}
+\funcline{__ipow__}{a, b}
+\code{a = ipow(a, b)} is equivalent to \code{a **= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{irepeat}{a, b}
+\funcline{__irepeat__}{a, b}
+\code{a = irepeat(a, b)} is equivalent to \code{a *= b} where
+\var{a} is a sequence and \var{b} is an integer.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{irshift}{a, b}
+\funcline{__irshift__}{a, b}
+\code{a = irshift(a, b)} is equivalent to \code{a >>= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{isub}{a, b}
+\funcline{__isub__}{a, b}
+\code{a = isub(a, b)} is equivalent to \code{a -= b}.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{itruediv}{a, b}
+\funcline{__itruediv__}{a, b}
+\code{a = itruediv(a, b)} is equivalent to \code{a /= b} when
+\code{__future__.division} is in effect.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{ixor}{a, b}
+\funcline{__ixor__}{a, b}
+\code{a = ixor(a, b)} is equivalent to \code{a \textasciicircum= b}.
+\versionadded{2.5}
 \end{funcdesc}
 
 
@@ -308,24 +415,31 @@ as arguments for \function{map()}, \function{sorted()},
 \method{itertools.groupby()}, or other functions that expect a
 function argument.
 
-\begin{funcdesc}{attrgetter}{attr}
+\begin{funcdesc}{attrgetter}{attr\optional{, args...}}
 Return a callable object that fetches \var{attr} from its operand.
+If more than one attribute is requested, returns a tuple of attributes.
 After, \samp{f=attrgetter('name')}, the call \samp{f(b)} returns
-\samp{b.name}.
+\samp{b.name}.  After, \samp{f=attrgetter('name', 'date')}, the call
+\samp{f(b)} returns \samp{(b.name, b.date)}. 
 \versionadded{2.4}
+\versionchanged[Added support for multiple attributes]{2.5}
 \end{funcdesc}
     
-\begin{funcdesc}{itemgetter}{item}
+\begin{funcdesc}{itemgetter}{item\optional{, args...}}
 Return a callable object that fetches \var{item} from its operand.
+If more than one item is requested, returns a tuple of items.
 After, \samp{f=itemgetter(2)}, the call \samp{f(b)} returns
 \samp{b[2]}.
+After, \samp{f=itemgetter(2,5,3)}, the call \samp{f(b)} returns
+\samp{(b[2], b[5], b[3])}.		
 \versionadded{2.4}
+\versionchanged[Added support for multiple item extraction]{2.5}		
 \end{funcdesc}
 
 Examples:
                 
 \begin{verbatim}
->>> from operator import *
+>>> from operator import itemgetter
 >>> inventory = [('apple', 3), ('banana', 2), ('pear', 5), ('orange', 1)]
 >>> getcount = itemgetter(1)
 >>> map(getcount, inventory)
@@ -385,7 +499,7 @@ symbols in the Python syntax and the functions in the
           {\code{neg(\var{a})}}
   \lineiii{Negation (Logical)}{\code{not \var{a}}}
           {\code{not_(\var{a})}}
-  \lineiii{Right Shift}{\code{\var{a} >\code{>} \var{b}}}
+  \lineiii{Right Shift}{\code{\var{a} >> \var{b}}}
           {\code{rshift(\var{a}, \var{b})}}
   \lineiii{Sequence Repitition}{\code{\var{seq} * \var{i}}}
           {\code{repeat(\var{seq}, \var{i})}}

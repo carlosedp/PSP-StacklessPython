@@ -84,7 +84,7 @@ the decimal module are: \constant{Clamped}, \constant{InvalidOperation},
 \constant{Subnormal}, \constant{Overflow}, and \constant{Underflow}.
 
 For each signal there is a flag and a trap enabler.  When a signal is
-encountered, its flag incremented from zero and, then, if the trap enabler
+encountered, its flag is incremented from zero and, then, if the trap enabler
 is set to one, an exception is raised.  Flags are sticky, so the user
 needs to reset them before monitoring a calculation.
 
@@ -119,7 +119,7 @@ Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999999, Emax=999999999,
 \end{verbatim}
 
 
-Decimal instances can be constructed from integers, strings or tuples.  To
+Decimal instances can be constructed from integers, strings, or tuples.  To
 create a Decimal from a \class{float}, first convert it to a string.  This
 serves as an explicit reminder of the details of the conversion (including
 representation error).  Decimal numbers include special values such as
@@ -160,7 +160,7 @@ Decimal("5.85988")
 \end{verbatim}
 
 
-Decimals interact well with much of the rest of python.  Here is a small
+Decimals interact well with much of the rest of Python.  Here is a small
 decimal floating point flying circus:
     
 \begin{verbatim}    
@@ -435,16 +435,41 @@ Each thread has its own current context which is accessed or changed using
 the \function{getcontext()} and \function{setcontext()} functions:
 
 \begin{funcdesc}{getcontext}{}
-  Return the current context for the active thread.                                          
+  Return the current context for the active thread.
 \end{funcdesc}            
 
 \begin{funcdesc}{setcontext}{c}
-  Set the current context for the active thread to \var{c}.                                          
+  Set the current context for the active thread to \var{c}.
 \end{funcdesc}  
 
-New contexts can formed using the \class{Context} constructor described below.
-In addition, the module provides three pre-made contexts:                                          
+Beginning with Python 2.5, you can also use the \keyword{with} statement
+and the \function{localcontext()} function to temporarily change the
+active context.
 
+\begin{funcdesc}{localcontext}{\optional{c}}
+  Return a context manager that will set the current context for
+  the active thread to a copy of \var{c} on entry to the with-statement
+  and restore the previous context when exiting the with-statement. If
+  no context is specified, a copy of the current context is used.
+  \versionadded{2.5}
+
+  For example, the following code sets the current decimal precision
+  to 42 places, performs a calculation, and then automatically restores
+  the previous context:
+\begin{verbatim}
+    from __future__ import with_statement
+    from decimal import localcontext
+
+    with localcontext() as ctx:
+        ctx.prec = 42   # Perform a high precision calculation
+        s = calculate_something()
+    s = +s  # Round the final result back to the default precision
+\end{verbatim}
+\end{funcdesc}
+
+New contexts can also be created using the \class{Context} constructor
+described below. In addition, the module provides three pre-made
+contexts:
 
 \begin{classdesc*}{BasicContext}
   This is a standard context defined by the General Decimal Arithmetic
@@ -689,8 +714,8 @@ here.
   \constant{NaN}.
 \end{methoddesc}
 
-\begin{methoddesc}{sqrt}{}
-  Return the square root to full precision.
+\begin{methoddesc}{sqrt}{x}
+  Return the square root of \var{x} to full precision.
 \end{methoddesc}                    
 
 \begin{methoddesc}{subtract}{x, y}
@@ -710,7 +735,7 @@ here.
   or \constant{Rounded}.                                        
 \end{methoddesc} 
 
-\begin{methoddesc}{to_sci_string}{}
+\begin{methoddesc}{to_sci_string}{x}
   Converts a number to a string using scientific notation.
 \end{methoddesc} 
 
@@ -743,7 +768,7 @@ exception is raised upon encountering the condition.
 \end{classdesc*}
 
 \begin{classdesc*}{DecimalException}
-    Base class for other signals and is a subclass of
+    Base class for other signals and a subclass of
     \exception{ArithmeticError}.
 \end{classdesc*}
 
@@ -851,7 +876,7 @@ distributive properties of addition:
 
 \begin{verbatim}
 # Examples from Seminumerical Algorithms, Section 4.2.2.
->>> from decimal import *
+>>> from decimal import Decimal, getcontext
 >>> getcontext().prec = 8
 
 >>> u, v, w = Decimal(11111113), Decimal(-11111111), Decimal('7.51111111')

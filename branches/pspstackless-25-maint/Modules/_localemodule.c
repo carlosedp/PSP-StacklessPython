@@ -12,10 +12,13 @@ This software comes with no warranty. Use at your own risk.
 #include "Python.h"
 
 #include <stdio.h>
-#include <errno.h>
 #include <locale.h>
 #include <string.h>
 #include <ctype.h>
+
+#ifdef HAVE_ERRNO_H
+#include <errno.h>
+#endif
 
 #ifdef HAVE_LANGINFO_H
 #include <langinfo.h>
@@ -278,7 +281,7 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
     wchar_t *ws1 = NULL, *ws2 = NULL;
     int rel1 = 0, rel2 = 0, len1, len2;
     
-    if (!PyArg_ParseTuple(args, "OO:strcoll", &os1, &os2))
+    if (!PyArg_UnpackTuple(args, "strcoll", 2, 2, &os1, &os2))
         return NULL;
     /* If both arguments are byte strings, use strcoll.  */
     if (PyString_Check(os1) && PyString_Check(os2))
@@ -357,7 +360,7 @@ PyLocale_strxfrm(PyObject* self, PyObject* args)
     buf = PyMem_Malloc(n1);
     if (!buf)
         return PyErr_NoMemory();
-    n2 = strxfrm(buf, s, n1);
+    n2 = strxfrm(buf, s, n1) + 1;
     if (n2 > n1) {
         /* more space needed */
         buf = PyMem_Realloc(buf, n2);
@@ -382,11 +385,11 @@ PyLocale_getdefaultlocale(PyObject* self)
     if (GetLocaleInfo(LOCALE_USER_DEFAULT,
                       LOCALE_SISO639LANGNAME,
                       locale, sizeof(locale))) {
-        int i = strlen(locale);
+        Py_ssize_t i = strlen(locale);
         locale[i++] = '_';
         if (GetLocaleInfo(LOCALE_USER_DEFAULT,
                           LOCALE_SISO3166CTRYNAME,
-                          locale+i, sizeof(locale)-i))
+                          locale+i, (int)(sizeof(locale)-i)))
             return Py_BuildValue("ss", locale, encoding);
     }
 
@@ -426,7 +429,7 @@ static char *mac_getscript(void)
     /* XXX which one is mac-latin2? */
     }
     if (!name) {
-        /* This leaks a an object. */
+        /* This leaks an object. */
         name = CFStringConvertEncodingToIANACharSetName(enc);
     }
     return (char *)CFStringGetCStringPtr(name, 0); 
@@ -715,6 +718,8 @@ init_locale(void)
 #endif
 
     m = Py_InitModule("_locale", PyLocale_Methods);
+    if (m == NULL)
+    	return;
 
     d = PyModule_GetDict(m);
 
