@@ -1,0 +1,271 @@
+= The psp2d module =
+
+This module exposes classes for 2D graphics, sound and controller.
+
+== Classes ==
+
+=== Errors ===
+
+==== Error ====
+
+This is the exception type for psp2d specific errors.
+
+=== Controller ===
+
+==== Controller ====
+
+This class gives access to the state of the pad and buttons. The state is read upon instantiation and is accessible through read-only properties.
+
+'''Methods'''
+
+  `__init__(self)`
+
+Constructor.
+
+No argument.
+
+'''Properties'''
+
+  `analogX`
+
+The analog pad state in the X direction, between -127 and 128.
+
+  `analogY`
+
+The analog pad state in the Y direction, between -127 and 128.
+
+Please note that the dead zone of the analog controller is quite large, you should ignore values between -5 and 5.
+
+The following properties are True if the corresponding button is pressed and False otherwise.
+
+ * `square`
+ * `triangle`
+ * `circle`
+ * `cross`
+ * `up`
+ * `down`
+ * `left`
+ * `right`
+ * `start`
+ * `select`
+ * `l` (Left trigger)
+ * `r` (Right trigger)
+
+=== Graphics ===
+
+==== Color ====
+
+This class encapsulates an RGBA color.
+
+'''Methods'''
+
+  `__init__(self, r, g, b, a = 0)`
+
+Constructor.
+
+'''Properties'''
+
+All these properties are read/write.
+
+  `red`
+
+Red component.
+
+  `green`
+
+Green component.
+
+  `blue`
+
+Blue component.
+
+  `alpha`
+
+Alpha component.
+
+----
+
+==== Image ====
+
+An in-memory image.
+
+'''Methods'''
+
+  `__init__(self, filename)`
+
+Constructor. 
+The file must be a PNG or JPEG image.
+
+  `__init__(self, w, h)`
+
+Constructor. 
+The initial content of the image is undefined.
+
+  `__init__(self, img)`
+
+Constructor. 
+Copies the specified Image.
+
+  `clear(color)`
+
+Clears the image using the specified Color.
+
+  `blit(source, sx = 0, sy = 0, w = -1, h = -1, dx = 0, dy = 0, blend = False, dw = -1, dh = -1)`
+
+Copies the (sx, sy, w, h) rectangle from the source Image to the instance's image at coordinates (dx, dy). If blend is True, alpha blending is performed. If w is not specified, it defaults to the source's width. Same for h.
+Alpha blending from image to image is currently implemented "by hand", so it may prove slow. You'd better use the Screen class method which does use hardware acceleration. If 'dw' and/or 'dh' is specified, and if you're blitting to the screen, and blend is True, the image will be scaled.
+
+  `fillRect(x, y, w, h, color)`
+
+Fills the (x, y, w, h) rectangle of the image with the specified Color.
+
+  `saveToFile(filename, type)`
+
+Saves the image to the specified file 'type' may be one of
+
+ * `psp2d.IMG_PNG`
+ * `psp2d.IMG_JPEG`
+
+to specify the type of file (default PNG).
+
+  `putPixel(x, y, Color)`
+
+Sets the color of the specified pixel
+
+  `getPixel(x, y)`
+
+Returns the color of the pixel at the specified coordinates
+
+'''Properties'''
+
+Read-only.
+
+  `width`
+
+Width of the image, in pixels.
+
+  `height`
+
+Height of the image, in pixels.
+
+----
+
+==== Screen ====
+
+This class represents the physical screen. It has the same methods as the Image class, plus an additionnal method.
+
+'''Methods'''
+
+  `swap(self)`
+
+This method swaps the draw and display buffer.
+
+Note that `Screen.saveToFile` only supports PNG right now.
+
+----
+
+==== Font ====
+
+A SFont-like font. Contrary to the traditional SFont, it can render all characters in the ISO-8859-1 set; see the [wiki:DevelopperTools] section for a GIMP script-fu that can generate such fonts.
+
+Strings passer to textWidth(), textHeight() and drawText() must be encoded in ISO-8859-1.
+
+'''Methods'''
+
+  `__init__(self, filename)`
+
+Constructor. 
+'filename' must be an SFont-like PNG file.
+
+  `textWidth(self, text)`
+
+Returns the width in pixels used to render 'text'.
+
+  `textHeight(self, text)`
+
+Returns the height in pixels used to render 'text'.
+
+  `drawText(drw, x, y, text)`
+
+Draws a text to a drawable (either Image or Screen) at the specified coordinates.
+
+==== !BlitBatch ====
+
+This class allows the user to batch several blitting operations. It was written for optimization purposes but it doesn't seem to really make a difference.
+
+''' Methods '''
+
+  `add(self, img)`
+
+Adds an object to the chain.
+
+  `blit(self)`
+
+Performs blitting. Each object in the chain must have a 'data' attribute, which must be a 3-tuple (img, x, y). The image 'img' will be blitted (with alpha blending) to the screen at position (x, y).
+
+=== Miscellaneous ===
+
+==== Mask ====
+
+This is a 2-dimensionnal bit field, intended to be used in collision detection.
+Methods
+
+  `__init__(self, img, x, y, w, h, threshold)`
+
+Constructor. 
+Creates a mask from the (x, y, w, h) rectangle in the img Image. Every pixel that has an alpha value greater than threshold will have the associated bit set to 1.
+
+  `collide(self, msk)`
+
+Returns the number of bits in the intersection between this mask and 'msk'. 'msk' must have the exact same size as this instance.
+
+  `union(self, msk)`
+
+Sets all the bits that are set in 'msk'. 'msk' must have the exact same size as this instance.
+
+  `isIn(self, x, y)`
+
+Returns True if the bit at position (x, y) is set.
+
+----
+
+==== Transform ====
+
+A class used to make pixel-based transformations on images.
+
+'''Methods'''
+
+  `__init__(self, type, param)`
+
+Constructor. 'param' is a float; 'type' may be one of:
+
+ * `TR_PLUS`: param will be added to every red, green and blue component
+ * `TR_MULT`: every component will be multiplied by param
+
+  `__init__(self, cb)`
+
+Constructor.
+'cb' must be a callable object; it will be called for every pixel and will receive as arguments (x, y, color) where (x, y) is the pixel's coordinates and 'color' and instance of Color. You may change 'color' in place and the change will be echoed back to the picture.
+This is __REAL SLOW__
+
+  `apply(self, img)`
+
+Apply the transformation to the specified Image.
+
+==== Timer ====
+
+A timer class that doesn't run in its own thread (unlike the standard `threading.Timer class`).
+
+'''Methods'''
+
+  `__init__(self, timeout)`
+
+Constructor. 'timeout' is in milliseconds.
+
+  `fire(self)`
+
+The default implementation of this method is to raise `NotImplementedError`. You must subclass Timer and override this. The method is called when the timeout elapses; if it returns False, the timer stops.
+
+  `run(self)`
+
+Enter the timer's main loop.
