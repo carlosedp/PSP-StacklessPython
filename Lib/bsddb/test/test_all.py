@@ -4,6 +4,12 @@
 import sys
 import os
 import unittest
+try:
+    # For Pythons w/distutils pybsddb
+    from bsddb3 import db
+except ImportError:
+    # For Python 2.3
+    from bsddb import db
 
 verbose = 0
 if 'verbose' in sys.argv:
@@ -16,12 +22,6 @@ if 'silent' in sys.argv:  # take care of old flag, just in case
 
 
 def print_versions():
-    try:
-        # For Pythons w/distutils pybsddb
-        from bsddb3 import db
-    except ImportError:
-        # For Python 2.3
-        from bsddb import db
     print
     print '-=' * 38
     print db.DB_VERSION_STRING
@@ -56,6 +56,7 @@ def suite():
         'test_associate',
         'test_basics',
         'test_compat',
+        'test_compare',
         'test_dbobj',
         'test_dbshelve',
         'test_dbtables',
@@ -64,9 +65,12 @@ def suite():
         'test_join',
         'test_lock',
         'test_misc',
+        'test_pickle',
         'test_queue',
         'test_recno',
         'test_thread',
+        'test_sequence',
+        'test_cursor_pget_bug',
         ]
 
     alltests = unittest.TestSuite()

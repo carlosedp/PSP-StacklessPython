@@ -1,13 +1,13 @@
 \documentclass{howto}
 \usepackage{distutils}
-% $Id: whatsnew24.tex 39518 2005-09-14 17:24:41Z birkenfeld $
+% $Id: whatsnew24.tex 51275 2006-08-14 10:38:35Z richard.tew $
 
 % Don't write extensive text for new sections; I'll do that.  
 % Feel free to add commented-out reminders of things that need
 % to be covered.  --amk
 
 \title{What's New in Python 2.4}
-\release{1.01}
+\release{1.02}
 \author{A.M.\ Kuchling}
 \authoraddress{
 	\strong{Python Software Foundation}\\
@@ -18,8 +18,8 @@
 \maketitle
 \tableofcontents
 
-This article explains the new features in Python 2.4, released in December
-2004.
+This article explains the new features in Python 2.4.1, released on
+March~30, 2005.
 
 Python 2.4 is a medium-sized release.  It doesn't introduce as many
 changes as the radical Python 2.2, but introduces more features than
@@ -162,7 +162,7 @@ for link in links:
 
 Generator expressions always have to be written inside parentheses, as
 in the above example.  The parentheses signalling a function call also
-count, so if you want to create a iterator that will be immediately
+count, so if you want to create an iterator that will be immediately
 passed to a function you could write:
 
 \begin{verbatim}
@@ -209,15 +209,13 @@ complicated to explain to such users, and if they make a mistake, it's
 difficult to provide helpful feedback to them.
 
 PEP 292 adds a \class{Template} class to the \module{string} module
-that uses \samp{\$} to indicate a substitution.  \class{Template} is a
-subclass of the built-in Unicode type, so the result is always a
-Unicode string:
+that uses \samp{\$} to indicate a substitution:
 
 \begin{verbatim}
 >>> import string
 >>> t = string.Template('$page: $title')
 >>> t.substitute({'page':2, 'title': 'The Best of Times'})
-u'2: The Best of Times'
+'2: The Best of Times'
 \end{verbatim}
 
 % $ Terminate $-mode for Emacs
@@ -227,9 +225,9 @@ will raise a \exception{KeyError}.  There's also a \method{safe_substitute}
 method that ignores missing keys:
 
 \begin{verbatim}
->>> t = string.SafeTemplate('$page: $title')
+>>> t = string.Template('$page: $title')
 >>> t.safe_substitute({'page':3})
-u'3: $title'
+'3: $title'
 \end{verbatim}
 
 % $ Terminate math-mode for Emacs
@@ -291,7 +289,9 @@ The \code{@classmethod} is shorthand for the
 the following:
 
 \begin{verbatim}
-@A @B @C
+@A
+@B
+@C
 def f ():
     ...
 \end{verbatim}
@@ -303,16 +303,18 @@ def f(): ...
 f = A(B(C(f)))
 \end{verbatim}
 
-Decorators must come on the line before a function definition, and
-can't be on the same line, meaning that \code{@A def f(): ...} is
-illegal.  You can only decorate function definitions, either at the
-module level or inside a class; you can't decorate class definitions.
+Decorators must come on the line before a function definition, one decorator
+per line, and can't be on the same line as the def statement, meaning that
+\code{@A def f(): ...} is illegal.  You can only decorate function
+definitions, either at the module level or inside a class; you can't
+decorate class definitions.
 
-A decorator is just a function that takes the function to be decorated
-as an argument and returns either the same function or some new
-callable thing.  It's easy to write your own decorators.  The
-following simple example just sets an attribute on the function
-object:
+A decorator is just a function that takes the function to be decorated as an
+argument and returns either the same function or some new object.  The
+return value of the decorator need not be callable (though it typically is),
+unless further decorators will be applied to the result.  It's easy to write
+your own decorators.  The following simple example just sets an attribute on
+the function object:
 
 \begin{verbatim}
 >>> def deco(func):
@@ -377,9 +379,11 @@ function that's constructed and returned.
 by Kevin D. Smith, Jim Jewett, and Skip Montanaro.  Several people
 wrote patches implementing function decorators, but the one that was
 actually checked in was patch \#979728, written by Mark Russell.}
-\end{seealso}
 
-% XXX add link to decorators module in Wiki
+\seeurl{http://www.python.org/moin/PythonDecoratorLibrary}
+{This Wiki page contains several examples of decorators.}
+
+\end{seealso}
 
 
 %======================================================================
@@ -799,8 +803,8 @@ from SimpleXMLRPCServer import (SimpleXMLRPCServer,
 
 The PEP also proposes that all \keyword{import} statements be absolute
 imports, with a leading \samp{.} character to indicate a relative
-import.  This part of the PEP is not yet implemented, and will have to
-wait for Python 2.5 or some other future version.
+import.  This part of the PEP was not implemented for Python 2.4,
+but was completed for Python 2.5.
 
 \begin{seealso}
 \seepep{328}{Imports: Multi-Line and Absolute/Relative}
@@ -881,6 +885,7 @@ fill character other than a space.
 \item Strings also gained an \method{rsplit()} method that
 works like the \method{split()} method but splits from the end of
 the string.  
+(Contributed by Sean Reifschneider.)
 
 \begin{verbatim}
 >>> 'www.python.org'.split('.', 1)
@@ -1331,7 +1336,7 @@ be used to implement other rotating handlers.
 \item The \module{marshal} module now shares interned strings on unpacking a 
 data structure.  This may shrink the size of certain pickle strings,
 but the primary effect is to make \file{.pyc} files significantly smaller.
-(Contributed by Martin von Loewis.)
+(Contributed by Martin von~L\"owis.)
 
 \item The \module{nntplib} module's \class{NNTP} class gained
 \method{description()} and \method{descriptions()} methods to retrieve 
@@ -1423,9 +1428,16 @@ sidestep the checking and if you were unlucky Python could segfault.
 Python 2.4's regular expression engine can match this pattern without
 problems.
 
-\item A new \function{socketpair()} function, returning a pair of
-connected sockets, was added to the \module{socket} module.
-(Contributed by Dave Cole.)
+\item The \module{signal} module now performs tighter error-checking
+on the parameters to the \function{signal.signal()} function.  For
+example, you can't set a handler on the \constant{SIGKILL} signal;
+previous versions of Python would quietly accept this, but 2.4 will
+raise a \exception{RuntimeError} exception.
+
+\item Two new functions were added to the \module{socket} module.
+\function{socketpair()} returns a pair of connected sockets and
+\function{getservbyport(\var{port})} looks up the service name for a
+given port number. (Contributed by Dave Cole and Barry Warsaw.)
 
 \item The \function{sys.exitfunc()} function has been deprecated.  Code
 should be using the existing \module{atexit} module, which correctly
@@ -1454,7 +1466,7 @@ Other threads can assign and retrieve their own values for the
 (Contributed by Jim Fulton.)
 
 \item The \module{timeit} module now automatically disables periodic
-  garbarge collection during the timing loop.  This change makes
+  garbage collection during the timing loop.  This change makes
   consecutive timings more comparable.  (Contributed by Raymond Hettinger.)
 
 \item The \module{weakref} module now supports a wider variety of objects
@@ -1676,7 +1688,7 @@ Some of the changes to Python's build process and to the C API are:
 \begin{itemize}
 
 \item The Windows port now builds under MSVC++ 7.1 as well as version 6.
-  (Contributed by Martin von Loewis.)
+  (Contributed by Martin von~L\"owis.)
 
 \end{itemize}
 
@@ -1701,6 +1713,11 @@ The \exception{OverflowWarning} warning will disappear in Python 2.5.
   now return  an empty list instead of raising a \exception{TypeError}
   exception if called with no arguments.
 
+\item You can no longer compare the \class{date} and \class{datetime}
+  instances provided by the \module{datetime} module.  Two 
+  instances of different classes will now always be unequal, and 
+  relative comparisons (\code{<}, \code{>}) will raise a \exception{TypeError}.
+
 \item \function{dircache.listdir()} now passes exceptions to the caller
       instead of returning empty lists.
 
@@ -1720,6 +1737,11 @@ a partially-initialized module object in \code{sys.modules}.
 \item \constant{None} is now a constant; code that binds a new value to 
 the name \samp{None} is now a syntax error.
 
+\item The \function{signals.signal()} function now raises a
+\exception{RuntimeError} exception for certain illegal values;
+previously these errors would pass silently.  For example, you can no
+longer set a handler on the \constant{SIGKILL} signal.
+
 \end{itemize}
 
 
@@ -1728,7 +1750,8 @@ the name \samp{None} is now a syntax error.
 
 The author would like to thank the following people for offering
 suggestions, corrections and assistance with various drafts of this
-article: Koray Can, Hye-Shik Chang, Michael Dyck, Raymond Hettinger, 
-Brian Hurt, Hamish Lawson, Fredrik Lundh.
+article: Koray Can, Hye-Shik Chang, Michael Dyck, Raymond Hettinger,
+Brian Hurt, Hamish Lawson, Fredrik Lundh, Sean Reifschneider,
+Sadruddin Rejeb.
 
 \end{document}

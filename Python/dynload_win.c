@@ -2,7 +2,9 @@
 /* Support for dynamic loading of extension modules */
 
 #include <windows.h>
+#ifdef HAVE_DIRECT_H
 #include <direct.h>
+#endif
 #include <ctype.h>
 
 #include "Python.h"
@@ -11,10 +13,16 @@
 const struct filedescr _PyImport_DynLoadFiletab[] = {
 #ifdef _DEBUG
 	{"_d.pyd", "rb", C_EXTENSION},
+	/* Temporarily disable .dll, to avoid conflicts between sqlite3.dll
+	   and the sqlite3 package. If this needs to be reverted for 2.5,
+	   some other solution for the naming conflict must be found.
 	{"_d.dll", "rb", C_EXTENSION},
+	*/
 #else
 	{".pyd", "rb", C_EXTENSION},
+	/* Likewise
 	{".dll", "rb", C_EXTENSION},
+	*/
 #endif
 	{0, 0}
 };

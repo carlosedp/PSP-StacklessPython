@@ -105,6 +105,10 @@ import SocketServer
 import BaseHTTPServer
 import sys
 import os
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 def resolve_dotted_attribute(obj, attr, allow_dotted_names=True):
     """resolve_dotted_attribute(a, 'b.c.d') => a.b.c.d
@@ -159,9 +163,11 @@ class SimpleXMLRPCDispatcher:
     reason to instantiate this class directly.
     """
 
-    def __init__(self):
+    def __init__(self, allow_none, encoding):
         self.funcs = {}
         self.instance = None
+        self.allow_none = allow_none
+        self.encoding = encoding
 
     def register_instance(self, instance, allow_dotted_names=False):
         """Registers an instance to respond to XML-RPC requests.
@@ -241,23 +247,26 @@ class SimpleXMLRPCDispatcher:
         of changing method dispatch behavior.
         """
 
-        params, method = xmlrpclib.loads(data)
-
-        # generate response
         try:
+            params, method = xmlrpclib.loads(data)
+
+            # generate response
             if dispatch_method is not None:
                 response = dispatch_method(method, params)
             else:
                 response = self._dispatch(method, params)
             # wrap response in a singleton tuple
             response = (response,)
-            response = xmlrpclib.dumps(response, methodresponse=1)
+            response = xmlrpclib.dumps(response, methodresponse=1,
+                                       allow_none=self.allow_none, encoding=self.encoding)
         except Fault, fault:
-            response = xmlrpclib.dumps(fault)
+            response = xmlrpclib.dumps(fault, allow_none=self.allow_none,
+                                       encoding=self.encoding)
         except:
             # report exception back to server
             response = xmlrpclib.dumps(
-                xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value))
+                xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value)),
+                encoding=self.encoding, allow_none=self.allow_none,
                 )
 
         return response
@@ -414,6 +423,17 @@ class SimpleXMLRPCRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     XML-RPC requests.
     """
 
+    # Class attribute listing the accessible path components;
+    # paths not on this list will result in a 404 error.
+    rpc_paths = ('/', '/RPC2')
+
+    def is_rpc_path_valid(self):
+        if self.rpc_paths:
+            return self.path in self.rpc_paths
+        else:
+            # If .rpc_paths is empty, just assume all paths are legal
+            return True
+
     def do_POST(self):
         """Handles the HTTP POST request.
 
@@ -421,9 +441,25 @@ class SimpleXMLRPCRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         which are forwarded to the server's _dispatch method for handling.
         """
 
+        # Check that the path is legal
+        if not self.is_rpc_path_valid():
+            self.report_404()
+            return
+
         try:
-            # get arguments
-            data = self.rfile.read(int(self.headers["content-length"]))
+            # Get arguments by reading body of request.
+            # We read this in chunks to avoid straining
+            # socket.read(); around the 10 or 15Mb mark, some platforms
+            # begin to have problems (bug #792570).
+            max_chunk_size = 10*1024*1024
+            size_remaining = int(self.headers["content-length"])
+            L = []
+            while size_remaining:
+                chunk_size = min(size_remaining, max_chunk_size)
+                L.append(self.rfile.read(chunk_size))
+                size_remaining -= len(L[-1])
+            data = ''.join(L)
+
             # In previous versions of SimpleXMLRPCServer, _dispatch
             # could be overridden in this class, instead of in
             # SimpleXMLRPCDispatcher. To maintain backwards compatibility,
@@ -448,6 +484,18 @@ class SimpleXMLRPCRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.wfile.flush()
             self.connection.shutdown(1)
 
+    def report_404 (self):
+            # Report a 404 error
+        self.send_response(404)
+        response = 'No such page'
+        self.send_header("Content-type", "text/plain")
+        self.send_header("Content-length", str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
+        # shut down the connection
+        self.wfile.flush()
+        self.connection.shutdown(1)
+
     def log_request(self, code='-', size='-'):
         """Selectively log an accepted request."""
 
@@ -465,18 +513,28 @@ class SimpleXMLRPCServer(SocketServer.TCPServer,
     from SimpleXMLRPCDispatcher to change this behavior.
     """
 
+    allow_reuse_address = True
+
     def __init__(self, addr, requestHandler=SimpleXMLRPCRequestHandler,
-                 logRequests=1):
+                 logRequests=True, allow_none=False, encoding=None):
         self.logRequests = logRequests
 
-        SimpleXMLRPCDispatcher.__init__(self)
+        SimpleXMLRPCDispatcher.__init__(self, allow_none, encoding)
         SocketServer.TCPServer.__init__(self, addr, requestHandler)
+
+        # [Bug #1222790] If possible, set close-on-exec flag; if a
+        # method spawns a subprocess, the subprocess shouldn't have
+        # the listening socket open.
+        if fcntl is not None and hasattr(fcntl, 'FD_CLOEXEC'):
+            flags = fcntl.fcntl(self.fileno(), fcntl.F_GETFD)
+            flags |= fcntl.FD_CLOEXEC
+            fcntl.fcntl(self.fileno(), fcntl.F_SETFD, flags)
 
 class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
     """Simple handler for XML-RPC data passed through CGI."""
 
-    def __init__(self):
-        SimpleXMLRPCDispatcher.__init__(self)
+    def __init__(self, allow_none=False, encoding=None):
+        SimpleXMLRPCDispatcher.__init__(self, allow_none, encoding)
 
     def handle_xmlrpc(self, request_text):
         """Handle a single XML-RPC request"""
@@ -530,6 +588,7 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
             self.handle_xmlrpc(request_text)
 
 if __name__ == '__main__':
+    print 'Running XML-RPC server on port 8000'
     server = SimpleXMLRPCServer(("localhost", 8000))
     server.register_function(pow)
     server.register_function(lambda x,y: x+y, 'add')

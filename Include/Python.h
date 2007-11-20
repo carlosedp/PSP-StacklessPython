@@ -35,7 +35,9 @@
 #endif
 
 #include <string.h>
+#ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
 #include <stdlib.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -72,6 +74,9 @@
 #error "PYMALLOC_DEBUG requires WITH_PYMALLOC"
 #endif
 #include "pymem.h"
+
+/* comment this out if you don't want to be stackless */
+#include "stackless.h"
 
 #include "object.h"
 #include "objimpl.h"
@@ -113,6 +118,7 @@
 
 #include "pystate.h"
 
+#include "pyarena.h"
 #include "modsupport.h"
 #include "pythonrun.h"
 #include "ceval.h"
@@ -128,8 +134,7 @@
 #include "pystrtod.h"
 
 /* _Py_Mangle is defined in compile.c */
-PyAPI_FUNC(int) _Py_Mangle(char *p, char *name, \
-				 char *buffer, size_t maxlen);
+PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);
 
 /* PyArg_GetInt is deprecated and should not be used, use PyArg_Parse(). */
 #define PyArg_GetInt(v, a)	PyArg_Parse((v), "i", (a))

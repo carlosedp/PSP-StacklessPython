@@ -1,7 +1,7 @@
 \documentclass{manual}
 \usepackage{distutils}
 
-% $Id: dist.tex 41375 2005-11-02 23:00:23Z brett.cannon $
+% $Id: dist.tex 54826 2007-04-14 13:02:57Z richard.tew $
 
 % TODO
 %   Document extension.read_setup_file
@@ -530,7 +530,7 @@ If you need to include header files from some other Python extension,
 you can take advantage of the fact that header files are installed in a
 consistent way by the Distutils \command{install\_header} command.  For
 example, the Numerical Python header files are installed (on a standard
-Unix installation) to \file{/usr/local/include/python1.5/Numerical}.
+\UNIX{} installation) to \file{/usr/local/include/python1.5/Numerical}.
 (The exact location will differ according to your platform and Python
 installation.)  Since the Python include
 directory---\file{/usr/local/include/python1.5} in this case---is always
@@ -634,7 +634,83 @@ is not needed when building compiled extensions: Distutils
 will automatically add \code{initmodule}
 to the list of exported symbols.
 
+\section{Relationships between Distributions and Packages}
+
+A distribution may relate to packages in three specific ways:
+
+\begin{enumerate}
+  \item It can require packages or modules.
+
+  \item It can provide packages or modules.
+
+  \item It can obsolete packages or modules.
+\end{enumerate}
+
+These relationships can be specified using keyword arguments to the
+\function{distutils.core.setup()} function.
+
+Dependencies on other Python modules and packages can be specified by
+supplying the \var{requires} keyword argument to \function{setup()}.
+The value must be a list of strings.  Each string specifies a package
+that is required, and optionally what versions are sufficient.
+
+To specify that any version of a module or package is required, the
+string should consist entirely of the module or package name.
+Examples include \code{'mymodule'} and \code{'xml.parsers.expat'}.
+
+If specific versions are required, a sequence of qualifiers can be
+supplied in parentheses.  Each qualifier may consist of a comparison
+operator and a version number.  The accepted comparison operators are:
+
+\begin{verbatim}
+<    >    ==
+<=   >=   !=
+\end{verbatim}
+
+These can be combined by using multiple qualifiers separated by commas
+(and optional whitespace).  In this case, all of the qualifiers must
+be matched; a logical AND is used to combine the evaluations.
+
+Let's look at a bunch of examples:
+
+\begin{tableii}{l|l}{code}{Requires Expression}{Explanation}
+  \lineii{==1.0}               {Only version \code{1.0} is compatible}
+  \lineii{>1.0, !=1.5.1, <2.0} {Any version after \code{1.0} and before
+                                \code{2.0} is compatible, except
+                                \code{1.5.1}}
+\end{tableii}
+
+Now that we can specify dependencies, we also need to be able to
+specify what we provide that other distributions can require.  This is
+done using the \var{provides} keyword argument to \function{setup()}.
+The value for this keyword is a list of strings, each of which names a
+Python module or package, and optionally identifies the version.  If
+the version is not specified, it is assumed to match that of the
+distribution.
+
+Some examples:
+
+\begin{tableii}{l|l}{code}{Provides Expression}{Explanation}
+  \lineii{mypkg}      {Provide \code{mypkg}, using the distribution version}
+  \lineii{mypkg (1.1)} {Provide \code{mypkg} version 1.1, regardless of the
+                       distribution version}
+\end{tableii}
+
+A package can declare that it obsoletes other packages using the
+\var{obsoletes} keyword argument.  The value for this is similar to
+that of the \var{requires} keyword: a list of strings giving module or
+package specifiers.  Each specifier consists of a module or package
+name optionally followed by one or more version qualifiers.  Version
+qualifiers are given in parentheses after the module or package name.
+
+The versions identified by the qualifiers are those that are obsoleted
+by the distribution being described.  If no qualifiers are given, all
+versions of the named module or package are understood to be
+obsoleted.
+
+
 \section{Installing Scripts}
+
 So far we have been dealing with pure and non-pure Python modules,
 which are usually not run by themselves but imported by scripts.
 
@@ -773,7 +849,7 @@ version. This information includes:
          {long string}{}
   \lineiv{download_url}{location where the package may be downloaded}
          {URL}{(4)}
-  \lineiv{classifiers}{a list of Trove classifiers}
+  \lineiv{classifiers}{a list of classifiers}
          {list of strings}{(4)}
 \end{tableiv}
 
@@ -1391,7 +1467,7 @@ script as follows:
   \lineii{\%description (section)}{\option{long\_description}}
 \end{tableii}
 
-Additionally, there many options in \file{.spec} files that don't have
+Additionally, there are many options in \file{.spec} files that don't have
 corresponding options in the setup script.  Most of these are handled
 through options to the \command{bdist\_rpm} command as follows:
 
@@ -1643,7 +1719,58 @@ By default PyPI will list all versions of a given package. To hide certain
 versions, the Hidden property should be set to yes. This must be edited
 through the web interface.
 
+\section{The .pypirc file}
+\label{pypirc}
 
+The format of the \file{.pypirc} file is formated as follows:
+
+\begin{verbatim}
+[server-login]
+repository: <repository-url>
+username: <username>
+password: <password>
+\end{verbatim}
+
+\var{repository} can be ommitted and defaults to
+\code{http://www.python.org/pypi}.
+
+\chapter{Uploading Packages to the Package Index}
+\label{package-upload}
+
+\versionadded{2.5}
+
+The Python Package Index (PyPI) not only stores the package info, but also 
+the package data if the author of the package wishes to. The distutils
+command \command{upload} pushes the distribution files to PyPI.
+
+The command is invoked immediately after building one or more distribution
+files.  For example, the command
+
+\begin{verbatim}
+python setup.py sdist bdist_wininst upload
+\end{verbatim}
+
+will cause the source distribution and the Windows installer to be
+uploaded to PyPI.  Note that these will be uploaded even if they are
+built using an earlier invocation of \file{setup.py}, but that only
+distributions named on the command line for the invocation including
+the \command{upload} command are uploaded.
+
+The \command{upload} command uses the username, password, and repository
+URL from the \file{\$HOME/.pypirc} file (see section~\ref{pypirc} for
+more on this file).
+
+You can use the \longprogramopt{sign} option to tell \command{upload} to
+sign each uploaded file using GPG (GNU Privacy Guard).  The 
+\program{gpg} program must be available for execution on the system
+\envvar{PATH}.  You can also specify which key to use for signing
+using the \longprogramopt{identity=\var{name}} option.
+
+Other \command{upload} options include 
+\longprogramopt{repository=\var{url}} (which lets you override the
+repository setting from \file{\$HOME/.pypirc}), and
+\longprogramopt{show-response} (which displays the full response text
+from the PyPI server for help in debugging upload problems).
 
 \chapter{Examples}
 \label{examples}
@@ -1865,6 +1992,7 @@ If the \module{foo} extension belongs in the root package, the setup
 script for this could be
 \begin{verbatim}
 from distutils.core import setup
+from distutils.extension import Extension
 setup(name='foobar',
       version='1.0',
       ext_modules=[Extension('foo', ['foo.c'])],
@@ -1879,6 +2007,7 @@ the \module{foopkg} package simply by changing the name of the
 extension:
 \begin{verbatim}
 from distutils.core import setup
+from distutils.extension import Extension
 setup(name='foobar',
       version='1.0',
       ext_modules=[Extension('foopkg.foo', ['foo.c'])],
@@ -1983,6 +2112,14 @@ line option above, the command \command{bdist\_openpkg} could be
 implemented by the class \class{distcmds.bdist_openpkg.bdist_openpkg}
 or \class{buildcmds.bdist_openpkg.bdist_openpkg}.
 
+\section{Adding new distribution types}
+
+Commands that create distributions (files in the \file{dist/}
+directory) need to add \code{(\var{command}, \var{filename})} pairs to
+\code{self.distribution.dist_files} so that \command{upload} can
+upload it to PyPI.  The \var{filename} in the pair contains no path
+information, only the name of the file itself.  In dry-run mode, pairs
+should still be added to represent what would have been created.
 
 \chapter{Command Reference}
 \label{reference}
@@ -2116,7 +2253,7 @@ are laid out in the following table.
 \lineiii{scripts}{A list of standalone script files to be built and installed}{a list of strings}
 \lineiii{ext_modules}{A list of Python extensions to be built}{A list of 
 instances of \class{distutils.core.Extension}}
-\lineiii{classifiers}{A list of Trove categories for the package}{XXX link to better definition}
+\lineiii{classifiers}{A list of categories for the package}{The list of available categorizations is at \url{http://cheeseshop.python.org/pypi?:action=list_classifiers}.}
 \lineiii{distclass}{the \class{Distribution} class to use}{A subclass of \class{distutils.core.Distribution}}
 % What on earth is the use case for script_name?
 \lineiii{script_name}{The name of the setup.py script - defaults to \code{sys.argv[0]}}{a string}
@@ -2182,7 +2319,7 @@ constructor
 \lineiii{name}{the full name of the extension, including any packages
 --- ie. \emph{not} a filename or pathname, but Python dotted name}{string}
 \lineiii{sources}{list of source filenames, relative to the distribution
-root (where the setup script lives), in Unix form (slash-separated) for
+root (where the setup script lives), in \UNIX{} form (slash-separated) for
 portability. Source files may be C, \Cpp, SWIG (.i), platform-specific
 resource files, or whatever else is recognized by the \command{build_ext}
 command as source for a Python extension.}{string}
@@ -2738,9 +2875,20 @@ C compiler:
 \modulesynopsis{Microsoft Compiler}
 
 This module provides \class{MSVCCompiler}, an implementation of the abstract 
-\class{CCompiler} class for Microsoft Visual Studio. It should also work using
-the freely available compiler provided as part of the .Net SDK download. XXX
-download link.
+\class{CCompiler} class for Microsoft Visual Studio. Typically, extension
+modules need to be compiled with the same compiler that was used to compile
+Python. For Python 2.3 and earlier, the compiler was Visual Studio 6. For
+Python 2.4 and 2.5, the compiler is Visual Studio .NET 2003. The AMD64
+and Itanium binaries are created using the Platform SDK.
+
+\class{MSVCCompiler} will normally choose the right compiler, linker etc.
+on its own. To override this choice, the environment variables
+\var{DISTUTILS\_USE\_SDK} and \var{MSSdk} must be both set. \var{MSSdk}
+indicates that the current environment has been setup by the SDK's
+\code{SetEnv.Cmd} script, or that the environment variables had been
+registered when the SDK was installed; \var{DISTUTILS\_USE\_SDK} indicates
+that the distutils user has made an explicit choice to override the
+compiler selection by \class{MSVCCompiler}.
 
 \section{\module{distutils.bcppcompiler} --- Borland Compiler}
 \declaremodule{standard}{distutils.bcppcompiler}
@@ -2953,7 +3101,7 @@ name of the output file, and \var{copied} is true if the file was copied
 Move file \var{src} to \var{dst}. If \var{dst} is a directory, the file will
 be moved into it with the same name; otherwise, \var{src} is just renamed
 to \var{dst}.  Returns the new full name of the file.
-\warning{Handles cross-device moves on Unix using \function{copy_file()}.  
+\warning{Handles cross-device moves on \UNIX{} using \function{copy_file()}.  
 What about other systems???}
 \end{funcdesc}
 
@@ -2996,7 +3144,7 @@ For non-\POSIX{} platforms, currently just returns \code{sys.platform}.
 Return 'pathname' as a name that will work on the native filesystem,
 i.e. split it on '/' and put it back together again using the current
 directory separator.  Needed because filenames in the setup script are
-always supplied in Unix style, and have to be converted to the local
+always supplied in \UNIX{} style, and have to be converted to the local
 convention before we can actually use them in the filesystem.  Raises
 \exception{ValueError} on non-\UNIX-ish systems if \var{pathname} either 
 starts or ends with a slash.
@@ -3045,7 +3193,7 @@ with \var{prefix}.
 \end{funcdesc}
 
 \begin{funcdesc}{split_quoted}{s}
-Split a string up according to Unix shell-like rules for quotes and
+Split a string up according to \UNIX{} shell-like rules for quotes and
 backslashes.  In short: words are delimited by spaces, as long as those
 spaces are not escaped by a backslash, or inside a quoted string.
 Single and double quotes are equivalent, and the quote characters can
@@ -3459,6 +3607,11 @@ The class constructor takes a single argument \var{dist}, a
 
 % todo
 
+\section{\module{distutils.command.bdist_msi} --- Build a Microsoft Installer binary package}
+\declaremodule[distutils.command.bdistmsi]{standard}{distutils.command.bdist_msi}
+\modulesynopsis{Build a binary distribution as a Windows MSI file}
+
+% todo
 
 \section{\module{distutils.command.bdist_rpm} --- Build a binary distribution as a Redhat RPM and SRPM}
 \declaremodule[distutils.command.bdistrpm]{standard}{distutils.command.bdist_rpm}

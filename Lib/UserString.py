@@ -5,14 +5,13 @@
 Note: string objects have grown methods in Python 1.6
 This module requires Python 1.6 or later.
 """
-from types import StringTypes
 import sys
 
 __all__ = ["UserString","MutableString"]
 
 class UserString:
     def __init__(self, seq):
-        if isinstance(seq, StringTypes):
+        if isinstance(seq, basestring):
             self.data = seq
         elif isinstance(seq, UserString):
             self.data = seq.data[:]
@@ -43,12 +42,12 @@ class UserString:
     def __add__(self, other):
         if isinstance(other, UserString):
             return self.__class__(self.data + other.data)
-        elif isinstance(other, StringTypes):
+        elif isinstance(other, basestring):
             return self.__class__(self.data + other)
         else:
             return self.__class__(self.data + str(other))
     def __radd__(self, other):
-        if isinstance(other, StringTypes):
+        if isinstance(other, basestring):
             return self.__class__(other + self.data)
         else:
             return self.__class__(str(other) + self.data)
@@ -102,6 +101,8 @@ class UserString:
         return self.__class__(self.data.ljust(width, *args))
     def lower(self): return self.__class__(self.data.lower())
     def lstrip(self, chars=None): return self.__class__(self.data.lstrip(chars))
+    def partition(self, sep):
+        return self.data.partition(sep)
     def replace(self, old, new, maxsplit=-1):
         return self.__class__(self.data.replace(old, new, maxsplit))
     def rfind(self, sub, start=0, end=sys.maxint):
@@ -110,6 +111,8 @@ class UserString:
         return self.data.rindex(sub, start, end)
     def rjust(self, width, *args):
         return self.__class__(self.data.rjust(width, *args))
+    def rpartition(self, sep):
+        return self.data.rpartition(sep)
     def rstrip(self, chars=None): return self.__class__(self.data.rstrip(chars))
     def split(self, sep=None, maxsplit=-1):
         return self.data.split(sep, maxsplit)
@@ -146,16 +149,20 @@ class MutableString(UserString):
     def __hash__(self):
         raise TypeError, "unhashable type (it is mutable)"
     def __setitem__(self, index, sub):
+        if index < 0:
+            index += len(self.data)
         if index < 0 or index >= len(self.data): raise IndexError
         self.data = self.data[:index] + sub + self.data[index+1:]
     def __delitem__(self, index):
+        if index < 0:
+            index += len(self.data)
         if index < 0 or index >= len(self.data): raise IndexError
         self.data = self.data[:index] + self.data[index+1:]
     def __setslice__(self, start, end, sub):
         start = max(start, 0); end = max(end, 0)
         if isinstance(sub, UserString):
             self.data = self.data[:start]+sub.data+self.data[end:]
-        elif isinstance(sub, StringTypes):
+        elif isinstance(sub, basestring):
             self.data = self.data[:start]+sub+self.data[end:]
         else:
             self.data =  self.data[:start]+str(sub)+self.data[end:]
@@ -167,7 +174,7 @@ class MutableString(UserString):
     def __iadd__(self, other):
         if isinstance(other, UserString):
             self.data += other.data
-        elif isinstance(other, StringTypes):
+        elif isinstance(other, basestring):
             self.data += other
         else:
             self.data += str(other)

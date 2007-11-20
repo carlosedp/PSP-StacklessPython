@@ -46,7 +46,7 @@ def warn(message, category=None, stacklevel=1):
     filename = globals.get('__file__')
     if filename:
         fnl = filename.lower()
-        if fnl.endswith(".pyc") or fnl.endswith(".pyo"):
+        if fnl.endswith((".pyc", ".pyo")):
             filename = filename[:-1]
     else:
         if module == "__main__":
@@ -58,10 +58,11 @@ def warn(message, category=None, stacklevel=1):
         if not filename:
             filename = module
     registry = globals.setdefault("__warningregistry__", {})
-    warn_explicit(message, category, filename, lineno, module, registry)
+    warn_explicit(message, category, filename, lineno, module, registry,
+                  globals)
 
 def warn_explicit(message, category, filename, lineno,
-                  module=None, registry=None):
+                  module=None, registry=None, module_globals=None):
     if module is None:
         module = filename or "<unknown>"
         if module[-3:].lower() == ".py":
@@ -92,6 +93,11 @@ def warn_explicit(message, category, filename, lineno,
     if action == "ignore":
         registry[key] = 1
         return
+
+    # Prime the linecache for formatting, in case the
+    # "file" is actually in a zipfile or something.
+    linecache.getlines(filename, module_globals)
+
     if action == "error":
         raise message
     # Other actions
@@ -145,7 +151,8 @@ def filterwarnings(action, message="", category=Warning, module="", lineno=0,
     assert action in ("error", "ignore", "always", "default", "module",
                       "once"), "invalid action: %r" % (action,)
     assert isinstance(message, basestring), "message must be a string"
-    assert isinstance(category, types.ClassType), "category must be a class"
+    assert isinstance(category, (type, types.ClassType)), \
+           "category must be a class"
     assert issubclass(category, Warning), "category must be a Warning subclass"
     assert isinstance(module, basestring), "module must be a string"
     assert isinstance(lineno, int) and lineno >= 0, \
@@ -220,7 +227,7 @@ def _getaction(action):
     if not action:
         return "default"
     if action == "all": return "always" # Alias
-    for a in ['default', 'always', 'ignore', 'module', 'once', 'error']:
+    for a in ('default', 'always', 'ignore', 'module', 'once', 'error'):
         if a.startswith(action):
             return a
     raise _OptionError("invalid action: %r" % (action,))
@@ -247,13 +254,11 @@ def _getcategory(category):
             cat = getattr(m, klass)
         except AttributeError:
             raise _OptionError("unknown warning category: %r" % (category,))
-    if (not isinstance(cat, types.ClassType) or
-        not issubclass(cat, Warning)):
+    if not issubclass(cat, Warning):
         raise _OptionError("invalid warning category: %r" % (category,))
     return cat
 
 # Module initialization
 _processoptions(sys.warnoptions)
-# XXX OverflowWarning should go away for Python 2.5.
-simplefilter("ignore", category=OverflowWarning, append=1)
 simplefilter("ignore", category=PendingDeprecationWarning, append=1)
+simplefilter("ignore", category=ImportWarning, append=1)

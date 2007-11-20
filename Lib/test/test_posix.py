@@ -73,6 +73,11 @@ class PosixTester(unittest.TestCase):
             finally:
                 fp.close()
 
+    def test_confstr(self):
+        if hasattr(posix, 'confstr'):
+            self.assertRaises(ValueError, posix.confstr, "CS_garbage")
+            self.assertEqual(len(posix.confstr("CS_PATH")) > 0, True)
+
     def test_dup2(self):
         if hasattr(posix, 'dup2'):
             fp1 = open(test_support.TESTFN)
@@ -93,6 +98,37 @@ class PosixTester(unittest.TestCase):
             self.fdopen_helper()
             self.fdopen_helper('r')
             self.fdopen_helper('r', 100)
+
+    def test_osexlock(self):
+        if hasattr(posix, "O_EXLOCK"):
+            fd = os.open(test_support.TESTFN,
+                         os.O_WRONLY|os.O_EXLOCK|os.O_CREAT)
+            self.assertRaises(OSError, os.open, test_support.TESTFN,
+                              os.O_WRONLY|os.O_EXLOCK|os.O_NONBLOCK)
+            os.close(fd)
+
+            if hasattr(posix, "O_SHLOCK"):
+                fd = os.open(test_support.TESTFN,
+                             os.O_WRONLY|os.O_SHLOCK|os.O_CREAT)
+                self.assertRaises(OSError, os.open, test_support.TESTFN,
+                                  os.O_WRONLY|os.O_EXLOCK|os.O_NONBLOCK)
+                os.close(fd)
+
+    def test_osshlock(self):
+        if hasattr(posix, "O_SHLOCK"):
+            fd1 = os.open(test_support.TESTFN,
+                         os.O_WRONLY|os.O_SHLOCK|os.O_CREAT)
+            fd2 = os.open(test_support.TESTFN,
+                          os.O_WRONLY|os.O_SHLOCK|os.O_CREAT)
+            os.close(fd2)
+            os.close(fd1)
+
+            if hasattr(posix, "O_EXLOCK"):
+                fd = os.open(test_support.TESTFN,
+                             os.O_WRONLY|os.O_SHLOCK|os.O_CREAT)
+                self.assertRaises(OSError, os.open, test_support.TESTFN,
+                                  os.O_RDONLY|os.O_EXLOCK|os.O_NONBLOCK)
+                os.close(fd)
 
     def test_fstat(self):
         if hasattr(posix, 'fstat'):

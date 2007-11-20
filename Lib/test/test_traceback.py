@@ -24,12 +24,16 @@ class TracebackCases(unittest.TestCase):
         # XXX why doesn't compile raise the same traceback?
         import test.badsyntax_nocaret
 
+    def syntax_error_bad_indentation(self):
+        compile("def spam():\n  print 1\n print 2", "?", "exec")
+
     def test_caret(self):
         err = self.get_exception_format(self.syntax_error_with_caret,
                                         SyntaxError)
         self.assert_(len(err) == 4)
-        self.assert_("^" in err[2]) # third line has caret
         self.assert_(err[1].strip() == "return x!")
+        self.assert_("^" in err[2]) # third line has caret
+        self.assert_(err[1].find("!") == err[2].find("^")) # in the right place
 
     def test_nocaret(self):
         if is_jython:
@@ -39,6 +43,14 @@ class TracebackCases(unittest.TestCase):
                                         SyntaxError)
         self.assert_(len(err) == 3)
         self.assert_(err[1].strip() == "[x for x in x] = x")
+
+    def test_bad_indentation(self):
+        err = self.get_exception_format(self.syntax_error_bad_indentation,
+                                        IndentationError)
+        self.assert_(len(err) == 4)
+        self.assert_(err[1].strip() == "print 2")
+        self.assert_("^" in err[2])
+        self.assert_(err[1].find("2") == err[2].find("^"))
 
     def test_bug737473(self):
         import sys, os, tempfile, time
@@ -84,6 +96,63 @@ def test():
             for f in os.listdir(testdir):
                 os.unlink(os.path.join(testdir, f))
             os.rmdir(testdir)
+
+    def test_members(self):
+        # Covers Python/structmember.c::listmembers()
+        try:
+            1/0
+        except:
+            import sys
+            sys.exc_traceback.__members__
+
+    def test_base_exception(self):
+        # Test that exceptions derived from BaseException are formatted right
+        e = KeyboardInterrupt()
+        lst = traceback.format_exception_only(e.__class__, e)
+        self.assertEqual(lst, ['KeyboardInterrupt\n'])
+
+    # String exceptions are deprecated, but legal.  The quirky form with
+    # separate "type" and "value" tends to break things, because
+    #     not isinstance(value, type)
+    # and a string cannot be the first argument to issubclass.
+    #
+    # Note that sys.last_type and sys.last_value do not get set if an
+    # exception is caught, so we sort of cheat and just emulate them.
+    #
+    # test_string_exception1 is equivalent to
+    #
+    # >>> raise "String Exception"
+    #
+    # test_string_exception2 is equivalent to
+    #
+    # >>> raise "String Exception", "String Value"
+    #
+    def test_string_exception1(self):
+        str_type = "String Exception"
+        err = traceback.format_exception_only(str_type, None)
+        self.assertEqual(len(err), 1)
+        self.assertEqual(err[0], str_type + '\n')
+
+    def test_string_exception2(self):
+        str_type = "String Exception"
+        str_value = "String Value"
+        err = traceback.format_exception_only(str_type, str_value)
+        self.assertEqual(len(err), 1)
+        self.assertEqual(err[0], str_type + ': ' + str_value + '\n')
+
+    def test_format_exception_only_bad__str__(self):
+        class X(Exception):
+            def __str__(self):
+                1/0
+        err = traceback.format_exception_only(X, X())
+        self.assertEqual(len(err), 1)
+        str_value = '<unprintable %s object>' % X.__name__
+        self.assertEqual(err[0], X.__name__ + ': ' + str_value + '\n')
+
+    def test_without_exception(self):
+        err = traceback.format_exception_only(None, None)
+        self.assertEqual(err, ['None\n'])
+
 
 def test_main():
     run_unittest(TracebackCases)

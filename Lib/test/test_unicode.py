@@ -92,6 +92,10 @@ class UnicodeTest(
                 "\\xfe\\xff'")
             testrepr = repr(u''.join(map(unichr, xrange(256))))
             self.assertEqual(testrepr, latin1repr)
+            # Test repr works on wide unicode escapes without overflow.
+            self.assertEqual(repr(u"\U00010000" * 39 + u"\uffff" * 4096),
+                             repr(u"\U00010000" * 39 + u"\uffff" * 4096))
+
 
     def test_count(self):
         string_tests.CommonTest.test_count(self)
@@ -406,21 +410,15 @@ class UnicodeTest(
         self.assertEqual('%i %*.*s' % (10, 5,3,u'abc',), u'10   abc')
         self.assertEqual('%i%s %*.*s' % (10, 3, 5, 3, u'abc',), u'103   abc')
         self.assertEqual('%c' % u'a', u'a')
+        class Wrapper:
+            def __str__(self):
+                return u'\u1234'
+        self.assertEqual('%s' % Wrapper(), u'\u1234')
 
-
+    @test_support.run_with_locale('LC_ALL', 'de_DE', 'fr_FR')
     def test_format_float(self):
-        try:
-            import locale
-            orig_locale = locale.setlocale(locale.LC_ALL)
-            locale.setlocale(locale.LC_ALL, 'de_DE')
-        except (ImportError, locale.Error):
-            return # skip if we can't set locale
-
-        try:
-            # should not format with a comma, but always with C locale
-            self.assertEqual(u'1.0', u'%.1f' % 1.0)
-        finally:
-            locale.setlocale(locale.LC_ALL, orig_locale)
+        # should not format with a comma, but always with C locale
+        self.assertEqual(u'1.0', u'%.1f' % 1.0)
 
     def test_constructor(self):
         # unicode(obj) tests (this maps to PyObject_Unicode() at C level)
@@ -626,20 +624,24 @@ class UnicodeTest(
         self.assertEqual(u'hello'.encode('latin-1'), 'hello')
 
         # Roundtrip safety for BMP (just the first 1024 chars)
-        u = u''.join(map(unichr, xrange(1024)))
-        for encoding in ('utf-7', 'utf-8', 'utf-16', 'utf-16-le', 'utf-16-be',
-                         'raw_unicode_escape', 'unicode_escape', 'unicode_internal'):
-            self.assertEqual(unicode(u.encode(encoding),encoding), u)
+        for c in xrange(1024):
+            u = unichr(c)
+            for encoding in ('utf-7', 'utf-8', 'utf-16', 'utf-16-le',
+                             'utf-16-be', 'raw_unicode_escape',
+                             'unicode_escape', 'unicode_internal'):
+                self.assertEqual(unicode(u.encode(encoding),encoding), u)
 
         # Roundtrip safety for BMP (just the first 256 chars)
-        u = u''.join(map(unichr, xrange(256)))
-        for encoding in ('latin-1',):
-            self.assertEqual(unicode(u.encode(encoding),encoding), u)
+        for c in xrange(256):
+            u = unichr(c)
+            for encoding in ('latin-1',):
+                self.assertEqual(unicode(u.encode(encoding),encoding), u)
 
         # Roundtrip safety for BMP (just the first 128 chars)
-        u = u''.join(map(unichr, xrange(128)))
-        for encoding in ('ascii',):
-            self.assertEqual(unicode(u.encode(encoding),encoding), u)
+        for c in xrange(128):
+            u = unichr(c)
+            for encoding in ('ascii',):
+                self.assertEqual(unicode(u.encode(encoding),encoding), u)
 
         # Roundtrip safety for non-BMP (just a few chars)
         u = u'\U00010001\U00020002\U00030003\U00040004\U00050005'
@@ -740,6 +742,69 @@ class UnicodeTest(
         y = x.encode("raw-unicode-escape").decode("raw-unicode-escape")
         self.assertEqual(x, y)
 
+    def test_conversion(self):
+        # Make sure __unicode__() works properly
+        class Foo0:
+            def __str__(self):
+                return "foo"
+
+        class Foo1:
+            def __unicode__(self):
+                return u"foo"
+
+        class Foo2(object):
+            def __unicode__(self):
+                return u"foo"
+
+        class Foo3(object):
+            def __unicode__(self):
+                return "foo"
+
+        class Foo4(str):
+            def __unicode__(self):
+                return "foo"
+
+        class Foo5(unicode):
+            def __unicode__(self):
+                return "foo"
+
+        class Foo6(str):
+            def __str__(self):
+                return "foos"
+
+            def __unicode__(self):
+                return u"foou"
+
+        class Foo7(unicode):
+            def __str__(self):
+                return "foos"
+            def __unicode__(self):
+                return u"foou"
+
+        class Foo8(unicode):
+            def __new__(cls, content=""):
+                return unicode.__new__(cls, 2*content)
+            def __unicode__(self):
+                return self
+
+        class Foo9(unicode):
+            def __str__(self):
+                return "string"
+            def __unicode__(self):
+                return "not unicode"
+
+        self.assertEqual(unicode(Foo0()), u"foo")
+        self.assertEqual(unicode(Foo1()), u"foo")
+        self.assertEqual(unicode(Foo2()), u"foo")
+        self.assertEqual(unicode(Foo3()), u"foo")
+        self.assertEqual(unicode(Foo4("bar")), u"foo")
+        self.assertEqual(unicode(Foo5("bar")), u"foo")
+        self.assertEqual(unicode(Foo6("bar")), u"foou")
+        self.assertEqual(unicode(Foo7("bar")), u"foou")
+        self.assertEqual(unicode(Foo8("foo")), u"foofoo")
+        self.assertEqual(str(Foo9("foo")), "string")
+        self.assertEqual(unicode(Foo9("foo")), u"not unicode")
+
     def test_unicode_repr(self):
         class s1:
             def __repr__(self):
@@ -751,6 +816,10 @@ class UnicodeTest(
 
         self.assertEqual(repr(s1()), '\\n')
         self.assertEqual(repr(s2()), '\\n')
+
+
+
+
 
 def test_main():
     test_support.run_unittest(UnicodeTest)

@@ -100,7 +100,7 @@ class TimeoutTestCase(unittest.TestCase):
 
     def setUp(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.addr_remote = ('www.python.org', 80)
+        self.addr_remote = ('www.python.org.', 80)
         self.addr_local  = ('127.0.0.1', 25339)
 
     def tearDown(self):
@@ -113,7 +113,8 @@ class TimeoutTestCase(unittest.TestCase):
 
         # If we are too close to www.python.org, this test will fail.
         # Pick a host that should be farther away.
-        if socket.getfqdn().split('.')[-2:] == ['python', 'org']:
+        if (socket.getfqdn().split('.')[-2:] == ['python', 'org'] or
+            socket.getfqdn().split('.')[-2:-1] == ['xs4all']):
             self.addr_remote = ('tut.fi', 80)
 
         _t1 = time.time()

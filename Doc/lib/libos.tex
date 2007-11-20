@@ -106,11 +106,11 @@ the mapping is modified.
 \code{environ} may cause memory leaks.  Refer to the system documentation
 for \cfunction{putenv()}.}
 
-If \function{putenv()} is not provided, a modified copy of this mapping
-may be passed to the appropriate process-creation functions to cause
+If \function{putenv()} is not provided, a modified copy of this mapping 
+may be passed to the appropriate process-creation functions to cause 
 child processes to use a modified environment.
 
-If the platform supports the \function{unsetenv()} function, you can
+If the platform supports the \function{unsetenv()} function, you can 
 delete items in this mapping to unset environment variables.
 \function{unsetenv()} will be called automatically when an item is
 deleted from \code{os.environ}.
@@ -343,6 +343,10 @@ Availability: Macintosh, \UNIX, Windows.
 \versionchanged[When specified, the \var{mode} argument must now start
   with one of the letters \character{r}, \character{w}, or \character{a},
   otherwise a \exception{ValueError} is raised]{2.3}
+\versionchanged[On \UNIX, when the \var{mode} argument starts with
+  \character{a}, the \var{O_APPEND} flag is set on the file descriptor
+  (which the \cfunction{fdopen()} implementation already does on most
+  platforms)]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{popen}{command\optional{, mode\optional{, bufsize}}}
@@ -356,6 +360,10 @@ available as the return value of the \method{close()} method of the file
 object, except that when the exit status is zero (termination without
 errors), \code{None} is returned.
 Availability: Macintosh, \UNIX, Windows.
+
+The \module{subprocess} module provides more powerful facilities for
+spawning new processes and retrieving their results; using that module
+is preferable to using this function.
 
 \versionchanged[This function worked unreliably under Windows in
   earlier versions of Python.  This was due to the use of the
@@ -371,8 +379,13 @@ deleted once there are no file descriptors for the file.
 Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
+There are a number of different \function{popen*()} functions that
+provide slightly different ways to create subprocesses.  Note that the
+\module{subprocess} module is easier to use and more powerful;
+consider using that module before writing code using the
+lower-level \function{popen*()} functions.
 
-For each of the following \function{popen()} variants, if \var{bufsize} is
+For each of the \function{popen*()} variants, if \var{bufsize} is
 specified, it specifies the buffer size for the I/O pipes.
 \var{mode}, if provided, should be the string \code{'b'} or
 \code{'t'}; on Windows this is needed to determine whether the file
@@ -427,8 +440,15 @@ functions have a different order.
 
 \subsection{File Descriptor Operations \label{os-fd-ops}}
 
-These functions operate on I/O streams referred to
-using file descriptors.
+These functions operate on I/O streams referenced using file
+descriptors.  
+
+File descriptors are small integers corresponding to a file that has
+been opened by the current process.  For example, standard input is
+usually file descriptor 0, standard output is 1, and standard error is
+2.  Further files opened by a process will then be assigned 3, 4, 5,
+and so forth.  The name ``file descriptor'' is slightly deceptive; on
+{\UNIX} platforms, sockets and pipes are also referenced by file descriptors.
 
 
 \begin{funcdesc}{close}{fd}
@@ -540,7 +560,8 @@ documentation; flag constants (like \constant{O_RDONLY} and
 This function is intended for low-level I/O.  For normal usage,
 use the built-in function \function{open()}, which returns a ``file
 object'' with \method{read()} and \method{write()} methods (and many
-more).
+more).  To wrap a file descriptor in a ``file object'', use
+\function{fdopen()}.
 \end{notice}
 \end{funcdesc}
 
@@ -612,7 +633,9 @@ its \method{write()} method.
 
 
 The following data items are available for use in constructing the
-\var{flags} parameter to the \function{open()} function.
+\var{flags} parameter to the \function{open()} function.  Some items will
+not be available on all platforms.  For descriptions of their availability
+and use, consult \manpage{open}{2}.
 
 \begin{datadesc}{O_RDONLY}
 \dataline{O_WRONLY}
@@ -632,6 +655,8 @@ Availability: Macintosh, \UNIX, Windows.
 \dataline{O_NDELAY}
 \dataline{O_NONBLOCK}
 \dataline{O_NOCTTY}
+\dataline{O_SHLOCK}
+\dataline{O_EXLOCK}
 More options for the \var{flag} argument to the \function{open()} function.
 Availability: Macintosh, \UNIX.
 \end{datadesc}
@@ -652,6 +677,15 @@ Availability: Windows.
 Options for the \var{flag} argument to the \function{open()} function.
 These can be bit-wise OR'd together.
 Availability: Windows.
+\end{datadesc}
+
+\begin{datadesc}{SEEK_SET}
+\dataline{SEEK_CUR}
+\dataline{SEEK_END}
+Parameters to the \function{lseek()} function.
+Their values are 0, 1, and 2, respectively.
+Availability: Windows, Macintosh, \UNIX.
+\versionadded{2.5}
 \end{datadesc}
 
 \subsection{Files and Directories \label{os-file-dir}}
@@ -789,7 +823,7 @@ entries \code{'.'} and \code{'..'} even if they are present in the
 directory.
 Availability: Macintosh, \UNIX, Windows.
 
-\versionchanged[On Windows NT/2k/XP and Unix, if \var{path} is a Unicode
+\versionchanged[On Windows NT/2k/XP and \UNIX, if \var{path} is a Unicode
 object, the result will be a list of Unicode objects]{2.3}
 \end{funcdesc}
 
@@ -973,18 +1007,35 @@ the \ctype{stat} structure, namely:
 \member{st_mtime} (time of most recent content modification),
 \member{st_ctime}
 (platform dependent; time of most recent metadata change on \UNIX, or
-the time of creation on Windows).
+the time of creation on Windows):
+
+\begin{verbatim}
+>>> import os
+>>> statinfo = os.stat('somefile.txt')
+>>> statinfo
+(33188, 422511L, 769L, 1, 1032, 100, 926L, 1105022698,1105022732, 1105022732)
+>>> statinfo.st_size
+926L
+>>>
+\end{verbatim}
 
 \versionchanged [If \function{stat_float_times} returns true, the time
 values are floats, measuring seconds. Fractions of a second may be
 reported if the system supports that. On Mac OS, the times are always
 floats. See \function{stat_float_times} for further discussion]{2.3}
 
-On some Unix systems (such as Linux), the following attributes may
+On some \UNIX{} systems (such as Linux), the following attributes may
 also be available:
 \member{st_blocks} (number of blocks allocated for file),
 \member{st_blksize} (filesystem blocksize),
 \member{st_rdev} (type of device if an inode device).
+\member{st_flags} (user defined flags for file).
+
+On other \UNIX{} systems (such as FreeBSD), the following attributes
+may be available (but may be only filled out if root tries to
+use them):
+\member{st_gen} (file generation number),
+\member{st_birthtime} (time of file creation).
 
 On Mac OS systems, the following attributes may also be available:
 \member{st_rsize},
@@ -1027,6 +1078,7 @@ Availability: Macintosh, \UNIX, Windows.
 
 \versionchanged
 [Added access to values as attributes of the returned object]{2.2}
+\versionchanged[Added st_gen, st_birthtime]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{stat_float_times}{\optional{newvalue}}
@@ -1036,16 +1088,15 @@ return floats, if it is \code{False}, future calls return ints.
 If \var{newvalue} is omitted, return the current setting.
 
 For compatibility with older Python versions, accessing
-\class{stat_result} as a tuple always returns integers. For
-compatibility with Python 2.2, accessing the time stamps by field name
-also returns integers. Applications that want to determine the
-fractions of a second in a time stamp can use this function to have
-time stamps represented as floats. Whether they will actually observe
-non-zero fractions depends on the system.
+\class{stat_result} as a tuple always returns integers.
 
-Future Python releases will change the default of this setting;
-applications that cannot deal with floating point time stamps can then
-use this function to turn the feature off.
+\versionchanged[Python now returns float values by default. Applications
+which do not work correctly with floating point time stamps can use
+this function to restore the old behaviour]{2.5}
+
+The resolution of the timestamps (that is the smallest possible fraction)
+depends on the system. Some systems only support second resolution;
+on these systems, the fraction will always be zero.
 
 It is recommended that this setting is only changed at program startup
 time in the \var{__main__} module; libraries should never change this
@@ -1461,7 +1512,7 @@ Availability: Macintosh, Some flavors of \UNIX.
 \begin{funcdesc}{kill}{pid, sig}
 \index{process!killing}
 \index{process!signalling}
-Kill the process \var{pid} with signal \var{sig}.  Constants for the
+Send signal \var{sig} to the process \var{pid}.  Constants for the
 specific signals available on the host platform are defined in the
 \refmodule{signal} module.
 Availability: Macintosh, \UNIX.
@@ -1470,7 +1521,7 @@ Availability: Macintosh, \UNIX.
 \begin{funcdesc}{killpg}{pgid, sig}
 \index{process!killing}
 \index{process!signalling}
-Kill the process group \var{pgid} with the signal \var{sig}.
+Send the signal \var{sig} to the process group \var{pgid}.
 Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{funcdesc}
@@ -1503,7 +1554,13 @@ functions are described in section \ref{os-newstreams}.
 \funcline{spawnve}{mode, path, args, env}
 \funcline{spawnvp}{mode, file, args}
 \funcline{spawnvpe}{mode, file, args, env}
-Execute the program \var{path} in a new process.  If \var{mode} is
+Execute the program \var{path} in a new process.  
+
+(Note that the \module{subprocess} module provides more powerful
+facilities for spawning new processes and retrieving their results;
+using that module is preferable to using these functions.)
+
+If \var{mode} is
 \constant{P_NOWAIT}, this function returns the process ID of the new
 process; if \var{mode} is \constant{P_WAIT}, returns the process's
 exit code if it exits normally, or \code{-\var{signal}}, where
@@ -1593,12 +1650,20 @@ Availability: Windows.
 \versionadded{1.6}
 \end{datadesc}
 
-\begin{funcdesc}{startfile}{path}
-Start a file with its associated application.  This acts like
+\begin{funcdesc}{startfile}{path\optional{, operation}}
+Start a file with its associated application.
+
+When \var{operation} is not specified or \code{'open'}, this acts like
 double-clicking the file in Windows Explorer, or giving the file name
 as an argument to the \program{start} command from the interactive
 command shell: the file is opened with whatever application (if any)
 its extension is associated.
+
+When another \var{operation} is given, it must be a ``command verb''
+that specifies what should be done with the file.
+Common verbs documented by Microsoft are \code{'print'} and 
+\code{'edit'} (to be used on files) as well as \code{'explore'} and
+\code{'find'} (to be used on directories).
 
 \function{startfile()} returns as soon as the associated application
 is launched.  There is no option to wait for the application to close,
@@ -1610,6 +1675,7 @@ function doesn't work if it is.  Use the \function{os.path.normpath()}
 function to ensure that the path is properly encoded for Win32.
 Availability: Windows.
 \versionadded{2.0}
+\versionadded[The \var{operation} parameter]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{system}{command}
@@ -1631,6 +1697,10 @@ and XP) this is the exit status of the command run; on systems using
 a non-native shell, consult your shell documentation.
 
 Availability: Macintosh, \UNIX, Windows.
+
+The \module{subprocess} module provides more powerful facilities for
+spawning new processes and retrieving their results; using that module
+is preferable to using this function.
 \end{funcdesc}
 
 \begin{funcdesc}{times}{}
@@ -1683,6 +1753,27 @@ The value of integer \var{options} has no effect.
 child process.
 The \function{spawn()} functions called with \constant{P_NOWAIT}
 return suitable process handles.
+\end{funcdesc}
+
+\begin{funcdesc}{wait3}{\optional{options}}
+Similar to \function{waitpid()}, except no process id argument is given and
+a 3-element tuple containing the child's process id, exit status indication,
+and resource usage information is returned.  Refer to
+\module{resource}.\function{getrusage()}
+for details on resource usage information.  The option argument is the same
+as that provided to \function{waitpid()} and \function{wait4()}.
+Availability: \UNIX.
+\versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{wait4}{pid, options}
+Similar to \function{waitpid()}, except a 3-element tuple, containing the
+child's process id, exit status indication, and resource usage information
+is returned.  Refer to \module{resource}.\function{getrusage()} for details
+on resource usage information.  The arguments to \function{wait4()} are
+the same as those provided to \function{waitpid()}.
+Availability: \UNIX.
+\versionadded{2.5}
 \end{funcdesc}
 
 \begin{datadesc}{WNOHANG}
@@ -1772,14 +1863,14 @@ Return string-valued system configuration values.
 string which is the name of a defined system value; these names are
 specified in a number of standards (\POSIX, \UNIX{} 95, \UNIX{} 98, and
 others).  Some platforms define additional names as well.  The names
-known to the host operating system are given in the
+known to the host operating system are given as the keys of the
 \code{confstr_names} dictionary.  For configuration variables not
 included in that mapping, passing an integer for \var{name} is also
 accepted.
 Availability: Macintosh, \UNIX.
 
-If the configuration value specified by \var{name} isn't defined, the
-empty string is returned.
+If the configuration value specified by \var{name} isn't defined,
+\code{None} is returned.
 
 If \var{name} is a string and is not known, \exception{ValueError} is
 raised.  If a specific value for \var{name} is not supported by the

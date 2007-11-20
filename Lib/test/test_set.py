@@ -5,6 +5,8 @@ import operator
 import copy
 import pickle
 import os
+from random import randrange, shuffle
+import sys
 
 class PassThru(Exception):
     pass
@@ -12,6 +14,25 @@ class PassThru(Exception):
 def check_pass_thru():
     raise PassThru
     yield 1
+
+class BadCmp:
+    def __hash__(self):
+        return 1
+    def __cmp__(self, other):
+        raise RuntimeError
+
+class ReprWrapper:
+    'Used to test self-referential repr() calls'
+    def __repr__(self):
+        return repr(self.value)
+
+class HashCountingInt(int):
+    'int-like object that counts the number of times __hash__ is called'
+    def __init__(self, *args):
+        self.hash_count = 0
+    def __hash__(self):
+        self.hash_count += 1
+        return int.__hash__(self)
 
 class TestJointOps(unittest.TestCase):
     # Tests common to both set and frozenset
@@ -216,7 +237,7 @@ class TestJointOps(unittest.TestCase):
         # Bug #1257731
         class H(self.thetype):
             def __hash__(self):
-                return id(self)
+                return int(id(self) & 0x7fffffff)
         s=H()
         f=set()
         f.add(s)
@@ -224,6 +245,57 @@ class TestJointOps(unittest.TestCase):
         f.remove(s)
         f.add(s)
         f.discard(s)
+
+    def test_badcmp(self):
+        s = self.thetype([BadCmp()])
+        # Detect comparison errors during insertion and lookup
+        self.assertRaises(RuntimeError, self.thetype, [BadCmp(), BadCmp()])
+        self.assertRaises(RuntimeError, s.__contains__, BadCmp())
+        # Detect errors during mutating operations
+        if hasattr(s, 'add'):
+            self.assertRaises(RuntimeError, s.add, BadCmp())
+            self.assertRaises(RuntimeError, s.discard, BadCmp())
+            self.assertRaises(RuntimeError, s.remove, BadCmp())
+
+    def test_cyclical_repr(self):
+        w = ReprWrapper()
+        s = self.thetype([w])
+        w.value = s
+        name = repr(s).partition('(')[0]    # strip class name from repr string
+        self.assertEqual(repr(s), '%s([%s(...)])' % (name, name))
+
+    def test_cyclical_print(self):
+        w = ReprWrapper()
+        s = self.thetype([w])
+        w.value = s
+        try:
+            fo = open(test_support.TESTFN, "wb")
+            print >> fo, s,
+            fo.close()
+            fo = open(test_support.TESTFN, "rb")
+            self.assertEqual(fo.read(), repr(s))
+        finally:
+            fo.close()
+            os.remove(test_support.TESTFN)
+
+    def test_do_not_rehash_dict_keys(self):
+        n = 10
+        d = dict.fromkeys(map(HashCountingInt, xrange(n)))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s = self.thetype(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s.difference(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        if hasattr(s, 'symmetric_difference_update'):
+            s.symmetric_difference_update(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)     
+        d2 = dict.fromkeys(set(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d), 123)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        self.assertEqual(d3, dict.fromkeys(d, 123))
 
 class TestSet(TestJointOps):
     thetype = set
@@ -273,6 +345,17 @@ class TestSet(TestJointOps):
         s.remove(self.thetype(self.word))
         self.assert_(self.thetype(self.word) not in s)
         self.assertRaises(KeyError, self.s.remove, self.thetype(self.word))
+
+    def test_remove_keyerror_unpacking(self):
+        # bug:  www.python.org/sf/1576657
+        for v1 in ['Q', (1,)]:
+            try:
+                self.s.remove(v1)
+            except KeyError, e:
+                v2 = e.args[0]
+                self.assertEqual(v1, v2)
+            else:
+                self.fail()
 
     def test_discard(self):
         self.s.discard('a')
@@ -401,11 +484,26 @@ class TestSet(TestJointOps):
         s = None
         self.assertRaises(ReferenceError, str, p)
 
+    # C API test only available in a debug build
+    if hasattr(set, "test_c_api"):
+        def test_c_api(self):
+            self.assertEqual(set('abc').test_c_api(), True)
+
 class SetSubclass(set):
     pass
 
 class TestSetSubclass(TestSet):
     thetype = SetSubclass
+
+class SetSubclassWithKeywordArgs(set):
+    def __init__(self, iterable=[], newarg=None):
+        set.__init__(self, iterable)
+
+class TestSetSubclassWithKeywordArgs(TestSet):
+    
+    def test_keywords_in_subclass(self):
+        'SF bug #1486663 -- this used to erroneously raise a TypeError'
+        SetSubclassWithKeywordArgs(newarg=1)
 
 class TestFrozenSet(TestJointOps):
     thetype = frozenset
@@ -415,6 +513,15 @@ class TestFrozenSet(TestJointOps):
         s.__init__(self.otherword)
         self.assertEqual(s, set(self.word))
 
+    def test_singleton_empty_frozenset(self):
+        f = frozenset()
+        efs = [frozenset(), frozenset([]), frozenset(()), frozenset(''),
+               frozenset(), frozenset([]), frozenset(()), frozenset(''),
+               frozenset(xrange(0)), frozenset(frozenset()),
+               frozenset(f), f]
+        # All of the empty frozensets should have just one id()
+        self.assertEqual(len(set(map(id, efs))), 1)
+
     def test_constructor_identity(self):
         s = self.thetype(range(3))
         t = self.thetype(s)
@@ -423,6 +530,15 @@ class TestFrozenSet(TestJointOps):
     def test_hash(self):
         self.assertEqual(hash(self.thetype('abcdeb')),
                          hash(self.thetype('ebecda')))
+
+        # make sure that all permutations give the same hash value
+        n = 100
+        seq = [randrange(n) for i in xrange(n)]
+        results = set()
+        for i in xrange(200):
+            shuffle(seq)
+            results.add(hash(self.thetype(seq)))
+        self.assertEqual(len(results), 1)
 
     def test_copy(self):
         dup = self.s.copy()
@@ -470,6 +586,17 @@ class TestFrozenSetSubclass(TestFrozenSet):
         s = self.thetype()
         t = self.thetype(s)
         self.assertEqual(s, t)
+
+    def test_singleton_empty_frozenset(self):
+        Frozenset = self.thetype
+        f = frozenset()
+        F = Frozenset()
+        efs = [Frozenset(), Frozenset([]), Frozenset(()), Frozenset(''),
+               Frozenset(), Frozenset([]), Frozenset(()), Frozenset(''),
+               Frozenset(xrange(0)), Frozenset(Frozenset()),
+               Frozenset(frozenset()), f, F, Frozenset(f), Frozenset(F)]
+        # All empty frozenset subclass instances should have different ids
+        self.assertEqual(len(set(map(id, efs))), len(efs))
 
 # Tests taken from test_sets.py =============================================
 
@@ -553,6 +680,10 @@ class TestBasicOps(unittest.TestCase):
     def test_iteration(self):
         for v in self.set:
             self.assert_(v in self.values)
+        setiter = iter(self.set)
+        # note: __length_hint__ is an internal undocumented API,
+        # don't rely on it in your own programs
+        self.assertEqual(setiter.__length_hint__(), len(self.set))
 
     def test_pickling(self):
         p = pickle.dumps(self.set)
@@ -639,6 +770,16 @@ class TestExceptionPropagation(unittest.TestCase):
         set(xrange(3))
         set('abc')
         set(gooditer())
+
+    def test_changingSizeWhileIterating(self):
+        s = set([1,2,3])
+        try:
+            for i in s:
+                s.update([4])
+        except RuntimeError:
+            pass
+        else:
+            self.fail("no exception when changing size during iteration")
 
 #==============================================================================
 
@@ -1342,11 +1483,11 @@ class TestVariousIteratorArgs(unittest.TestCase):
 #==============================================================================
 
 def test_main(verbose=None):
-    import sys
     from test import test_sets
     test_classes = (
         TestSet,
         TestSetSubclass,
+        TestSetSubclassWithKeywordArgs,        
         TestFrozenSet,
         TestFrozenSetSubclass,
         TestSetOfSets,

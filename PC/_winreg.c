@@ -455,7 +455,7 @@ static PyNumberMethods PyHKEY_NumberMethods =
 
 
 /* fwd declare __getattr__ */
-static PyObject *PyHKEY_getattr(PyObject *self, char *name);
+static PyObject *PyHKEY_getattr(PyObject *self, const char *name);
 
 /* The type itself */
 PyTypeObject PyHKEY_Type =
@@ -526,7 +526,7 @@ static struct PyMethodDef PyHKEY_methods[] = {
 };
 
 /*static*/ PyObject *
-PyHKEY_getattr(PyObject *self, char *name)
+PyHKEY_getattr(PyObject *self, const char *name)
 {
 	PyObject *res;
 
@@ -832,9 +832,9 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
 				void *src_buf;
 				PyBufferProcs *pb = value->ob_type->tp_as_buffer;
 				if (pb==NULL) {
-					PyErr_Format(PyExc_TypeError, 
+					PyErr_Format(PyExc_TypeError,
 						"Objects of type '%s' can not "
-						"be used as binary registry values", 
+						"be used as binary registry values",
 						value->ob_type->tp_name);
 					return FALSE;
 				}
@@ -960,7 +960,9 @@ PyConnectRegistry(PyObject *self, PyObject *args)
 		return NULL;
 	if (!PyHKEY_AsHKEY(obKey, &hKey, FALSE))
 		return NULL;
+	Py_BEGIN_ALLOW_THREADS
 	rc = RegConnectRegistry(szCompName, hKey, &retKey);
+	Py_END_ALLOW_THREADS
 	if (rc != ERROR_SUCCESS)
 		return PyErr_SetFromWindowsErrWithFunction(rc,
 							   "ConnectRegistry");
@@ -1032,31 +1034,22 @@ PyEnumKey(PyObject *self, PyObject *args)
 	int index;
 	long rc;
 	PyObject *retStr;
-	char *retBuf;
-	DWORD len;
+	char tmpbuf[256]; /* max key name length is 255 */
+	DWORD len = sizeof(tmpbuf); /* includes NULL terminator */
 
 	if (!PyArg_ParseTuple(args, "Oi:EnumKey", &obKey, &index))
 		return NULL;
 	if (!PyHKEY_AsHKEY(obKey, &hKey, FALSE))
 		return NULL;
 
-	if ((rc = RegQueryInfoKey(hKey, NULL, NULL, NULL, NULL, &len,
-				  NULL, NULL, NULL, NULL, NULL, NULL))
-	    != ERROR_SUCCESS)
-		return PyErr_SetFromWindowsErrWithFunction(rc,
-							   "RegQueryInfoKey");
-	++len;    /* include null terminator */
-	retStr = PyString_FromStringAndSize(NULL, len);
-	if (retStr == NULL)
-		return NULL;
-	retBuf = PyString_AS_STRING(retStr);
+	Py_BEGIN_ALLOW_THREADS
+	rc = RegEnumKeyEx(hKey, index, tmpbuf, &len, NULL, NULL, NULL, NULL);
+	Py_END_ALLOW_THREADS
+	if (rc != ERROR_SUCCESS)
+		return PyErr_SetFromWindowsErrWithFunction(rc, "RegEnumKeyEx");
 
-	if ((rc = RegEnumKey(hKey, index, retBuf, len)) != ERROR_SUCCESS) {
-		Py_DECREF(retStr);
-		return PyErr_SetFromWindowsErrWithFunction(rc, "RegEnumKey");
-	}
-	_PyString_Resize(&retStr, strlen(retBuf));
-	return retStr;
+	retStr = PyString_FromStringAndSize(tmpbuf, len);
+	return retStr;  /* can be NULL */
 }
 
 static PyObject *
@@ -1459,6 +1452,8 @@ PyMODINIT_FUNC init_winreg(void)
 {
 	PyObject *m, *d;
 	m = Py_InitModule3("_winreg", winreg_methods, module_doc);
+	if (m == NULL)
+		return;
 	d = PyModule_GetDict(m);
 	PyHKEY_Type.ob_type = &PyType_Type;
 	PyHKEY_Type.tp_doc = PyHKEY_doc;

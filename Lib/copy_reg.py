@@ -67,6 +67,13 @@ def _reduce_ex(self, proto):
     else:
         if base is self.__class__:
             raise TypeError, "can't pickle %s objects" % base.__name__
+        ## Stackless addition BEGIN
+        # if base is only supported by our shadow types in copy_reg,
+        # we need to substitute here:
+        reducer = dispatch_table.get(base)
+        if reducer and reducer.__module__ == "stackless._wrap":
+            base = reducer(self)[0]
+        ## Stackless addition END
         state = base(self)
     args = (self.__class__, base, state)
     try:
@@ -116,8 +123,19 @@ def _slotnames(cls):
         # Slots found -- gather slot names from all base classes
         for c in cls.__mro__:
             if "__slots__" in c.__dict__:
-                names += [name for name in c.__dict__["__slots__"]
-                               if name not in ("__dict__", "__weakref__")]
+                slots = c.__dict__['__slots__']
+                # if class has a single slot, it can be given as a string
+                if isinstance(slots, basestring):
+                    slots = (slots,)
+                for name in slots:
+                    # special descriptors
+                    if name in ("__dict__", "__weakref__"):
+                        continue
+                    # mangled names
+                    elif name.startswith('__') and not name.endswith('__'):
+                        names.append('_%s%s' % (c.__name__, name))
+                    else:
+                        names.append(name)
 
     # Cache the outcome in the class if at all possible
     try:

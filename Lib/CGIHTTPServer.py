@@ -14,6 +14,8 @@ requests are executed sychronously.
 SECURITY WARNING: DON'T USE THIS CODE UNLESS YOU ARE INSIDE A FIREWALL
 -- it may execute arbitrary Python code or external programs.
 
+Note that status code 200 is sent prior to execution of a CGI script, so
+scripts cannot send other status codes such as 302 (redirect).
 """
 
 
@@ -103,17 +105,36 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def run_cgi(self):
         """Execute a CGI script."""
+        path = self.path
         dir, rest = self.cgi_info
+        
+        i = path.find('/', len(dir) + 1)
+        while i >= 0:
+            nextdir = path[:i]
+            nextrest = path[i+1:]
+
+            scriptdir = self.translate_path(nextdir)
+            if os.path.isdir(scriptdir):
+                dir, rest = nextdir, nextrest
+                i = path.find('/', len(dir) + 1)
+            else:
+                break
+
+        # find an explicit query string, if present.
         i = rest.rfind('?')
         if i >= 0:
             rest, query = rest[:i], rest[i+1:]
         else:
             query = ''
+
+        # dissect the part after the directory name into a script name &
+        # a possible additional path, to be stored in PATH_INFO.
         i = rest.find('/')
         if i >= 0:
             script, rest = rest[:i], rest[i:]
         else:
             script, rest = rest, ''
+
         scriptname = dir + '/' + script
         scriptfile = self.translate_path(scriptname)
         if not os.path.exists(scriptfile):

@@ -6,7 +6,7 @@ extensions ASAP)."""
 
 # This module should be kept compatible with Python 2.1.
 
-__revision__ = "$Id: build_ext.py 37828 2004-11-10 22:23:15Z loewis $"
+__revision__ = "$Id: build_ext.py 54826 2007-04-14 13:02:57Z richard.tew $"
 
 import sys, os, string, re
 from types import *
@@ -186,11 +186,22 @@ class build_ext (Command):
         # for extensions under Cygwin and AtheOS Python's library directory must be
         # appended to library_dirs
         if sys.platform[:6] == 'cygwin' or sys.platform[:6] == 'atheos':
-            if string.find(sys.executable, sys.exec_prefix) != -1:
+            if sys.executable.startswith(os.path.join(sys.exec_prefix, "bin")):
                 # building third party extensions
                 self.library_dirs.append(os.path.join(sys.prefix, "lib",
                                                       "python" + get_python_version(),
                                                       "config"))
+            else:
+                # building python standard extensions
+                self.library_dirs.append('.')
+
+        # for extensions under Linux with a shared Python library,
+        # Python's library directory must be appended to library_dirs
+        if (sys.platform.startswith('linux') or sys.platform.startswith('gnu')) \
+                and sysconfig.get_config_var('Py_ENABLE_SHARED'):
+            if sys.executable.startswith(os.path.join(sys.exec_prefix, "bin")):
+                # building third party extensions
+                self.library_dirs.append(sysconfig.get_config_var('LIBDIR'))
             else:
                 # building python standard extensions
                 self.library_dirs.append('.')
@@ -687,7 +698,19 @@ class build_ext (Command):
             # don't extend ext.libraries, it may be shared with other
             # extensions, it is a reference to the original list
             return ext.libraries + [pythonlib, "m"] + extra
-        else:
+
+        elif sys.platform == 'darwin':
+            # Don't use the default code below
             return ext.libraries
+
+        else:
+            from distutils import sysconfig
+            if sysconfig.get_config_var('Py_ENABLE_SHARED'):
+                template = "python%d.%d"
+                pythonlib = (template %
+                             (sys.hexversion >> 24, (sys.hexversion >> 16) & 0xff))
+                return ext.libraries + [pythonlib]
+            else:
+                return ext.libraries
 
 # class build_ext

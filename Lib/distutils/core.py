@@ -8,7 +8,7 @@ really defined in distutils.dist and distutils.cmd.
 
 # This module should be kept compatible with Python 2.1.
 
-__revision__ = "$Id: core.py 37828 2004-11-10 22:23:15Z loewis $"
+__revision__ = "$Id: core.py 38672 2005-03-20 22:19:47Z fdrake $"
 
 import sys, os
 from types import *
@@ -47,7 +47,9 @@ setup_keywords = ('distclass', 'script_name', 'script_args', 'options',
                   'name', 'version', 'author', 'author_email',
                   'maintainer', 'maintainer_email', 'url', 'license',
                   'description', 'long_description', 'keywords',
-                  'platforms', 'classifiers', 'download_url',)
+                  'platforms', 'classifiers', 'download_url',
+                  'requires', 'provides', 'obsoletes',
+                  )
 
 # Legal keyword arguments for the Extension constructor
 extension_keywords = ('name', 'sources', 'include_dirs',

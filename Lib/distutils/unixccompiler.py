@@ -13,7 +13,7 @@ the "typical" Unix-style command-line C compiler:
   * link shared library handled by 'cc -shared'
 """
 
-__revision__ = "$Id: unixccompiler.py 37184 2004-08-29 16:40:55Z loewis $"
+__revision__ = "$Id: unixccompiler.py 52349 2006-10-15 16:28:45Z richard.tew $"
 
 import os, sys
 from types import StringType, NoneType
@@ -41,6 +41,64 @@ from distutils import log
 #     current system, they can be as system-dependent as they like, and we
 #     should just happily stuff them into the preprocessor/compiler/linker
 #     options and carry on.
+
+def _darwin_compiler_fixup(compiler_so, cc_args):
+    """
+    This function will strip '-isysroot PATH' and '-arch ARCH' from the
+    compile flags if the user has specified one them in extra_compile_flags.
+
+    This is needed because '-arch ARCH' adds another architecture to the
+    build, without a way to remove an architecture. Furthermore GCC will
+    barf if multiple '-isysroot' arguments are present.
+    """
+    stripArch = stripSysroot = 0
+
+    compiler_so = list(compiler_so)
+    kernel_version = os.uname()[2] # 8.4.3
+    major_version = int(kernel_version.split('.')[0])
+
+    if major_version < 8:
+        # OSX before 10.4.0, these don't support -arch and -isysroot at
+        # all.
+        stripArch = stripSysroot = True
+    else:
+        stripArch = '-arch' in cc_args
+        stripSysroot = '-isysroot' in cc_args
+
+    if stripArch:
+        while 1:
+            try:
+                index = compiler_so.index('-arch')
+                # Strip this argument and the next one:
+                del compiler_so[index:index+2]
+            except ValueError:
+                break
+
+    if stripSysroot:
+        try:
+            index = compiler_so.index('-isysroot')
+            # Strip this argument and the next one:
+            del compiler_so[index:index+2]
+        except ValueError:
+            pass
+
+    # Check if the SDK that is used during compilation actually exists, 
+    # the universal build requires the usage of a universal SDK and not all
+    # users have that installed by default.
+    sysroot = None
+    if '-isysroot' in cc_args:
+        idx = cc_args.index('-isysroot')
+        sysroot = cc_args[idx+1]
+    elif '-isysroot' in compiler_so:
+        idx = compiler_so.index('-isysroot')
+        sysroot = compiler_so[idx+1]
+
+    if sysroot and not os.path.isdir(sysroot):
+        log.warn("Compiling with an SDK that doesn't seem to exist: %s",
+                sysroot)
+        log.warn("Please check your Xcode installation")
+
+    return compiler_so
 
 class UnixCCompiler(CCompiler):
 
@@ -108,8 +166,11 @@ class UnixCCompiler(CCompiler):
                 raise CompileError, msg
 
     def _compile(self, obj, src, ext, cc_args, extra_postargs, pp_opts):
+        compiler_so = self.compiler_so
+        if sys.platform == 'darwin':
+            compiler_so = _darwin_compiler_fixup(compiler_so, cc_args + extra_postargs)
         try:
-            self.spawn(self.compiler_so + cc_args + [src, '-o', obj] +
+            self.spawn(compiler_so + cc_args + [src, '-o', obj] +
                        extra_postargs)
         except DistutilsExecError, msg:
             raise CompileError, msg
@@ -172,7 +233,22 @@ class UnixCCompiler(CCompiler):
                 else:
                     linker = self.linker_so[:]
                 if target_lang == "c++" and self.compiler_cxx:
-                    linker[0] = self.compiler_cxx[0]
+                    # skip over environment variable settings if /usr/bin/env
+                    # is used to set up the linker's environment.
+                    # This is needed on OSX. Note: this assumes that the
+                    # normal and C++ compiler have the same environment
+                    # settings.
+                    i = 0
+                    if os.path.basename(linker[0]) == "env":
+                        i = 1
+                        while '=' in linker[i]:
+                            i = i + 1
+
+                    linker[i] = self.compiler_cxx[i]
+
+                if sys.platform == 'darwin':
+                    linker = _darwin_compiler_fixup(linker, ld_args)
+
                 self.spawn(linker + ld_args)
             except DistutilsExecError, msg:
                 raise LinkError, msg

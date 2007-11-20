@@ -131,6 +131,12 @@
   objects may affect the wrong (sub-)interpreter's dictionary of
   loaded modules.  (XXX This is a hard-to-fix bug that will be
   addressed in a future release.)
+
+  Also note that the use of this functionality is incompatible with
+  extension modules such as PyObjC and ctypes that use the
+  \cfunction{PyGILState_*} APIs (and this is inherent in the way the
+  \cfunction{PyGILState_*} functions work).  Simple things may work,
+  but confusing behavior will always be near.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{Py_EndInterpreter}{PyThreadState *tstate}
@@ -178,7 +184,7 @@
   variable in the top-level \file{Makefile} and the
   \longprogramopt{prefix} argument to the \program{configure} script
   at build time.  The value is available to Python code as
-  \code{sys.prefix}.  It is only useful on \UNIX.  See also the next
+  \code{sys.prefix}.  It is only useful on \UNIX{}.  See also the next
   function.
 \end{cfuncdesc}
 
@@ -266,6 +272,13 @@
   \withsubitem{(in module sys)}{\ttindex{version}}
 \end{cfuncdesc}
 
+\begin{cfuncdesc}{const char*}{Py_GetBuildNumber}{}
+  Return a string representing the Subversion revision that this Python
+  executable was built from.  This number is a string because it may contain a
+  trailing 'M' if Python was built from a mixed revision source tree.
+  \versionadded{2.5}
+\end{cfuncdesc}
+
 \begin{cfuncdesc}{const char*}{Py_GetPlatform}{}
   Return the platform identifier for the current platform.  On \UNIX,
   this is formed from the ``official'' name of the operating system,
@@ -318,7 +331,7 @@
   \withsubitem{(in module sys)}{\ttindex{version}}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySys_SetArgv}{int argc, char **argv}
+\begin{cfuncdesc}{void}{PySys_SetArgv}{int argc, char **argv}
   Set \code{sys.argv} based on \var{argc} and \var{argv}.  These
   parameters are similar to those passed to the program's
   \cfunction{main()}\ttindex{main()} function with the difference that
@@ -471,10 +484,10 @@ thread is now:
     PyGILState_Release(gstate);
 \end{verbatim}
 
-Note that the \cfunction{PyGILState_*()} functions assume there is only
-one global  interpreter (created automatically by
+Note that the \cfunction{PyGILState_*()} functions assume there is
+only one global interpreter (created automatically by
 \cfunction{Py_Initialize()}).  Python still supports the creation of
-additional interpreters  (using \cfunction{Py_NewInterpreter()}), but
+additional interpreters (using \cfunction{Py_NewInterpreter()}), but
 mixing multiple interpreters and the \cfunction{PyGILState_*()} API is
 unsupported.
 
@@ -683,30 +696,30 @@ interpreter lock has been created.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyThreadState_SetAsyncExc}{long id, PyObject *exc}
-  Asynchronously raise an exception in a thread. 
+  Asynchronously raise an exception in a thread.
   The \var{id} argument is the thread id of the target thread;
   \var{exc} is the exception object to be raised.
   This function does not steal any references to \var{exc}.
-  To prevent naive misuse, you must write your own C extension 
-  to call this.  Must be called with the GIL held. 
-  Returns the number of thread states modified; if it returns a number 
-  greater than one, you're in trouble, and you should call it again 
-  with \var{exc} set to \constant{NULL} to revert the effect.
+  To prevent naive misuse, you must write your own C extension
+  to call this.  Must be called with the GIL held.
+  Returns the number of thread states modified; this is normally one, but
+  will be zero if the thread id isn't found.  If \var{exc} is
+  \constant{NULL}, the pending exception (if any) for the thread is cleared.
   This raises no exceptions.
   \versionadded{2.3}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyGILState_STATE}{PyGILState_Ensure}{}
-Ensure that the current thread is ready to call the Python
-C API regardless of the current state of Python, or of its
-thread lock.  This may be called as many times as desired
-by a thread as long as each call is matched with a call to 
-\cfunction{PyGILState_Release()}.  
-In general, other thread-related APIs may 
-be used between \cfunction{PyGILState_Ensure()} and \cfunction{PyGILState_Release()} calls as long as the 
-thread state is restored to its previous state before the Release().
-For example, normal usage of the \csimplemacro{Py_BEGIN_ALLOW_THREADS}
-and \csimplemacro{Py_END_ALLOW_THREADS} macros is acceptable.
+Ensure that the current thread is ready to call the Python C API
+regardless of the current state of Python, or of its thread lock.
+This may be called as many times as desired by a thread as long as
+each call is matched with a call to \cfunction{PyGILState_Release()}.
+In general, other thread-related APIs may be used between
+\cfunction{PyGILState_Ensure()} and \cfunction{PyGILState_Release()}
+calls as long as the thread state is restored to its previous state
+before the Release().  For example, normal usage of the
+\csimplemacro{Py_BEGIN_ALLOW_THREADS} and
+\csimplemacro{Py_END_ALLOW_THREADS} macros is acceptable.
     
 The return value is an opaque "handle" to the thread state when
 \cfunction{PyGILState_Acquire()} was called, and must be passed to

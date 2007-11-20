@@ -16,10 +16,10 @@ extern void PyMarshal_Init(void);
 extern void initimp(void);
 extern void initgc(void);
 extern void initswi(void);
-
+extern void initstackless(void);
 extern void inittime(void);
 extern void initmath(void);
-extern void initstruct(void);
+extern void init_struct(void);
 extern void initbinascii(void);
 extern void init_random(void);
 extern void init_sre(void);
@@ -27,11 +27,13 @@ extern void initcStringIO(void);
 extern void initerrno(void);
 extern void initthread(void);
 extern void initcollections(void);
-extern void initmd5(void);
+extern void init_md5(void);
 extern void init_socket(void);
 extern void initselect(void);
 extern void initzipimport(void);
-extern void initsha(void);
+extern void init_sha(void);
+extern void init_sha256(void);
+extern void init_sha512(void);
 extern void init_codecs(void);
 extern void initdatetime(void);
 extern void init_bisect(void);
@@ -49,6 +51,14 @@ extern void init_symtable(void);
 extern void inittiming(void);
 extern void initunicodedata(void);
 extern void initzlib(void);
+extern void init_ast(void);
+extern void init_types(void);
+extern void init_locale(void);
+extern void initstrop(void);
+extern void initpyexpat(void);
+extern void init_elementtree(void);
+extern void init_functools(void);
+extern void init_hashlib(void);
 
 extern void initpspos(void);
 
@@ -68,9 +78,26 @@ extern void initpspnet(void);
 extern void initosl(void);
 #endif
 
-#ifdef WITH_SQLITE
-extern void init_sqlite(void);
+#ifdef WITH_PSPOGG
+extern void initpspogg(void);
 #endif
+
+//#ifdef WITH_SQLITE
+//extern void init_sqlite(void);
+//#endif
+
+#ifdef WITH_SQLITE
+extern void init_sqlite3(void)
+#endif
+
+#ifdef WITH_PSPMP3
+extern void initpspmp3(void);
+#endif
+
+#ifdef WITH_SSL
+extern void init_ssl(void);
+#endif
+
 
 struct _inittab _PyImport_Inittab[] = {
 	{"marshal", PyMarshal_Init},
@@ -83,10 +110,11 @@ struct _inittab _PyImport_Inittab[] = {
 	{"exceptions", NULL},
 
 	{"gc", initgc},
-
+	{"_ast", init_ast},
+        {"_types", init_types},
         {"time", inittime},
         {"math", initmath},
-        {"struct", initstruct},
+        {"_struct", init_struct},
         {"binascii", initbinascii},
         {"_random", init_random},
         {"_sre", init_sre},
@@ -94,11 +122,13 @@ struct _inittab _PyImport_Inittab[] = {
         {"errno", initerrno},
         {"thread", initthread},
         {"collections", initcollections},
-        {"md5", initmd5 },
+        {"md5", init_md5 },
         {"_socket", init_socket},
         {"select", initselect},
         {"zipimport", initzipimport},
-        {"sha", initsha},
+        {"sha", init_sha},
+    	{"_sha512", init_sha256},
+    	{"_sha512", init_sha512},
         {"_codecs", init_codecs},
         {"datetime", initdatetime},
         {"_bisect", init_bisect},
@@ -116,7 +146,17 @@ struct _inittab _PyImport_Inittab[] = {
         {"timing", inittiming},
         {"unicodedata", initunicodedata},
         {"zlib", initzlib},
+        {"_locale", init_locale},
+        {"strop", initstrop},
+	    {"pyexpat", initpyexpat},
+        {"pspos", initpspos},
+        {"_elementtree", init_elementtree},
+        {"_functools", init_functools},
+        {"_hashlib", init_hashlib},
 
+#ifdef WITH_SSL
+        {"_ssl", init_ssl},
+#endif
         {"pspos", initpspos},
 
 #ifdef WITH_PSP2D
@@ -135,10 +175,23 @@ struct _inittab _PyImport_Inittab[] = {
         {"osl", initosl},
 #endif
 
+//#ifdef WITH_SQLITE
+//        {"_sqlite", init_sqlite},
+//#endif
+
 #ifdef WITH_SQLITE
-        {"_sqlite", init_sqlite},
+        {"_sqlite3", init_sqlite3},
 #endif
 
+
+
+#ifdef WITH_PSPOGG
+        {"pspogg", initpspogg},
+#endif
+
+#ifdef WITH_PSPMP3
+        {"pspmp3", initpspmp3},
+#endif
 	{0, 0}
 };
 

@@ -1686,7 +1686,7 @@ al_GetParamInfo(PyObject *self, PyObject *args)
 {
 	int res, param;
 	ALparamInfo pinfo;
-	PyObject *v, *item;;
+	PyObject *v, *item;
 
 	if (!PyArg_ParseTuple(args, "ii:GetParamInfo", &res, &param))
 		return NULL;
@@ -1998,6 +1998,8 @@ inital(void)
 	m = Py_InitModule4("al", al_methods,
 		al_module_documentation,
 		(PyObject*)NULL,PYTHON_API_VERSION);
+	if (m == NULL)
+		return;
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);

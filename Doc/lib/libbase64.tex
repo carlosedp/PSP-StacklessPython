@@ -21,7 +21,7 @@ three alphabets.  The legacy interface provides for encoding and
 decoding to and from file-like objects as well as strings, but only
 using the Base64 standard alphabet.
 
-The modern interface provides:
+The modern interface, which was introduced in Python 2.4, provides:
 
 \begin{funcdesc}{b64encode}{s\optional{, altchars}}
 Encode a string use Base64.
@@ -145,6 +145,18 @@ base64-encoded data.  \function{encodestring()} returns a
 string containing one or more lines of base64-encoded data
 always including an extra trailing newline (\code{'\e n'}).
 \end{funcdesc}
+
+An example usage of the module:
+
+\begin{verbatim}
+>>> import base64
+>>> encoded = base64.b64encode('data to be encoded')
+>>> encoded
+'ZGF0YSB0byBiZSBlbmNvZGVk'
+>>> data = base64.b64decode(encoded)
+>>> data
+'data to be encoded'
+\end{verbatim}
 
 \begin{seealso}
   \seemodule{binascii}{Support module containing \ASCII-to-binary

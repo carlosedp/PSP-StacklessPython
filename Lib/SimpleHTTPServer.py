@@ -18,7 +18,10 @@ import urlparse
 import cgi
 import shutil
 import mimetypes
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 
 class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -63,6 +66,12 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         path = self.translate_path(self.path)
         f = None
         if os.path.isdir(path):
+            if not self.path.endswith('/'):
+                # redirect browser - doing basically what apache does
+                self.send_response(301)
+                self.send_header("Location", self.path + "/")
+                self.end_headers()
+                return None
             for index in "index.html", "index.htm":
                 index = os.path.join(path, index)
                 if os.path.exists(index):
@@ -71,17 +80,20 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             else:
                 return self.list_directory(path)
         ctype = self.guess_type(path)
+        if ctype.startswith('text/'):
+            mode = 'r'
+        else:
+            mode = 'rb'
         try:
-            # Always read in binary mode. Opening files in text mode may cause
-            # newline translations, making the actual size of the content
-            # transmitted *less* than the content-length!
-            f = open(path, 'rb')
+            f = open(path, mode)
         except IOError:
             self.send_error(404, "File not found")
             return None
         self.send_response(200)
         self.send_header("Content-type", ctype)
-        self.send_header("Content-Length", str(os.fstat(f.fileno())[6]))
+        fs = os.fstat(f.fileno())
+        self.send_header("Content-Length", str(fs[6]))
+        self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
         self.end_headers()
         return f
 
@@ -186,6 +198,8 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         else:
             return self.extensions_map['']
 
+    if not mimetypes.inited:
+        mimetypes.init() # try to read system mime.types
     extensions_map = mimetypes.types_map.copy()
     extensions_map.update({
         '': 'application/octet-stream', # Default

@@ -31,7 +31,7 @@
  *   PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* CVS: $Id: _cursesmodule.c 41999 2006-01-10 07:08:06Z neal.norwitz $ */
+/* CVS: $Id: _cursesmodule.c 54826 2007-04-14 13:02:57Z richard.tew $ */
 
 /*
 
@@ -43,8 +43,8 @@ unsupported functions:
 	del_curterm delscreen dupwin inchnstr inchstr innstr keyok
 	mcprint mvaddchnstr mvaddchstr mvchgat mvcur mvinchnstr
 	mvinchstr mvinnstr mmvwaddchnstr mvwaddchstr mvwchgat
-	mvwgetnstr mvwinchnstr mvwinchstr mvwinnstr newterm
-	resizeterm restartterm ripoffline scr_dump
+	mvwinchnstr mvwinchstr mvwinnstr newterm
+	restartterm ripoffline scr_dump
 	scr_init scr_restore scr_set scrl set_curterm set_term setterm
 	tgetent tgetflag tgetnum tgetstr tgoto timeout tputs
 	vidattr vidputs waddchnstr waddchstr wchgat
@@ -819,14 +819,17 @@ PyCursesWindow_GetStr(PyCursesWindowObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args,"ii;y,x",&y,&x))
       return NULL;
     Py_BEGIN_ALLOW_THREADS
+#ifdef STRICT_SYSV_CURSES
+    rtn2 = wmove(self->win,y,x)==ERR ? ERR : wgetnstr(self->win, rtn, 1023);
+#else
     rtn2 = mvwgetnstr(self->win,y,x,rtn, 1023);
+#endif
     Py_END_ALLOW_THREADS
     break;
   case 3:
     if (!PyArg_ParseTuple(args,"iii;y,x,n", &y, &x, &n))
       return NULL;
 #ifdef STRICT_SYSV_CURSES
- /* Untested */
     Py_BEGIN_ALLOW_THREADS
     rtn2 = wmove(self->win,y,x)==ERR ? ERR :
       wgetnstr(self->win, rtn, MIN(n, 1023));
@@ -838,7 +841,7 @@ PyCursesWindow_GetStr(PyCursesWindowObject *self, PyObject *args)
 #endif
     break;
   default:
-    PyErr_SetString(PyExc_TypeError, "getstr requires 0 to 2 arguments");
+    PyErr_SetString(PyExc_TypeError, "getstr requires 0 to 3 arguments");
     return NULL;
   }
   if (rtn2 == ERR)
@@ -1781,7 +1784,6 @@ static PyObject *
 PyCurses_InitScr(PyObject *self)
 {
   WINDOW *win;
-  PyObject *nlines, *cols;
 
   if (initialised == TRUE) {
     wrefresh(stdscr);
@@ -1800,7 +1802,12 @@ PyCurses_InitScr(PyObject *self)
 /* This was moved from initcurses() because it core dumped on SGI,
    where they're not defined until you've called initscr() */
 #define SetDictInt(string,ch) \
-	PyDict_SetItemString(ModDict,string,PyInt_FromLong((long) (ch)));
+    do {							\
+	PyObject *o = PyInt_FromLong((long) (ch));		\
+	if (o && PyDict_SetItemString(ModDict, string, o) == 0)	{ \
+	    Py_DECREF(o);					\
+	}							\
+    } while (0)
 
 	/* Here are some graphic symbols you can use */
         SetDictInt("ACS_ULCORNER",      (ACS_ULCORNER));
@@ -1869,12 +1876,8 @@ PyCurses_InitScr(PyObject *self)
 	SetDictInt("ACS_STERLING",      (ACS_STERLING));
 #endif
 
-  nlines = PyInt_FromLong((long) LINES);
-  PyDict_SetItemString(ModDict, "LINES", nlines);
-  Py_DECREF(nlines);
-  cols = PyInt_FromLong((long) COLS);
-  PyDict_SetItemString(ModDict, "COLS", cols);
-  Py_DECREF(cols);
+  SetDictInt("LINES", LINES);
+  SetDictInt("COLS", COLS);
 
   return (PyObject *)PyCursesWindow_New(win);
 }
@@ -1889,7 +1892,7 @@ PyCurses_setupterm(PyObject* self, PyObject *args, PyObject* keywds)
 	static char *kwlist[] = {"term", "fd", NULL};
 
 	if (!PyArg_ParseTupleAndKeywords(
-		args,keywds,"|zi:setupterm",kwlist,&termstr,&fd)) {
+		args, keywds, "|zi:setupterm", kwlist, &termstr, &fd)) {
 		return NULL;
 	}
 	
@@ -1949,6 +1952,29 @@ PyCurses_IntrFlush(PyObject *self, PyObject *args)
 
   return PyCursesCheckERR(intrflush(NULL,ch), "intrflush");
 }
+
+#ifdef HAVE_CURSES_IS_TERM_RESIZED
+static PyObject *
+PyCurses_Is_Term_Resized(PyObject *self, PyObject *args)
+{
+  int lines;
+  int columns;
+  int result;
+
+  PyCursesInitialised
+
+  if (!PyArg_ParseTuple(args,"ii:is_term_resized", &lines, &columns))
+    return NULL;
+  result = is_term_resized(lines, columns);
+  if (result == TRUE) {
+    Py_INCREF(Py_True);
+    return Py_True;
+  } else {
+    Py_INCREF(Py_False);
+    return Py_False;
+  }
+}
+#endif /* HAVE_CURSES_IS_TERM_RESIZED */
 
 #if !defined(__NetBSD__)
 static PyObject *
@@ -2170,6 +2196,99 @@ PyCurses_QiFlush(PyObject *self, PyObject *args)
   }
 }
 
+/* Internal helper used for updating curses.LINES, curses.COLS, _curses.LINES
+ * and _curses.COLS */
+static int
+update_lines_cols(void)
+{
+  PyObject *o;
+  PyObject *m = PyImport_ImportModule("curses");
+
+  if (!m)
+    return 0;
+
+  o = PyInt_FromLong(LINES);
+  if (!o) {
+    Py_DECREF(m);
+    return 0;
+  }
+  if (PyObject_SetAttrString(m, "LINES", o)) {
+    Py_DECREF(m);
+    Py_DECREF(o);
+    return 0;
+  }
+  if (PyDict_SetItemString(ModDict, "LINES", o)) {
+    Py_DECREF(m);
+    Py_DECREF(o);
+    return 0;
+  }
+  Py_DECREF(o);
+  o = PyInt_FromLong(COLS);
+  if (!o) {
+    Py_DECREF(m);
+    return 0;
+  }
+  if (PyObject_SetAttrString(m, "COLS", o)) {
+    Py_DECREF(m);
+    Py_DECREF(o);
+    return 0;
+  }
+  if (PyDict_SetItemString(ModDict, "COLS", o)) {
+    Py_DECREF(m);
+    Py_DECREF(o);
+    return 0;
+  }
+  Py_DECREF(o);
+  Py_DECREF(m);
+  return 1;
+}
+
+#ifdef HAVE_CURSES_RESIZETERM
+static PyObject *
+PyCurses_ResizeTerm(PyObject *self, PyObject *args)
+{
+  int lines;
+  int columns;
+  PyObject *result;
+
+  PyCursesInitialised
+
+  if (!PyArg_ParseTuple(args,"ii:resizeterm", &lines, &columns))
+    return NULL;
+
+  result = PyCursesCheckERR(resizeterm(lines, columns), "resizeterm");
+  if (!result)
+    return NULL;
+  if (!update_lines_cols())
+    return NULL;
+  return result;
+}
+
+#endif
+
+#ifdef HAVE_CURSES_RESIZE_TERM
+static PyObject *
+PyCurses_Resize_Term(PyObject *self, PyObject *args)
+{
+  int lines;
+  int columns;
+
+  PyObject *result;
+
+  PyCursesInitialised
+
+  if (!PyArg_ParseTuple(args,"ii:resize_term", &lines, &columns))
+    return NULL;
+
+  result = PyCursesCheckERR(resize_term(lines, columns), "resize_term");
+  if (!result)
+    return NULL;
+  if (!update_lines_cols())
+    return NULL;
+  return result;
+}
+#endif /* HAVE_CURSES_RESIZE_TERM */
+
 static PyObject *
 PyCurses_setsyx(PyObject *self, PyObject *args)
 {
@@ -2275,6 +2394,10 @@ PyCurses_tparm(PyObject *self, PyObject *args)
 	}
 
 	result = tparm(fmt,i1,i2,i3,i4,i5,i6,i7,i8,i9);
+	if (!result) {
+		PyErr_SetString(PyCursesError, "tparm() returned NULL");
+  		return NULL;
+	}
 
 	return PyString_FromString(result);
 }
@@ -2414,6 +2537,9 @@ static PyMethodDef PyCurses_methods[] = {
   {"initscr",             (PyCFunction)PyCurses_InitScr, METH_NOARGS},
   {"intrflush",           (PyCFunction)PyCurses_IntrFlush, METH_VARARGS},
   {"isendwin",            (PyCFunction)PyCurses_isendwin, METH_NOARGS},
+#ifdef HAVE_CURSES_IS_TERM_RESIZED
+  {"is_term_resized",     (PyCFunction)PyCurses_Is_Term_Resized, METH_VARARGS},
+#endif
 #if !defined(__NetBSD__)
   {"keyname",             (PyCFunction)PyCurses_KeyName, METH_VARARGS},
 #endif
@@ -2441,6 +2567,12 @@ static PyMethodDef PyCurses_methods[] = {
   {"reset_prog_mode",     (PyCFunction)PyCurses_reset_prog_mode, METH_NOARGS},
   {"reset_shell_mode",    (PyCFunction)PyCurses_reset_shell_mode, METH_NOARGS},
   {"resetty",             (PyCFunction)PyCurses_resetty, METH_NOARGS},
+#ifdef HAVE_CURSES_RESIZETERM
+  {"resizeterm",          (PyCFunction)PyCurses_ResizeTerm, METH_VARARGS},
+#endif
+#ifdef HAVE_CURSES_RESIZE_TERM
+  {"resize_term",         (PyCFunction)PyCurses_Resize_Term, METH_VARARGS},
+#endif
   {"savetty",             (PyCFunction)PyCurses_savetty, METH_NOARGS},
   {"setsyx",              (PyCFunction)PyCurses_setsyx, METH_VARARGS},
   {"setupterm",           (PyCFunction)PyCurses_setupterm,
@@ -2481,9 +2613,13 @@ init_curses(void)
 
 	/* Create the module and add the functions */
 	m = Py_InitModule("_curses", PyCurses_methods);
+	if (m == NULL)
+    		return;
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
+	if (d == NULL)
+		return;
 	ModDict = d; /* For PyCurses_InitScr to use later */
 
 	/* Add a CObject for the C API */
@@ -2597,6 +2733,10 @@ init_curses(void)
 	    if (strncmp(key_n,"KEY_F(",6)==0) {
 	      char *p1, *p2;
 	      key_n2 = malloc(strlen(key_n)+1);
+	      if (!key_n2) {
+		PyErr_NoMemory();
+		break;
+              }
 	      p1 = key_n;
 	      p2 = key_n2;
 	      while (*p1) {
@@ -2609,7 +2749,7 @@ init_curses(void)
 	      *p2 = (char)0;
 	    } else
 	      key_n2 = key_n;
-	    PyDict_SetItemString(d,key_n2,PyInt_FromLong((long) key));
+	    SetDictInt(key_n2,key);
 	    if (key_n2 != key_n)
 	      free(key_n2);
 	  }

@@ -37,7 +37,8 @@ taken from the specified file.  Assignment to an
 exception.  Assignment to an \constant{ACCESS_WRITE} memory map
 affects both memory and the underlying file.  Assignment to an
 \constant{ACCESS_COPY} memory map affects memory but does not update
-the underlying file.
+the underlying file.  \versionchanged[To map anonymous memory,
+-1 should be passed as the fileno along with the length]{2.5}
 
 \begin{funcdesc}{mmap}{fileno, length\optional{, tagname\optional{, access}}}
   \strong{(Windows version)} Maps \var{length} bytes from the file
@@ -62,8 +63,10 @@ the underlying file.
                          prot\optional{, access}}}}
   \strong{(\UNIX{} version)} Maps \var{length} bytes from the file
   specified by the file descriptor \var{fileno}, and returns a mmap
-  object.
-
+  object.  If \var{length} is \code{0}, the maximum length of the map
+  will be the current size of the file when \function{mmap()} is
+  called.
+  
   \var{flags} specifies the nature of the mapping.
   \constant{MAP_PRIVATE} creates a private copy-on-write mapping, so
   changes to the contents of the mmap object will be private to this
@@ -137,8 +140,9 @@ Memory-mapped file objects support the following methods:
 
 \begin{methoddesc}{seek}{pos\optional{, whence}}
   Set the file's current position.  \var{whence} argument is optional
-  and defaults to \code{0} (absolute file positioning); other values
-  are \code{1} (seek relative to the current position) and \code{2}
+  and defaults to \code{os.SEEK_SET} or \code{0} (absolute file
+  positioning); other values are \code{os.SEEK_CUR} or \code{1} (seek
+  relative to the current position) and \code{os.SEEK_END} or \code{2}
   (seek relative to the file's end).
 \end{methoddesc}
 
@@ -162,6 +166,6 @@ Memory-mapped file objects support the following methods:
 \begin{methoddesc}{write_byte}{\var{byte}}
   Write the single-character string \var{byte} into memory at the
   current position of the file pointer; the file position is advanced
-  by \code{1}.If the mmap was created with \constant{ACCESS_READ},
+  by \code{1}. If the mmap was created with \constant{ACCESS_READ},
   then writing to it will throw a \exception{TypeError} exception.
 \end{methoddesc}

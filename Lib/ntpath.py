@@ -212,14 +212,13 @@ def dirname(p):
 def commonprefix(m):
     "Given a list of pathnames, returns the longest common leading component"
     if not m: return ''
-    prefix = m[0]
-    for item in m:
-        for i in range(len(prefix)):
-            if prefix[:i+1] != item[:i+1]:
-                prefix = prefix[:i]
-                if i == 0: return ''
-                break
-    return prefix
+    s1 = min(m)
+    s2 = max(m)
+    n = min(len(s1), len(s2))
+    for i in xrange(n):
+        if s1[i] != s2[i]:
+            return s1[:i]
+    return s1[:n]
 
 
 # Get size, mtime, atime of files.
@@ -482,27 +481,28 @@ def normpath(path):
 
 
 # Return an absolute path.
-def abspath(path):
-    """Return the absolute version of a path"""
-    try:
-        from nt import _getfullpathname
-    except ImportError: # Not running on Windows - mock up something sensible.
-        global abspath
-        def _abspath(path):
-            if not isabs(path):
-                path = join(os.getcwd(), path)
-            return normpath(path)
-        abspath = _abspath
-        return _abspath(path)
+try:
+    from nt import _getfullpathname
 
-    if path: # Empty path must return current working directory.
-        try:
-            path = _getfullpathname(path)
-        except WindowsError:
-            pass # Bad path - return unchanged.
-    else:
-        path = os.getcwd()
-    return normpath(path)
+except ImportError: # not running on Windows - mock up something sensible
+    def abspath(path):
+        """Return the absolute version of a path."""
+        if not isabs(path):
+            path = join(os.getcwd(), path)
+        return normpath(path)
+
+else:  # use native Windows method on Windows
+    def abspath(path):
+        """Return the absolute version of a path."""
+
+        if path: # Empty path must return current working directory.
+            try:
+                path = _getfullpathname(path)
+            except WindowsError:
+                pass # Bad path - return unchanged.
+        else:
+            path = os.getcwd()
+        return normpath(path)
 
 # realpath is a no-op on systems without islink support
 realpath = abspath

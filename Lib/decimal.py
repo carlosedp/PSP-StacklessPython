@@ -131,7 +131,7 @@ __all__ = [
     'ROUND_FLOOR', 'ROUND_UP', 'ROUND_HALF_DOWN',
 
     # Functions for manipulating contexts
-    'setcontext', 'getcontext'
+    'setcontext', 'getcontext', 'localcontext'
 ]
 
 import copy as _copy
@@ -458,6 +458,49 @@ else:
 
     del threading, local        # Don't contaminate the namespace
 
+def localcontext(ctx=None):
+    """Return a context manager for a copy of the supplied context
+
+    Uses a copy of the current context if no context is specified
+    The returned context manager creates a local decimal context
+    in a with statement:
+        def sin(x):
+             with localcontext() as ctx:
+                 ctx.prec += 2
+                 # Rest of sin calculation algorithm
+                 # uses a precision 2 greater than normal
+             return +s # Convert result to normal precision
+
+         def sin(x):
+             with localcontext(ExtendedContext):
+                 # Rest of sin calculation algorithm
+                 # uses the Extended Context from the
+                 # General Decimal Arithmetic Specification
+             return +s # Convert result to normal context
+
+    """
+    # The string below can't be included in the docstring until Python 2.6
+    # as the doctest module doesn't understand __future__ statements
+    """
+    >>> from __future__ import with_statement
+    >>> print getcontext().prec
+    28
+    >>> with localcontext():
+    ...     ctx = getcontext()
+    ...     ctx.prec += 2
+    ...     print ctx.prec
+    ...
+    30
+    >>> with localcontext(ExtendedContext):
+    ...     print getcontext().prec
+    ...
+    9
+    >>> print getcontext().prec
+    28
+    """
+    if ctx is None: ctx = getcontext()
+    return _ContextManager(ctx)
+
 
 ##### Decimal class ###########################################
 
@@ -731,7 +774,7 @@ class Decimal(object):
         """x.__hash__() <==> hash(x)"""
         # Decimal integers must hash the same as the ints
         # Non-integer decimals are normalized and hashed as strings
-        # Normalization assures that hast(100E-1) == hash(10)
+        # Normalization assures that hash(100E-1) == hash(10)
         if self._is_special:
             if self._isnan():
                 raise TypeError('Cannot hash a NaN value.')
@@ -2172,6 +2215,21 @@ for name in rounding_functions:
     Decimal._pick_rounding_function[val] = name
 
 del name, val, globalname, rounding_functions
+
+class _ContextManager(object):
+    """Context manager class to support localcontext().
+
+      Sets a copy of the supplied context in __enter__() and restores
+      the previous decimal context in __exit__()
+    """
+    def __init__(self, new_context):
+        self.new_context = new_context.copy()
+    def __enter__(self):
+        self.saved_context = getcontext()
+        setcontext(self.new_context)
+        return self.new_context
+    def __exit__(self, t, v, tb):
+        setcontext(self.saved_context)
 
 class Context(object):
     """Contains the context for a Decimal instance.

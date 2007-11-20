@@ -43,11 +43,23 @@ enumerate(iter('abc')).
 
 import unittest
 from test import test_support
-from itertools import repeat, count
+from itertools import repeat
 from collections import deque
 from UserList import UserList
+from __builtin__ import len as _len
 
 n = 10
+
+def len(obj):
+    try:
+        return _len(obj)
+    except TypeError:
+        try:
+            # note: this is an internal undocumented API,
+            # don't rely on it in your own programs
+            return obj.__length_hint__()
+        except AttributeError:
+            raise TypeError
 
 class TestInvariantWithoutMutations(unittest.TestCase):
 
@@ -223,9 +235,7 @@ class TestSeqIterReversed(TestInvariantWithoutMutations):
         self.assertEqual(len(it), 0)
 
 
-
-if __name__ == "__main__":
-
+def test_main():
     unittests = [
         TestRepeat,
         TestXrange,
@@ -243,3 +253,6 @@ if __name__ == "__main__":
         TestSeqIterReversed,
     ]
     test_support.run_unittest(*unittests)
+
+if __name__ == "__main__":
+    test_main()

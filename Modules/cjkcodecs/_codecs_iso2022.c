@@ -2,7 +2,6 @@
  * _codecs_iso2022.c: Codecs collection for ISO-2022 encodings.
  *
  * Written by Hye-Shik Chang <perky@FreeBSD.org>
- * $CJKCodecs: _codecs_iso2022.c,v 1.22 2004/08/19 17:08:13 perky Exp $
  */
 
 #define USING_IMPORTED_MAPS
@@ -104,7 +103,7 @@
 
 typedef int (*iso2022_init_func)(void);
 typedef ucs4_t (*iso2022_decode_func)(const unsigned char *data);
-typedef DBCHAR (*iso2022_encode_func)(const ucs4_t *data, int *length);
+typedef DBCHAR (*iso2022_encode_func)(const ucs4_t *data, Py_ssize_t *length);
 
 struct iso2022_designation {
 	unsigned char mark;
@@ -160,7 +159,7 @@ ENCODER(iso2022)
 		const struct iso2022_designation *dsg;
 		DBCHAR encoded;
 		ucs4_t c = **inbuf;
-		int insize;
+		Py_ssize_t insize;
 
 		if (c < 0x80) {
 			if (STATE_G0 != CHARSET_ASCII) {
@@ -183,7 +182,7 @@ ENCODER(iso2022)
 
 		encoded = MAP_UNMAPPABLE;
 		for (dsg = CONFIG_DESIGNATIONS; dsg->mark; dsg++) {
-			int length = 1;
+			Py_ssize_t length = 1;
 			encoded = dsg->encoder(&c, &length);
 			if (encoded == MAP_MULTIPLE_AVAIL) {
 				/* this implementation won't work for pair
@@ -300,12 +299,12 @@ DECODER_RESET(iso2022)
 	return 0;
 }
 
-static int
+static Py_ssize_t
 iso2022processesc(const void *config, MultibyteCodec_State *state,
-		  const unsigned char **inbuf, size_t *inleft)
+		  const unsigned char **inbuf, Py_ssize_t *inleft)
 {
 	unsigned char charset, designation;
-	size_t i, esclen;
+	Py_ssize_t i, esclen;
 
 	for (i = 1;i < MAX_ESCSEQLEN;i++) {
 		if (i >= *inleft)
@@ -388,10 +387,10 @@ iso2022processesc(const void *config, MultibyteCodec_State *state,
 	else if ((c) == 0xa2) (assi) = 0x2019;				\
 	else if ((c) == 0xaf) (assi) = 0x2015;
 
-static int
+static Py_ssize_t
 iso2022processg2(const void *config, MultibyteCodec_State *state,
-		 const unsigned char **inbuf, size_t *inleft,
-		 Py_UNICODE **outbuf, size_t *outleft)
+		 const unsigned char **inbuf, Py_ssize_t *inleft,
+		 Py_UNICODE **outbuf, Py_ssize_t *outleft)
 {
 	/* not written to use encoder, decoder functions because only few
 	 * encodings use G2 designations in CJKCodecs */
@@ -425,7 +424,7 @@ DECODER(iso2022)
 
 	while (inleft > 0) {
 		unsigned char c = IN1;
-		int err;
+		Py_ssize_t err;
 
 		if (STATE_GETFLAG(F_ESCTHROUGHOUT)) {
 			/* ESC throughout mode:
@@ -589,13 +588,15 @@ ksx1001_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-ksx1001_encoder(const ucs4_t *data, int *length)
+ksx1001_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
 	assert(*length == 1);
-	TRYMAP_ENC(cp949, coded, *data)
-		if (!(coded & 0x8000))
-			return coded;
+	if (*data < 0x10000) {
+		TRYMAP_ENC(cp949, coded, *data)
+			if (!(coded & 0x8000))
+				return coded;
+	}
 	return MAP_UNMAPPABLE;
 }
 
@@ -625,15 +626,17 @@ jisx0208_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-jisx0208_encoder(const ucs4_t *data, int *length)
+jisx0208_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
 	assert(*length == 1);
-	if (*data == 0xff3c) /* F/W REVERSE SOLIDUS */
-		return 0x2140;
-	else TRYMAP_ENC(jisxcommon, coded, *data) {
-		if (!(coded & 0x8000))
-			return coded;
+	if (*data < 0x10000) {
+		if (*data == 0xff3c) /* F/W REVERSE SOLIDUS */
+			return 0x2140;
+		else TRYMAP_ENC(jisxcommon, coded, *data) {
+			if (!(coded & 0x8000))
+				return coded;
+		}
 	}
 	return MAP_UNMAPPABLE;
 }
@@ -662,13 +665,15 @@ jisx0212_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-jisx0212_encoder(const ucs4_t *data, int *length)
+jisx0212_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
 	assert(*length == 1);
-	TRYMAP_ENC(jisxcommon, coded, *data) {
-		if (coded & 0x8000)
-			return coded & 0x7fff;
+	if (*data < 0x10000) {
+		TRYMAP_ENC(jisxcommon, coded, *data) {
+			if (coded & 0x8000)
+				return coded & 0x7fff;
+		}
 	}
 	return MAP_UNMAPPABLE;
 }
@@ -760,7 +765,7 @@ jisx0213_2004_2_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-jisx0213_encoder(const ucs4_t *data, int *length, void *config)
+jisx0213_encoder(const ucs4_t *data, Py_ssize_t *length, void *config)
 {
 	DBCHAR coded;
 
@@ -814,7 +819,7 @@ jisx0213_encoder(const ucs4_t *data, int *length, void *config)
 }
 
 static DBCHAR
-jisx0213_2000_1_encoder(const ucs4_t *data, int *length)
+jisx0213_2000_1_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded = jisx0213_encoder(data, length, (void *)2000);
 	if (coded == MAP_UNMAPPABLE || coded == MAP_MULTIPLE_AVAIL)
@@ -826,10 +831,10 @@ jisx0213_2000_1_encoder(const ucs4_t *data, int *length)
 }
 
 static DBCHAR
-jisx0213_2000_1_encoder_paironly(const ucs4_t *data, int *length)
+jisx0213_2000_1_encoder_paironly(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
-	int ilength = *length;
+	Py_ssize_t ilength = *length;
 
 	coded = jisx0213_encoder(data, length, (void *)2000);
 	switch (ilength) {
@@ -849,19 +854,19 @@ jisx0213_2000_1_encoder_paironly(const ucs4_t *data, int *length)
 }
 
 static DBCHAR
-jisx0213_2000_2_encoder(const ucs4_t *data, int *length)
+jisx0213_2000_2_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded = jisx0213_encoder(data, length, (void *)2000);
 	if (coded == MAP_UNMAPPABLE || coded == MAP_MULTIPLE_AVAIL)
 		return coded;
 	else if (coded & 0x8000)
-		return coded;
+		return coded & 0x7fff;
 	else
 		return MAP_UNMAPPABLE;
 }
 
 static DBCHAR
-jisx0213_2004_1_encoder(const ucs4_t *data, int *length)
+jisx0213_2004_1_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded = jisx0213_encoder(data, length, NULL);
 	if (coded == MAP_UNMAPPABLE || coded == MAP_MULTIPLE_AVAIL)
@@ -873,10 +878,10 @@ jisx0213_2004_1_encoder(const ucs4_t *data, int *length)
 }
 
 static DBCHAR
-jisx0213_2004_1_encoder_paironly(const ucs4_t *data, int *length)
+jisx0213_2004_1_encoder_paironly(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
-	int ilength = *length;
+	Py_ssize_t ilength = *length;
 
 	coded = jisx0213_encoder(data, length, NULL);
 	switch (ilength) {
@@ -896,13 +901,13 @@ jisx0213_2004_1_encoder_paironly(const ucs4_t *data, int *length)
 }
 
 static DBCHAR
-jisx0213_2004_2_encoder(const ucs4_t *data, int *length)
+jisx0213_2004_2_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded = jisx0213_encoder(data, length, NULL);
 	if (coded == MAP_UNMAPPABLE || coded == MAP_MULTIPLE_AVAIL)
 		return coded;
 	else if (coded & 0x8000)
-		return coded;
+		return coded & 0x7fff;
 	else
 		return MAP_UNMAPPABLE;
 }
@@ -917,7 +922,7 @@ jisx0201_r_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-jisx0201_r_encoder(const ucs4_t *data, int *length)
+jisx0201_r_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
 	JISX0201_R_ENCODE(*data, coded)
@@ -935,7 +940,7 @@ jisx0201_k_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-jisx0201_k_encoder(const ucs4_t *data, int *length)
+jisx0201_k_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
 	JISX0201_K_ENCODE(*data, coded)
@@ -967,13 +972,15 @@ gb2312_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-gb2312_encoder(const ucs4_t *data, int *length)
+gb2312_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	DBCHAR coded;
 	assert(*length == 1);
-	TRYMAP_ENC(gbcommon, coded, *data) {
-		if (!(coded & 0x8000))
-			return coded;
+	if (*data < 0x10000) {
+		TRYMAP_ENC(gbcommon, coded, *data) {
+			if (!(coded & 0x8000))
+				return coded;
+		}
 	}
 	return MAP_UNMAPPABLE;
 }
@@ -986,14 +993,17 @@ dummy_decoder(const unsigned char *data)
 }
 
 static DBCHAR
-dummy_encoder(const ucs4_t *data, int *length)
+dummy_encoder(const ucs4_t *data, Py_ssize_t *length)
 {
 	return MAP_UNMAPPABLE;
 }
 
 /*-*- registry tables -*-*/
 
-#define REGISTRY_KSX1001	{ CHARSET_KSX1001, 1, 2,		\
+#define REGISTRY_KSX1001_G0	{ CHARSET_KSX1001, 0, 2,		\
+				  ksx1001_init,				\
+				  ksx1001_decoder, ksx1001_encoder }
+#define REGISTRY_KSX1001_G1	{ CHARSET_KSX1001, 1, 2,		\
 				  ksx1001_init,				\
 				  ksx1001_decoder, ksx1001_encoder }
 #define REGISTRY_JISX0201_R	{ CHARSET_JISX0201_R, 0, 1,		\
@@ -1035,7 +1045,7 @@ dummy_encoder(const ucs4_t *data, int *length)
 				  jisx0213_init,			\
 				  jisx0213_2004_2_decoder,		\
 				  jisx0213_2004_2_encoder }
-#define REGISTRY_GB2312		{ CHARSET_GB2312, 1, 2,			\
+#define REGISTRY_GB2312		{ CHARSET_GB2312, 0, 2,			\
 				  gb2312_init,				\
 				  gb2312_decoder, gb2312_encoder }
 #define REGISTRY_CNS11643_1	{ CHARSET_CNS11643_1, 1, 2,		\
@@ -1055,7 +1065,7 @@ dummy_encoder(const ucs4_t *data, int *length)
 	};
 
 static const struct iso2022_designation iso2022_kr_designations[] = {
-	REGISTRY_KSX1001, REGISTRY_SENTINEL
+	REGISTRY_KSX1001_G1, REGISTRY_SENTINEL
 };
 CONFIGDEF(kr, 0)
 
@@ -1072,7 +1082,7 @@ static const struct iso2022_designation iso2022_jp_1_designations[] = {
 CONFIGDEF(jp_1, NO_SHIFT | USE_JISX0208_EXT)
 
 static const struct iso2022_designation iso2022_jp_2_designations[] = {
-	REGISTRY_JISX0208, REGISTRY_JISX0212, REGISTRY_KSX1001,
+	REGISTRY_JISX0208, REGISTRY_JISX0212, REGISTRY_KSX1001_G0,
 	REGISTRY_GB2312, REGISTRY_JISX0201_R, REGISTRY_JISX0208_O,
 	REGISTRY_ISO8859_1, REGISTRY_ISO8859_7, REGISTRY_SENTINEL
 };

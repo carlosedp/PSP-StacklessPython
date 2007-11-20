@@ -85,11 +85,6 @@ if [ "$1" ] ; then
     shift
 fi
 
-if [ "$DOCTYPE" = 'maint' ] ; then
-    # 'maint' is a symlink
-    DOCTYPE='maint24'
-fi
-
 START="`pwd`"
 MYDIR="`dirname $0`"
 cd "$MYDIR"

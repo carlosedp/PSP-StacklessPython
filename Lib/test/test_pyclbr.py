@@ -93,8 +93,14 @@ class PyclbrTest(TestCase):
             py_item = getattr(module, name)
             if isinstance(value, pyclbr.Function):
                 self.assert_(isinstance(py_item, (FunctionType, BuiltinFunctionType)))
+                if py_item.__module__ != moduleName:
+                    continue   # skip functions that came from somewhere else
+                self.assertEquals(py_item.__module__, value.module)
             else:
                 self.failUnless(isinstance(py_item, (ClassType, type)))
+                if py_item.__module__ != moduleName:
+                    continue   # skip classes that came from somewhere else
+
                 real_bases = [base.__name__ for base in py_item.__bases__]
                 pyclbr_bases = [ getattr(base, 'name', base)
                                  for base in value.super ]
@@ -170,7 +176,7 @@ class PyclbrTest(TestCase):
         cm('pydoc')
 
         # Tests for modules inside packages
-        cm('email.Parser')
+        cm('email.parser')
         cm('test.test_pyclbr')
 
 

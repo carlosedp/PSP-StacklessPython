@@ -1,6 +1,6 @@
 from collections import deque
 import unittest
-from test import test_support
+from test import test_support, seq_tests
 from weakref import proxy
 import copy
 import cPickle as pickle
@@ -13,6 +13,18 @@ BIG = 100000
 def fail():
     raise SyntaxError
     yield 1
+
+class BadCmp:
+    def __eq__(self, other):
+        raise RuntimeError
+
+class MutateCmp:
+    def __init__(self, deque, result):
+        self.deque = deque
+        self.result = result
+    def __eq__(self, other):
+        self.deque.clear()
+        return self.result
 
 class TestBasic(unittest.TestCase):
 
@@ -197,6 +209,30 @@ class TestBasic(unittest.TestCase):
         d.clear()               # clear an emtpy deque
         self.assertEqual(list(d), [])
 
+    def test_remove(self):
+        d = deque('abcdefghcij')
+        d.remove('c')
+        self.assertEqual(d, deque('abdefghcij'))
+        d.remove('c')
+        self.assertEqual(d, deque('abdefghij'))
+        self.assertRaises(ValueError, d.remove, 'c')
+        self.assertEqual(d, deque('abdefghij'))
+
+        # Handle comparison errors
+        d = deque(['a', 'b', BadCmp(), 'c'])
+        e = deque(d)
+        self.assertRaises(RuntimeError, d.remove, 'c')
+        for x, y in zip(d, e):
+            # verify that original order and values are retained.
+            self.assert_(x is y)
+
+        # Handle evil mutator
+        for match in (True, False):
+            d = deque(['ab'])
+            d.extend([MutateCmp(d, match), 'c'])
+            self.assertRaises(IndexError, d.remove, 'c')
+            self.assertEqual(d, deque())
+
     def test_repr(self):
         d = deque(xrange(200))
         e = eval(repr(d))
@@ -342,98 +378,28 @@ class TestBasic(unittest.TestCase):
             d.append(1)
             gc.collect()
 
-def R(seqn):
-    'Regular generator'
-    for i in seqn:
-        yield i
-
-class G:
-    'Sequence using __getitem__'
-    def __init__(self, seqn):
-        self.seqn = seqn
-    def __getitem__(self, i):
-        return self.seqn[i]
-
-class I:
-    'Sequence using iterator protocol'
-    def __init__(self, seqn):
-        self.seqn = seqn
-        self.i = 0
-    def __iter__(self):
-        return self
-    def next(self):
-        if self.i >= len(self.seqn): raise StopIteration
-        v = self.seqn[self.i]
-        self.i += 1
-        return v
-
-class Ig:
-    'Sequence using iterator protocol defined with a generator'
-    def __init__(self, seqn):
-        self.seqn = seqn
-        self.i = 0
-    def __iter__(self):
-        for val in self.seqn:
-            yield val
-
-class X:
-    'Missing __getitem__ and __iter__'
-    def __init__(self, seqn):
-        self.seqn = seqn
-        self.i = 0
-    def next(self):
-        if self.i >= len(self.seqn): raise StopIteration
-        v = self.seqn[self.i]
-        self.i += 1
-        return v
-
-class N:
-    'Iterator missing next()'
-    def __init__(self, seqn):
-        self.seqn = seqn
-        self.i = 0
-    def __iter__(self):
-        return self
-
-class E:
-    'Test propagation of exceptions'
-    def __init__(self, seqn):
-        self.seqn = seqn
-        self.i = 0
-    def __iter__(self):
-        return self
-    def next(self):
-        3 // 0
-
-class S:
-    'Test immediate stop'
-    def __init__(self, seqn):
-        pass
-    def __iter__(self):
-        return self
-    def next(self):
-        raise StopIteration
-
-from itertools import chain, imap
-def L(seqn):
-    'Test multiple tiers of iterators'
-    return chain(imap(lambda x:x, R(Ig(G(seqn)))))
-
-
 class TestVariousIteratorArgs(unittest.TestCase):
 
     def test_constructor(self):
         for s in ("123", "", range(1000), ('do', 1.2), xrange(2000,2200,5)):
-            for g in (G, I, Ig, S, L, R):
+            for g in (seq_tests.Sequence, seq_tests.IterFunc,
+                      seq_tests.IterGen, seq_tests.IterFuncStop,
+                      seq_tests.itermulti, seq_tests.iterfunc):
                 self.assertEqual(list(deque(g(s))), list(g(s)))
-            self.assertRaises(TypeError, deque, X(s))
-            self.assertRaises(TypeError, deque, N(s))
-            self.assertRaises(ZeroDivisionError, deque, E(s))
+            self.assertRaises(TypeError, deque, seq_tests.IterNextOnly(s))
+            self.assertRaises(TypeError, deque, seq_tests.IterNoNext(s))
+            self.assertRaises(ZeroDivisionError, deque, seq_tests.IterGenExc(s))
 
     def test_iter_with_altered_data(self):
         d = deque('abcdefg')
         it = iter(d)
         d.pop()
+        self.assertRaises(RuntimeError, it.next)
+
+    def test_runtime_error_on_empty_deque(self):
+        d = deque()
+        it = iter(d)
+        d.append(10)
         self.assertRaises(RuntimeError, it.next)
 
 class Deque(deque):
@@ -519,6 +485,16 @@ class TestSubclass(unittest.TestCase):
         d2 = X([4,5,6])
         d1 == d2   # not clear if this is supposed to be True or False,
                    # but it used to give a SystemError
+
+
+class SubclassWithKwargs(deque):
+    def __init__(self, newarg=1):
+        deque.__init__(self)
+
+class TestSubclassWithKwargs(unittest.TestCase):
+    def test_subclass_with_kwargs(self):
+        # SF bug #1486663 -- this used to erroneously raise a TypeError
+        SubclassWithKwargs(newarg=1)
 
 #==============================================================================
 
@@ -633,6 +609,7 @@ def test_main(verbose=None):
         TestBasic,
         TestVariousIteratorArgs,
         TestSubclass,
+        TestSubclassWithKwargs,
     )
 
     test_support.run_unittest(*test_classes)

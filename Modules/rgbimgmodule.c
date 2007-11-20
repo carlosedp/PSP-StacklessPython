@@ -168,7 +168,7 @@ putlong(FILE *outf, Py_UInt32 val)
 	buf[1] = (unsigned char) (val >> 16);
 	buf[2] = (unsigned char) (val >> 8);
 	buf[3] = (unsigned char) (val >> 0);
-	return fwrite(buf, 4, 1, outf);
+	return (int)fwrite(buf, 4, 1, outf);
 }
 
 static void
@@ -200,7 +200,7 @@ writeheader(FILE *outf, IMAGE *image)
 	putlong(outf, image->min);
 	putlong(outf, image->max);
 	putlong(outf, 0);
-	return fwrite("no name", 8, 1, outf);
+	return (int)fwrite("no name", 8, 1, outf);
 }
 
 static int
@@ -410,6 +410,11 @@ longimagedata(PyObject *self, PyObject *args)
 		addlongimgtag(base, xsize, ysize);
 #endif
 		verdat = (unsigned char *)malloc(xsize);
+		if (!verdat) {
+			Py_CLEAR(rv);
+			goto finally;
+		}
+
 		fseek(inf, 512, SEEK_SET);
 		for (z = 0; z < zsize; z++) {
 			lptr = base;
@@ -431,10 +436,14 @@ longimagedata(PyObject *self, PyObject *args)
 			copybw((Py_Int32 *) base, xsize * ysize);
 	}
   finally:
-	free(starttab);
-	free(lengthtab);
-	free(rledat);
-	free(verdat);
+	if (starttab)
+		free(starttab);
+	if (lengthtab)
+		free(lengthtab);
+	if (rledat)
+		free(rledat);
+	if (verdat)
+		free(verdat);
 	fclose(inf);
 	return rv;
 }
@@ -567,7 +576,8 @@ longstoimage(PyObject *self, PyObject *args)
 	Py_Int32 *starttab = NULL, *lengthtab = NULL;
 	unsigned char *rlebuf = NULL;
 	unsigned char *lumbuf = NULL;
-	int rlebuflen, goodwrite;
+	int rlebuflen;
+	Py_ssize_t goodwrite;
 	PyObject *retval = NULL;
 
 	if (!PyArg_ParseTuple(args, "s#iiis:longstoimage", &lptr, &len,
@@ -756,6 +766,13 @@ initrgbimg(void)
 {
 	PyObject *m, *d;
 	m = Py_InitModule("rgbimg", rgbimg_methods);
+	if (m == NULL)
+		return;
+
+	if (PyErr_Warn(PyExc_DeprecationWarning, 
+				"the rgbimg module is deprecated"))
+		return;
+	
 	d = PyModule_GetDict(m);
 	ImgfileError = PyErr_NewException("rgbimg.error", NULL, NULL);
 	if (ImgfileError != NULL)

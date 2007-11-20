@@ -5,7 +5,7 @@ Implements the Distutils 'register' command (register with the repository).
 
 # created 2002/10/21, Richard Jones
 
-__revision__ = "$Id: register.py 38753 2005-03-31 14:16:30Z doerwalter $"
+__revision__ = "$Id: register.py 52349 2006-10-15 16:28:45Z richard.tew $"
 
 import sys, os, string, urllib2, getpass, urlparse
 import StringIO, ConfigParser
@@ -231,7 +231,13 @@ Your selection [default 1]: ''',
             'platform': meta.get_platforms(),
             'classifiers': meta.get_classifiers(),
             'download_url': meta.get_download_url(),
+            # PEP 314
+            'provides': meta.get_provides(),
+            'requires': meta.get_requires(),
+            'obsoletes': meta.get_obsoletes(),
         }
+        if data['provides'] or data['requires'] or data['obsoletes']:
+            data['metadata_version'] = '1.1'
         return data
 
     def post_to_server(self, data, auth=None):
@@ -245,7 +251,7 @@ Your selection [default 1]: ''',
         body = StringIO.StringIO()
         for key, value in data.items():
             # handle multiple entries for the same name
-            if type(value) != type([]):
+            if type(value) not in (type([]), type( () )):
                 value = [value]
             for value in value:
                 value = unicode(value).encode("utf-8")

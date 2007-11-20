@@ -7,6 +7,7 @@
              [1998/01/11 LaTeX package (Python markup)]
 
 \RequirePackage{longtable}
+\RequirePackage{underscore}
 
 % Uncomment these two lines to ignore the paper size and make the page 
 % size more like a typical published manual.
@@ -541,28 +542,6 @@
                                     {\reset@font\normalsize\py@HeaderFamily}}
 
 
-% This gets the underscores closer to the right width; the only change
-% from standard LaTeX is the width specified.
-
-\DeclareTextCommandDefault{\textunderscore}{%
-  \leavevmode \kern.06em\vbox{\hrule\@width.55em}}
-
-% Underscore hack (only act like subscript operator if in math mode)
-%
-% The following is due to Mark Wooding (the old version didn't work with
-% Latex 2e.
-
-\DeclareRobustCommand\hackscore{%
-  \ifmmode_\else\textunderscore\fi%
-}
-\begingroup
-\catcode`\_\active
-\def\next{%
-  \AtBeginDocument{\catcode`\_\active\def_{\hackscore{}}}%
-}
-\expandafter\endgroup\next
-
-
 % Now for a lot of semantically-loaded environments that do a ton of magical
 % things to get the right formatting and index entries for the stuff in
 % Python modules and C API.
@@ -869,8 +848,17 @@
 % but only if we actually used hyperref:
 \ifpdf
   \newcommand{\url}[1]{{%
-    \py@pdfstartlink attr{/Border [0 0 0]} user{/S /URI /URI (#1)}%
-    \py@LinkColor%                              color of the link text
+    \py@pdfstartlink%
+    attr{ /Border [0 0 0] }%
+    user{%
+      /Subtype/Link%
+      /A<<%
+      /Type/Action%
+      /S/URI%
+      /URI(#1)%
+      >>%
+    }%
+    \py@LinkColor%                      color of the link text
     \py@smallsize\sf #1%
     \py@NormalColor%                    Turn it back off; these are declarative
     \pdfendlink}%                       and don't appear bound to the current
@@ -946,7 +934,16 @@
 \ifpdf
   \newcommand{\ulink}[2]{{%
     % For PDF, we *should* only generate a link when the URL is absolute.
-    \py@pdfstartlink attr{/Border [0 0 0]} user{/S /URI /URI (#2)}%
+    \py@pdfstartlink%
+    attr{ /Border [0 0 0] }%
+    user{%
+      /Subtype/Link%
+      /A<<%
+      /Type/Action%
+      /S/URI%
+      /URI(#2)%
+      >>%
+    }%
     \py@LinkColor%                              color of the link text
     #1%
     \py@NormalColor%                    Turn it back off; these are declarative

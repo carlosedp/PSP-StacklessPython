@@ -395,7 +395,67 @@ class DictTest(unittest.TestCase):
         else:
             self.fail("< didn't raise Exc")
 
-import mapping_tests
+    def test_missing(self):
+        # Make sure dict doesn't have a __missing__ method
+        self.assertEqual(hasattr(dict, "__missing__"), False)
+        self.assertEqual(hasattr({}, "__missing__"), False)
+        # Test several cases:
+        # (D) subclass defines __missing__ method returning a value
+        # (E) subclass defines __missing__ method raising RuntimeError
+        # (F) subclass sets __missing__ instance variable (no effect)
+        # (G) subclass doesn't define __missing__ at a all
+        class D(dict):
+            def __missing__(self, key):
+                return 42
+        d = D({1: 2, 3: 4})
+        self.assertEqual(d[1], 2)
+        self.assertEqual(d[3], 4)
+        self.assert_(2 not in d)
+        self.assert_(2 not in d.keys())
+        self.assertEqual(d[2], 42)
+        class E(dict):
+            def __missing__(self, key):
+                raise RuntimeError(key)
+        e = E()
+        try:
+            e[42]
+        except RuntimeError, err:
+            self.assertEqual(err.args, (42,))
+        else:
+            self.fail("e[42] didn't raise RuntimeError")
+        class F(dict):
+            def __init__(self):
+                # An instance variable __missing__ should have no effect
+                self.__missing__ = lambda key: None
+        f = F()
+        try:
+            f[42]
+        except KeyError, err:
+            self.assertEqual(err.args, (42,))
+        else:
+            self.fail("f[42] didn't raise KeyError")
+        class G(dict):
+            pass
+        g = G()
+        try:
+            g[42]
+        except KeyError, err:
+            self.assertEqual(err.args, (42,))
+        else:
+            self.fail("g[42] didn't raise KeyError")
+
+    def test_tuple_keyerror(self):
+        # SF #1576657
+        d = {}
+        try:
+            d[(1,)]
+        except KeyError, e:
+            self.assertEqual(e.args, ((1,),))
+        else:
+            self.fail("missing KeyError")
+
+
+from test import mapping_tests
 
 class GeneralMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = dict
