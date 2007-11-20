@@ -6,10 +6,10 @@
         ((PyWeakReference **) PyObject_GET_WEAKREFS_LISTPTR(o))
 
 
-long
+Py_ssize_t
 _PyWeakref_GetWeakrefCount(PyWeakReference *head)
 {
-    long count = 0;
+    Py_ssize_t count = 0;
 
     while (head != NULL) {
         ++count;
@@ -57,6 +57,9 @@ clear_weakref(PyWeakReference *self)
             PyWeakref_GET_OBJECT(self));
 
         if (*list == self)
+	    /* If 'self' is the end of the list (and thus self->wr_next == NULL)
+	       then the weakref list itself (and thus the value of *list) will
+	       end up being set to NULL. */
             *list = self->wr_next;
         self->wr_object = Py_None;
         if (self->wr_prev != NULL)
@@ -109,8 +112,7 @@ weakref_dealloc(PyObject *self)
 static int
 gc_traverse(PyWeakReference *self, visitproc visit, void *arg)
 {
-    if (self->wr_callback != NULL)
-        return visit(self->wr_callback, arg);
+    Py_VISIT(self->wr_callback);
     return 0;
 }
 
@@ -126,9 +128,9 @@ gc_clear(PyWeakReference *self)
 static PyObject *
 weakref_call(PyWeakReference *self, PyObject *args, PyObject *kw)
 {
-    static char *argnames[] = {NULL};
+    static char *kwlist[] = {NULL};
 
-    if (PyArg_ParseTupleAndKeywords(args, kw, ":__call__", argnames)) {
+    if (PyArg_ParseTupleAndKeywords(args, kw, ":__call__", kwlist)) {
         PyObject *object = PyWeakref_GET_OBJECT(self);
         Py_INCREF(object);
         return (object);
@@ -367,7 +369,7 @@ _PyWeakref_RefType = {
     0,                          /*tp_descr_get*/
     0,                          /*tp_descr_set*/
     0,                          /*tp_dictoffset*/
-    (initproc)weakref___init__, /*tp_init*/
+    weakref___init__,           /*tp_init*/
     PyType_GenericAlloc,        /*tp_alloc*/
     weakref___new__,            /*tp_new*/
     PyObject_GC_Del,            /*tp_free*/
@@ -520,7 +522,7 @@ proxy_dealloc(PyWeakReference *self)
 /* sequence slots */
 
 static PyObject *
-proxy_slice(PyWeakReference *proxy, int i, int j)
+proxy_slice(PyWeakReference *proxy, Py_ssize_t i, Py_ssize_t j)
 {
     if (!proxy_checkref(proxy))
         return NULL;
@@ -528,7 +530,7 @@ proxy_slice(PyWeakReference *proxy, int i, int j)
 }
 
 static int
-proxy_ass_slice(PyWeakReference *proxy, int i, int j, PyObject *value)
+proxy_ass_slice(PyWeakReference *proxy, Py_ssize_t i, Py_ssize_t j, PyObject *value)
 {
     if (!proxy_checkref(proxy))
         return -1;
@@ -546,7 +548,7 @@ proxy_contains(PyWeakReference *proxy, PyObject *value)
 
 /* mapping slots */
 
-static int
+static Py_ssize_t
 proxy_length(PyWeakReference *proxy)
 {
     if (!proxy_checkref(proxy))
@@ -588,56 +590,56 @@ proxy_iternext(PyWeakReference *proxy)
 
 
 static PyNumberMethods proxy_as_number = {
-    (binaryfunc)proxy_add,      /*nb_add*/
-    (binaryfunc)proxy_sub,      /*nb_subtract*/
-    (binaryfunc)proxy_mul,      /*nb_multiply*/
-    (binaryfunc)proxy_div,      /*nb_divide*/
-    (binaryfunc)proxy_mod,      /*nb_remainder*/
-    (binaryfunc)proxy_divmod,   /*nb_divmod*/
-    (ternaryfunc)proxy_pow,     /*nb_power*/
-    (unaryfunc)proxy_neg,       /*nb_negative*/
-    (unaryfunc)proxy_pos,       /*nb_positive*/
-    (unaryfunc)proxy_abs,       /*nb_absolute*/
-    (inquiry)proxy_nonzero,     /*nb_nonzero*/
-    (unaryfunc)proxy_invert,    /*nb_invert*/
-    (binaryfunc)proxy_lshift,   /*nb_lshift*/
-    (binaryfunc)proxy_rshift,   /*nb_rshift*/
-    (binaryfunc)proxy_and,      /*nb_and*/
-    (binaryfunc)proxy_xor,      /*nb_xor*/
-    (binaryfunc)proxy_or,       /*nb_or*/
-    (coercion)0,                /*nb_coerce*/
-    (unaryfunc)proxy_int,       /*nb_int*/
-    (unaryfunc)proxy_long,      /*nb_long*/
-    (unaryfunc)proxy_float,     /*nb_float*/
-    (unaryfunc)0,               /*nb_oct*/
-    (unaryfunc)0,               /*nb_hex*/
-    (binaryfunc)proxy_iadd,     /*nb_inplace_add*/
-    (binaryfunc)proxy_isub,     /*nb_inplace_subtract*/
-    (binaryfunc)proxy_imul,     /*nb_inplace_multiply*/
-    (binaryfunc)proxy_idiv,     /*nb_inplace_divide*/
-    (binaryfunc)proxy_imod,     /*nb_inplace_remainder*/
-    (ternaryfunc)proxy_ipow,    /*nb_inplace_power*/
-    (binaryfunc)proxy_ilshift,  /*nb_inplace_lshift*/
-    (binaryfunc)proxy_irshift,  /*nb_inplace_rshift*/
-    (binaryfunc)proxy_iand,     /*nb_inplace_and*/
-    (binaryfunc)proxy_ixor,     /*nb_inplace_xor*/
-    (binaryfunc)proxy_ior,      /*nb_inplace_or*/
+    proxy_add,              /*nb_add*/
+    proxy_sub,              /*nb_subtract*/
+    proxy_mul,              /*nb_multiply*/
+    proxy_div,              /*nb_divide*/
+    proxy_mod,              /*nb_remainder*/
+    proxy_divmod,           /*nb_divmod*/
+    proxy_pow,              /*nb_power*/
+    proxy_neg,              /*nb_negative*/
+    proxy_pos,              /*nb_positive*/
+    proxy_abs,              /*nb_absolute*/
+    (inquiry)proxy_nonzero, /*nb_nonzero*/
+    proxy_invert,           /*nb_invert*/
+    proxy_lshift,           /*nb_lshift*/
+    proxy_rshift,           /*nb_rshift*/
+    proxy_and,              /*nb_and*/
+    proxy_xor,              /*nb_xor*/
+    proxy_or,               /*nb_or*/
+    0,                      /*nb_coerce*/
+    proxy_int,              /*nb_int*/
+    proxy_long,             /*nb_long*/
+    proxy_float,            /*nb_float*/
+    0,                      /*nb_oct*/
+    0,                      /*nb_hex*/
+    proxy_iadd,             /*nb_inplace_add*/
+    proxy_isub,             /*nb_inplace_subtract*/
+    proxy_imul,             /*nb_inplace_multiply*/
+    proxy_idiv,             /*nb_inplace_divide*/
+    proxy_imod,             /*nb_inplace_remainder*/
+    proxy_ipow,             /*nb_inplace_power*/
+    proxy_ilshift,          /*nb_inplace_lshift*/
+    proxy_irshift,          /*nb_inplace_rshift*/
+    proxy_iand,             /*nb_inplace_and*/
+    proxy_ixor,             /*nb_inplace_xor*/
+    proxy_ior,              /*nb_inplace_or*/
 };
 
 static PySequenceMethods proxy_as_sequence = {
-    (inquiry)proxy_length,      /*sq_length*/
+    (lenfunc)proxy_length,      /*sq_length*/
     0,                          /*sq_concat*/
     0,                          /*sq_repeat*/
     0,                          /*sq_item*/
-    (intintargfunc)proxy_slice, /*sq_slice*/
+    (ssizessizeargfunc)proxy_slice, /*sq_slice*/
     0,                          /*sq_ass_item*/
-    (intintobjargproc)proxy_ass_slice, /*sq_ass_slice*/
+    (ssizessizeobjargproc)proxy_ass_slice, /*sq_ass_slice*/
     (objobjproc)proxy_contains, /* sq_contains */
 };
 
 static PyMappingMethods proxy_as_mapping = {
-    (inquiry)proxy_length,      /*mp_length*/
-    (binaryfunc)proxy_getitem,  /*mp_subscript*/
+    (lenfunc)proxy_length,        /*mp_length*/
+    proxy_getitem,                /*mp_subscript*/
     (objobjargproc)proxy_setitem, /*mp_ass_subscript*/
 };
 
@@ -655,14 +657,14 @@ _PyWeakref_ProxyType = {
     0,				        /* tp_getattr */
     0, 				        /* tp_setattr */
     proxy_compare,		        /* tp_compare */
-    (unaryfunc)proxy_repr,	        /* tp_repr */
+    (reprfunc)proxy_repr,	        /* tp_repr */
     &proxy_as_number,		        /* tp_as_number */
     &proxy_as_sequence,		        /* tp_as_sequence */
     &proxy_as_mapping,		        /* tp_as_mapping */
     0,	                                /* tp_hash */
-    (ternaryfunc)0,	                /* tp_call */
-    (unaryfunc)proxy_str,	        /* tp_str */
-    (getattrofunc)proxy_getattr,        /* tp_getattro */
+    0,	                                /* tp_call */
+    proxy_str,                          /* tp_str */
+    proxy_getattr,                      /* tp_getattro */
     (setattrofunc)proxy_setattr,        /* tp_setattro */
     0,				        /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
@@ -695,9 +697,9 @@ _PyWeakref_CallableProxyType = {
     &proxy_as_sequence,		        /* tp_as_sequence */
     &proxy_as_mapping,		        /* tp_as_mapping */
     0,	                                /* tp_hash */
-    (ternaryfunc)proxy_call,	        /* tp_call */
-    (unaryfunc)proxy_str,	        /* tp_str */
-    (getattrofunc)proxy_getattr,        /* tp_getattro */
+    proxy_call,	                        /* tp_call */
+    proxy_str,	                        /* tp_str */
+    proxy_getattr,                      /* tp_getattro */
     (setattrofunc)proxy_setattr,        /* tp_setattro */
     0,				        /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
@@ -852,7 +854,7 @@ PyWeakref_GetObject(PyObject *ref)
 static void
 handle_callback(PyWeakReference *ref, PyObject *callback)
 {
-    PyObject *cbresult = PyObject_CallFunction(callback, "O", ref);
+    PyObject *cbresult = PyObject_CallFunctionObjArgs(callback, ref, NULL);
 
     if (cbresult == NULL)
         PyErr_WriteUnraisable(callback);
@@ -886,7 +888,7 @@ PyObject_ClearWeakRefs(PyObject *object)
     }
     if (*list != NULL) {
         PyWeakReference *current = *list;
-        int count = _PyWeakref_GetWeakrefCount(current);
+        Py_ssize_t count = _PyWeakref_GetWeakrefCount(current);
         int restore_error = PyErr_Occurred() ? 1 : 0;
         PyObject *err_type, *err_value, *err_tb;
 
@@ -904,8 +906,8 @@ PyObject_ClearWeakRefs(PyObject *object)
         }
         else {
             PyObject *tuple;
-            int i = 0;
-
+            Py_ssize_t i = 0;
+    
             tuple = PyTuple_New(count * 2);
             if (tuple == NULL) {
                 if (restore_error)
@@ -927,8 +929,8 @@ PyObject_ClearWeakRefs(PyObject *object)
                 PyObject *callback = PyTuple_GET_ITEM(tuple, i * 2 + 1);
 
                 if (callback != NULL) {
-                    PyObject *current = PyTuple_GET_ITEM(tuple, i * 2);
-                    handle_callback((PyWeakReference *)current, callback);
+                    PyObject *item = PyTuple_GET_ITEM(tuple, i * 2);
+                    handle_callback((PyWeakReference *)item, callback);
                 }
             }
             Py_DECREF(tuple);

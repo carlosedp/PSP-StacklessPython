@@ -5,6 +5,10 @@ of their type, or with wide classes of object types (e.g. all
 numerical types, or all sequence types).  When used on object types
 for which they do not apply, they will raise a Python exception.
 
+It is not possible to use these functions on objects that are not properly
+initialized, such as a list object that has been created by
+\cfunction{PyList_New()}, but whose items have not been set to some
+non-\code{NULL} value yet.
 
 \section{Object Protocol \label{object}}
 
@@ -16,7 +20,7 @@ for which they do not apply, they will raise a Python exception.
   object is written instead of the \function{repr()}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PyObject_HasAttrString}{PyObject *o, char *attr_name}
+\begin{cfuncdesc}{int}{PyObject_HasAttrString}{PyObject *o, const char *attr_name}
   Returns \code{1} if \var{o} has the attribute \var{attr_name}, and
   \code{0} otherwise.  This is equivalent to the Python expression
   \samp{hasattr(\var{o}, \var{attr_name})}.  This function always
@@ -24,7 +28,7 @@ for which they do not apply, they will raise a Python exception.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyObject_GetAttrString}{PyObject *o,
-                                                     char *attr_name}
+                                                     const char *attr_name}
   Retrieve an attribute named \var{attr_name} from object \var{o}.
   Returns the attribute value on success, or \NULL{} on failure.
   This is the equivalent of the Python expression
@@ -50,7 +54,7 @@ for which they do not apply, they will raise a Python exception.
 
 
 \begin{cfuncdesc}{int}{PyObject_SetAttrString}{PyObject *o,
-                                               char *attr_name, PyObject *v}
+                                               const char *attr_name, PyObject *v}
   Set the value of the attribute named \var{attr_name}, for object
   \var{o}, to the value \var{v}. Returns \code{-1} on failure.  This
   is the equivalent of the Python statement
@@ -67,7 +71,7 @@ for which they do not apply, they will raise a Python exception.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{int}{PyObject_DelAttrString}{PyObject *o, char *attr_name}
+\begin{cfuncdesc}{int}{PyObject_DelAttrString}{PyObject *o, const char *attr_name}
   Delete attribute named \var{attr_name}, for object \var{o}. Returns
   \code{-1} on failure.  This is the equivalent of the Python
   statement: \samp{del \var{o}.\var{attr_name}}.
@@ -260,6 +264,8 @@ determination.
   result of the call on success, or \NULL{} on failure.  This is the
   equivalent of the Python expression \samp{apply(\var{callable},
   \var{args})} or \samp{\var{callable}(*\var{args})}.
+  Note that if you only pass \ctype{PyObject *} args,
+  \cfunction{PyObject_CallFunctionObjArgs} is a faster alternative.
   \bifuncindex{apply}
 \end{cfuncdesc}
 
@@ -274,6 +280,8 @@ determination.
   indicating that no arguments are provided. Returns the result of the
   call on success, or \NULL{} on failure.  This is the equivalent of
   the Python expression \samp{\var{o}.\var{method}(\var{args})}.
+  Note that if you only pass \ctype{PyObject *} args,
+  \cfunction{PyObject_CallMethodObjArgs} is a faster alternative.
 \end{cfuncdesc}
 
 
@@ -301,7 +309,7 @@ determination.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{int}{PyObject_Hash}{PyObject *o}
+\begin{cfuncdesc}{long}{PyObject_Hash}{PyObject *o}
   Compute and return the hash value of an object \var{o}.  On failure,
   return \code{-1}.  This is the equivalent of the Python expression
   \samp{hash(\var{o})}.\bifuncindex{hash}
@@ -340,8 +348,8 @@ determination.
   \versionadded{2.2}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PyObject_Length}{PyObject *o}
-\cfuncline{int}{PyObject_Size}{PyObject *o}
+\begin{cfuncdesc}{Py_ssize_t}{PyObject_Length}{PyObject *o}
+\cfuncline{Py_ssize_t}{PyObject_Size}{PyObject *o}
   Return the length of object \var{o}.  If the object \var{o} provides
   either the sequence and mapping protocols, the sequence length is
   returned.  On error, \code{-1} is returned.  This is the equivalent
@@ -630,7 +638,7 @@ determination.
   Returns the result of right shifting \var{o1} by \var{o2} on
   success, or \NULL{} on failure.  The operation is done
   \emph{in-place} when \var{o1} supports it.  This is the equivalent
-  of the Python statement \samp{\var{o1} >\code{>=} \var{o2}}.
+  of the Python statement \samp{\var{o1} >>= \var{o2}}.
 \end{cfuncdesc}
 
 
@@ -689,6 +697,30 @@ determination.
   \samp{float(\var{o})}.\bifuncindex{float}
 \end{cfuncdesc}
 
+\begin{cfuncdesc}{PyObject*}{PyNumber_Index}{PyObject *o}
+  Returns the \var{o} converted to a Python int or long on success or \NULL{}
+  with a TypeError exception raised on failure.
+  \versionadded{2.5}
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{Py_ssize_t}{PyNumber_AsSsize_t}{PyObject *o, PyObject *exc}
+  Returns \var{o} converted to a Py_ssize_t value if \var{o}
+  can be interpreted as an integer. If \var{o} can be converted to a Python
+  int or long but the attempt to convert to a Py_ssize_t value
+  would raise an \exception{OverflowError}, then the \var{exc} argument
+  is the type of exception that will be raised (usually \exception{IndexError}
+  or \exception{OverflowError}).  If \var{exc} is \NULL{}, then the exception
+  is cleared and the value is clipped to \var{PY_SSIZE_T_MIN}
+  for a negative integer or \var{PY_SSIZE_T_MAX} for a positive integer.
+  \versionadded{2.5}
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{int}{PyIndex_Check}{PyObject *o}
+  Returns True if \var{o} is an index integer (has the nb_index slot of 
+  the tp_as_number structure filled in).  
+  \versionadded{2.5}
+\end{cfuncdesc}
+
 
 \section{Sequence Protocol \label{sequence}}
 
@@ -697,14 +729,14 @@ determination.
   \code{0} otherwise.  This function always succeeds.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_Size}{PyObject *o}
+\begin{cfuncdesc}{Py_ssize_t}{PySequence_Size}{PyObject *o}
   Returns the number of objects in sequence \var{o} on success, and
   \code{-1} on failure.  For objects that do not provide sequence
   protocol, this is equivalent to the Python expression
   \samp{len(\var{o})}.\bifuncindex{len}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_Length}{PyObject *o}
+\begin{cfuncdesc}{Py_ssize_t}{PySequence_Length}{PyObject *o}
   Alternate name for \cfunction{PySequence_Size()}.
 \end{cfuncdesc}
 
@@ -715,7 +747,7 @@ determination.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{PyObject*}{PySequence_Repeat}{PyObject *o, int count}
+\begin{cfuncdesc}{PyObject*}{PySequence_Repeat}{PyObject *o, Py_ssize_t count}
   Return the result of repeating sequence object \var{o} \var{count}
   times, or \NULL{} on failure.  This is the equivalent of the Python
   expression \samp{\var{o} * \var{count}}.
@@ -730,7 +762,7 @@ determination.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{PyObject*}{PySequence_InPlaceRepeat}{PyObject *o, int count}
+\begin{cfuncdesc}{PyObject*}{PySequence_InPlaceRepeat}{PyObject *o, Py_ssize_t count}
   Return the result of repeating sequence object \var{o} \var{count}
   times, or \NULL{} on failure.  The operation is done \emph{in-place}
   when \var{o} supports it.  This is the equivalent of the Python
@@ -738,47 +770,47 @@ determination.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{PyObject*}{PySequence_GetItem}{PyObject *o, int i}
+\begin{cfuncdesc}{PyObject*}{PySequence_GetItem}{PyObject *o, Py_ssize_t i}
   Return the \var{i}th element of \var{o}, or \NULL{} on failure.
   This is the equivalent of the Python expression
   \samp{\var{o}[\var{i}]}.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{PyObject*}{PySequence_GetSlice}{PyObject *o, int i1, int i2}
+\begin{cfuncdesc}{PyObject*}{PySequence_GetSlice}{PyObject *o, Py_ssize_t i1, Py_ssize_t i2}
   Return the slice of sequence object \var{o} between \var{i1} and
   \var{i2}, or \NULL{} on failure. This is the equivalent of the
   Python expression \samp{\var{o}[\var{i1}:\var{i2}]}.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{int}{PySequence_SetItem}{PyObject *o, int i, PyObject *v}
+\begin{cfuncdesc}{int}{PySequence_SetItem}{PyObject *o, Py_ssize_t i, PyObject *v}
   Assign object \var{v} to the \var{i}th element of \var{o}.  Returns
   \code{-1} on failure.  This is the equivalent of the Python
   statement \samp{\var{o}[\var{i}] = \var{v}}.  This function \emph{does not}
   steal a reference to \var{v}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_DelItem}{PyObject *o, int i}
+\begin{cfuncdesc}{int}{PySequence_DelItem}{PyObject *o, Py_ssize_t i}
   Delete the \var{i}th element of object \var{o}.  Returns \code{-1}
   on failure.  This is the equivalent of the Python statement
   \samp{del \var{o}[\var{i}]}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_SetSlice}{PyObject *o, int i1,
-                                            int i2, PyObject *v}
+\begin{cfuncdesc}{int}{PySequence_SetSlice}{PyObject *o, Py_ssize_t i1,
+                                            Py_ssize_t i2, PyObject *v}
   Assign the sequence object \var{v} to the slice in sequence object
   \var{o} from \var{i1} to \var{i2}.  This is the equivalent of the
   Python statement \samp{\var{o}[\var{i1}:\var{i2}] = \var{v}}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_DelSlice}{PyObject *o, int i1, int i2}
+\begin{cfuncdesc}{int}{PySequence_DelSlice}{PyObject *o, Py_ssize_t i1, Py_ssize_t i2}
   Delete the slice in sequence object \var{o} from \var{i1} to
   \var{i2}.  Returns \code{-1} on failure.  This is the equivalent of
   the Python statement \samp{del \var{o}[\var{i1}:\var{i2}]}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_Count}{PyObject *o, PyObject *value}
+\begin{cfuncdesc}{Py_ssize_t}{PySequence_Count}{PyObject *o, PyObject *value}
   Return the number of occurrences of \var{value} in \var{o}, that is,
   return the number of keys for which \code{\var{o}[\var{key}] ==
   \var{value}}.  On failure, return \code{-1}.  This is equivalent to
@@ -792,7 +824,7 @@ determination.
   expression \samp{\var{value} in \var{o}}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_Index}{PyObject *o, PyObject *value}
+\begin{cfuncdesc}{Py_ssize_t}{PySequence_Index}{PyObject *o, PyObject *value}
   Return the first index \var{i} for which \code{\var{o}[\var{i}] ==
   \var{value}}.  On error, return \code{-1}.    This is equivalent to
   the Python expression \samp{\var{o}.index(\var{value})}.
@@ -821,7 +853,7 @@ determination.
   text.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{PyObject*}{PySequence_Fast_GET_ITEM}{PyObject *o, int i}
+\begin{cfuncdesc}{PyObject*}{PySequence_Fast_GET_ITEM}{PyObject *o, Py_ssize_t i}
   Return the \var{i}th element of \var{o}, assuming that \var{o} was
   returned by \cfunction{PySequence_Fast()}, \var{o} is not \NULL,
   and that \var{i} is within bounds.
@@ -834,7 +866,7 @@ determination.
   \versionadded{2.4}  
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{PyObject*}{PySequence_ITEM}{PyObject *o, int i}
+\begin{cfuncdesc}{PyObject*}{PySequence_ITEM}{PyObject *o, Py_ssize_t i}
   Return the \var{i}th element of \var{o} or \NULL{} on failure.
   Macro form of \cfunction{PySequence_GetItem()} but without checking
   that \cfunction{PySequence_Check(\var{o})} is true and without
@@ -842,7 +874,7 @@ determination.
   \versionadded{2.3}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_Fast_GET_SIZE}{PyObject *o}
+\begin{cfuncdesc}{Py_ssize_t}{PySequence_Fast_GET_SIZE}{PyObject *o}
   Returns the length of \var{o}, assuming that \var{o} was
   returned by \cfunction{PySequence_Fast()} and that \var{o} is
   not \NULL.  The size can also be gotten by calling
@@ -860,7 +892,7 @@ determination.
 \end{cfuncdesc}
 
 
-\begin{cfuncdesc}{int}{PyMapping_Length}{PyObject *o}
+\begin{cfuncdesc}{Py_ssize_t}{PyMapping_Length}{PyObject *o}
   Returns the number of keys in object \var{o} on success, and
   \code{-1} on failure.  For objects that do not provide mapping
   protocol, this is equivalent to the Python expression
@@ -986,7 +1018,7 @@ else {
 
 \begin{cfuncdesc}{int}{PyObject_AsCharBuffer}{PyObject *obj,
                                               const char **buffer,
-                                              int *buffer_len}
+                                              Py_ssize_t *buffer_len}
   Returns a pointer to a read-only memory location useable as character-
   based input.  The \var{obj} argument must support the single-segment
   character buffer interface.  On success, returns \code{0}, sets
@@ -997,7 +1029,7 @@ else {
 
 \begin{cfuncdesc}{int}{PyObject_AsReadBuffer}{PyObject *obj,
                                               const void **buffer,
-                                              int *buffer_len}
+                                              Py_ssize_t *buffer_len}
   Returns a pointer to a read-only memory location containing
   arbitrary data.  The \var{obj} argument must support the
   single-segment readable buffer interface.  On success, returns
@@ -1015,7 +1047,7 @@ else {
 
 \begin{cfuncdesc}{int}{PyObject_AsWriteBuffer}{PyObject *obj,
                                                void **buffer,
-                                               int *buffer_len}
+                                               Py_ssize_t *buffer_len}
   Returns a pointer to a writeable memory location.  The \var{obj}
   argument must support the single-segment, character buffer
   interface.  On success, returns \code{0}, sets \var{buffer} to the

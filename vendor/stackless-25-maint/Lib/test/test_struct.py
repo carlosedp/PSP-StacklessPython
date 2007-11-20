@@ -1,5 +1,8 @@
-from test.test_support import TestFailed, verbose, verify
+from test.test_support import TestFailed, verbose, verify, vereq
+import test.test_support
 import struct
+import array
+import warnings
 
 import sys
 ISBIGENDIAN = sys.byteorder == "big"
@@ -7,10 +10,19 @@ del sys
 verify((struct.pack('=i', 1)[0] == chr(0)) == ISBIGENDIAN,
        "bigendian determination appears wrong")
 
+try:
+    import _struct
+except ImportError:
+    PY_STRUCT_RANGE_CHECKING = 0
+    PY_STRUCT_OVERFLOW_MASKING = 1
+    PY_STRUCT_FLOAT_COERCE = 2
+else:
+    PY_STRUCT_RANGE_CHECKING = getattr(_struct, '_PY_STRUCT_RANGE_CHECKING', 0)
+    PY_STRUCT_OVERFLOW_MASKING = getattr(_struct, '_PY_STRUCT_OVERFLOW_MASKING', 0)
+    PY_STRUCT_FLOAT_COERCE = getattr(_struct, '_PY_STRUCT_FLOAT_COERCE', 0)
+
 def string_reverse(s):
-    chars = list(s)
-    chars.reverse()
-    return "".join(chars)
+    return "".join(reversed(s))
 
 def bigendian_to_native(value):
     if ISBIGENDIAN:
@@ -30,11 +42,45 @@ def simple_err(func, *args):
 def any_err(func, *args):
     try:
         func(*args)
-    except (struct.error, OverflowError, TypeError):
+    except (struct.error, TypeError):
         pass
     else:
         raise TestFailed, "%s%s did not raise error" % (
             func.__name__, args)
+
+def with_warning_restore(func):
+    def _with_warning_restore(*args, **kw):
+        # The `warnings` module doesn't have an advertised way to restore
+        # its filter list.  Cheat.
+        save_warnings_filters = warnings.filters[:]
+        # Grrr, we need this function to warn every time.  Without removing
+        # the warningregistry, running test_tarfile then test_struct would fail
+        # on 64-bit platforms.
+        globals = func.func_globals
+        if '__warningregistry__' in globals:
+            del globals['__warningregistry__']
+        warnings.filterwarnings("error", r"""^struct.*""", DeprecationWarning)
+        warnings.filterwarnings("error", r""".*format requires.*""",
+                                DeprecationWarning)
+        try:
+            return func(*args, **kw)
+        finally:
+            warnings.filters[:] = save_warnings_filters[:]
+    return _with_warning_restore
+
+def deprecated_err(func, *args):
+    try:
+        func(*args)
+    except (struct.error, TypeError):
+        pass
+    except DeprecationWarning:
+        if not PY_STRUCT_OVERFLOW_MASKING:
+            raise TestFailed, "%s%s expected to raise struct.error" % (
+                func.__name__, args)
+    else:
+        raise TestFailed, "%s%s did not raise error" % (
+            func.__name__, args)
+deprecated_err = with_warning_restore(deprecated_err)
 
 
 simple_err(struct.calcsize, 'Z')
@@ -263,12 +309,12 @@ class IntTester:
 
         else:
             # x is out of range -- verify pack realizes that.
-            if code in self.BUGGY_RANGE_CHECK:
+            if not PY_STRUCT_RANGE_CHECKING and code in self.BUGGY_RANGE_CHECK:
                 if verbose:
                     print "Skipping buggy range check for code", code
             else:
-                any_err(pack, ">" + code, x)
-                any_err(pack, "<" + code, x)
+                deprecated_err(pack, ">" + code, x)
+                deprecated_err(pack, "<" + code, x)
 
         # Much the same for unsigned.
         code = self.unsigned_code
@@ -318,12 +364,12 @@ class IntTester:
 
         else:
             # x is out of range -- verify pack realizes that.
-            if code in self.BUGGY_RANGE_CHECK:
+            if not PY_STRUCT_RANGE_CHECKING and code in self.BUGGY_RANGE_CHECK:
                 if verbose:
                     print "Skipping buggy range check for code", code
             else:
-                any_err(pack, ">" + code, x)
-                any_err(pack, "<" + code, x)
+                deprecated_err(pack, ">" + code, x)
+                deprecated_err(pack, "<" + code, x)
 
     def run(self):
         from random import randrange
@@ -437,3 +483,143 @@ def test_705836():
         TestFailed("expected OverflowError")
 
 test_705836()
+
+###########################################################################
+# SF bug 1229380. No struct.pack exception for some out of range integers
+
+def test_1229380():
+    import sys
+    for endian in ('', '>', '<'):
+        for cls in (int, long):
+            for fmt in ('B', 'H', 'I', 'L'):
+                deprecated_err(struct.pack, endian + fmt, cls(-1))
+
+            deprecated_err(struct.pack, endian + 'B', cls(300))
+            deprecated_err(struct.pack, endian + 'H', cls(70000))
+
+        deprecated_err(struct.pack, endian + 'I', sys.maxint * 4L)
+        deprecated_err(struct.pack, endian + 'L', sys.maxint * 4L)
+
+if PY_STRUCT_RANGE_CHECKING:
+    test_1229380()
+
+###########################################################################
+# SF bug 1530559. struct.pack raises TypeError where it used to convert.
+
+def check_float_coerce(format, number):
+    if PY_STRUCT_FLOAT_COERCE == 2:
+        # Test for pre-2.5 struct module
+        packed = struct.pack(format, number)
+        floored = struct.unpack(format, packed)[0]
+        if floored != int(number):
+            raise TestFailed("did not correcly coerce float to int")
+        return
+    try:
+        func(*args)
+    except (struct.error, TypeError):
+        if PY_STRUCT_FLOAT_COERCE:
+            raise TestFailed("expected DeprecationWarning for float coerce")
+    except DeprecationWarning:
+        if not PY_STRUCT_FLOAT_COERCE:
+            raise TestFailed("expected to raise struct.error for float coerce")
+    else:
+        raise TestFailed("did not raise error for float coerce")
+
+check_float_coerce = with_warning_restore(deprecated_err)
+
+def test_1530559():
+    for endian in ('', '>', '<'):
+        for fmt in ('B', 'H', 'I', 'L', 'b', 'h', 'i', 'l'):
+            check_float_coerce(endian + fmt, 1.0)
+            check_float_coerce(endian + fmt, 1.5)
+
+test_1530559()
+
+###########################################################################
+# Packing and unpacking to/from buffers.
+
+# Copied and modified from unittest.
+def assertRaises(excClass, callableObj, *args, **kwargs):
+    try:
+        callableObj(*args, **kwargs)
+    except excClass:
+        return
+    else:
+        raise TestFailed("%s not raised." % excClass)
+
+def test_unpack_from():
+    test_string = 'abcd01234'
+    fmt = '4s'
+    s = struct.Struct(fmt)
+    for cls in (str, buffer):
+        data = cls(test_string)
+        vereq(s.unpack_from(data), ('abcd',))
+        vereq(s.unpack_from(data, 2), ('cd01',))
+        vereq(s.unpack_from(data, 4), ('0123',))
+        for i in xrange(6):
+            vereq(s.unpack_from(data, i), (data[i:i+4],))
+        for i in xrange(6, len(test_string) + 1):
+            simple_err(s.unpack_from, data, i)
+    for cls in (str, buffer):
+        data = cls(test_string)
+        vereq(struct.unpack_from(fmt, data), ('abcd',))
+        vereq(struct.unpack_from(fmt, data, 2), ('cd01',))
+        vereq(struct.unpack_from(fmt, data, 4), ('0123',))
+        for i in xrange(6):
+            vereq(struct.unpack_from(fmt, data, i), (data[i:i+4],))
+        for i in xrange(6, len(test_string) + 1):
+            simple_err(struct.unpack_from, fmt, data, i)
+
+def test_pack_into():
+    test_string = 'Reykjavik rocks, eow!'
+    writable_buf = array.array('c', ' '*100)
+    fmt = '21s'
+    s = struct.Struct(fmt)
+
+    # Test without offset
+    s.pack_into(writable_buf, 0, test_string)
+    from_buf = writable_buf.tostring()[:len(test_string)]
+    vereq(from_buf, test_string)
+
+    # Test with offset.
+    s.pack_into(writable_buf, 10, test_string)
+    from_buf = writable_buf.tostring()[:len(test_string)+10]
+    vereq(from_buf, test_string[:10] + test_string)
+
+    # Go beyond boundaries.
+    small_buf = array.array('c', ' '*10)
+    assertRaises(struct.error, s.pack_into, small_buf, 0, test_string)
+    assertRaises(struct.error, s.pack_into, small_buf, 2, test_string)
+
+def test_pack_into_fn():
+    test_string = 'Reykjavik rocks, eow!'
+    writable_buf = array.array('c', ' '*100)
+    fmt = '21s'
+    pack_into = lambda *args: struct.pack_into(fmt, *args)
+
+    # Test without offset.
+    pack_into(writable_buf, 0, test_string)
+    from_buf = writable_buf.tostring()[:len(test_string)]
+    vereq(from_buf, test_string)
+
+    # Test with offset.
+    pack_into(writable_buf, 10, test_string)
+    from_buf = writable_buf.tostring()[:len(test_string)+10]
+    vereq(from_buf, test_string[:10] + test_string)
+
+    # Go beyond boundaries.
+    small_buf = array.array('c', ' '*10)
+    assertRaises(struct.error, pack_into, small_buf, 0, test_string)
+    assertRaises(struct.error, pack_into, small_buf, 2, test_string)
+
+def test_unpack_with_buffer():
+    # SF bug 1563759: struct.unpack doens't support buffer protocol objects
+    data = array.array('B', '\x12\x34\x56\x78')
+    value, = struct.unpack('>I', data)
+    vereq(value, 0x12345678)
+
+# Test methods to pack and unpack from buffers rather than strings.
+test_unpack_from()
+test_pack_into()
+test_pack_into_fn()
+test_unpack_with_buffer()

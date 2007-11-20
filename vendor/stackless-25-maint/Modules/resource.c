@@ -55,6 +55,7 @@ static PyStructSequence_Desc struct_rusage_desc = {
 	16	/* n_in_sequence */
 };
 
+static int initialized;
 static PyTypeObject StructRUsageType;
 
 static PyObject *
@@ -193,12 +194,9 @@ resource_setrlimit(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-resource_getpagesize(PyObject *self, PyObject *args)
+resource_getpagesize(PyObject *self, PyObject *unused)
 {
 	long pagesize = 0;
-	if (!PyArg_ParseTuple(args, ":getpagesize"))
-		return NULL;
-
 #if defined(HAVE_GETPAGESIZE)
 	pagesize = getpagesize();
 #elif defined(HAVE_SYSCONF)
@@ -220,7 +218,7 @@ resource_methods[] = {
 	{"getrusage",    resource_getrusage,   METH_VARARGS},
 	{"getrlimit",    resource_getrlimit,   METH_VARARGS},
 	{"setrlimit",    resource_setrlimit,   METH_VARARGS},
-	{"getpagesize",  resource_getpagesize, METH_VARARGS},
+	{"getpagesize",  resource_getpagesize, METH_NOARGS},
 	{NULL, NULL}			     /* sentinel */
 };
 
@@ -234,6 +232,8 @@ initresource(void)
 
 	/* Create the module and add the functions */
 	m = Py_InitModule("resource", resource_methods);
+	if (m == NULL)
+		return;
 
 	/* Add some symbolic constants to the module */
 	if (ResourceError == NULL) {
@@ -242,7 +242,10 @@ initresource(void)
 	}
 	Py_INCREF(ResourceError);
 	PyModule_AddObject(m, "error", ResourceError);
- 	PyStructSequence_InitType(&StructRUsageType, &struct_rusage_desc);
+	if (!initialized)
+		PyStructSequence_InitType(&StructRUsageType, 
+					  &struct_rusage_desc);
+	Py_INCREF(&StructRUsageType);
  	PyModule_AddObject(m, "struct_rusage", 
 			   (PyObject*) &StructRUsageType);
 
@@ -318,4 +321,5 @@ initresource(void)
 	if (v) {
 		PyModule_AddObject(m, "RLIM_INFINITY", v);
 	}
+	initialized = 1;
 }

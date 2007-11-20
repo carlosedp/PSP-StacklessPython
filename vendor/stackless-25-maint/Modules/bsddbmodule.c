@@ -240,7 +240,7 @@ bsddb_dealloc(bsddbobject *dp)
 #define BSDDB_END_SAVE(_dp) Py_END_ALLOW_THREADS
 #endif
 
-static int
+static Py_ssize_t
 bsddb_length(bsddbobject *dp)
 {
 	check_bsddbobject_open(dp, -1);
@@ -374,7 +374,7 @@ bsddb_ass_sub(bsddbobject *dp, PyObject *key, PyObject *value)
 }
 
 static PyMappingMethods bsddb_as_mapping = {
-	(inquiry)bsddb_length,		/*mp_length*/
+	(lenfunc)bsddb_length,		/*mp_length*/
 	(binaryfunc)bsddb_subscript,	/*mp_subscript*/
 	(objobjargproc)bsddb_ass_sub,	/*mp_ass_subscript*/
 };
@@ -849,6 +849,8 @@ initbsddb185(void) {
 
 	Bsddbtype.ob_type = &PyType_Type;
 	m = Py_InitModule("bsddb185", bsddbmodule_methods);
+	if (m == NULL)
+		return;
 	d = PyModule_GetDict(m);
 	BsddbError = PyErr_NewException("bsddb.error", NULL, NULL);
 	if (BsddbError != NULL)

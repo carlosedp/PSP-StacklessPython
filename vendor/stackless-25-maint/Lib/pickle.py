@@ -24,7 +24,7 @@ Misc variables:
 
 """
 
-__version__ = "$Revision: 36861 $"       # Code version
+__version__ = "$Revision: 47146 $"       # Code version
 
 from types import *
 from copy_reg import dispatch_table
@@ -33,7 +33,6 @@ import marshal
 import sys
 import struct
 import re
-import warnings
 
 __all__ = ["PickleError", "PicklingError", "UnpicklingError", "Pickler",
            "Unpickler", "dump", "dumps", "load", "loads"]
@@ -171,7 +170,7 @@ del x
 
 class Pickler:
 
-    def __init__(self, file, protocol=None, bin=None):
+    def __init__(self, file, protocol=None):
         """This takes a file-like object for writing a pickle data stream.
 
         The optional protocol argument tells the pickler to use the
@@ -195,12 +194,6 @@ class Pickler:
         object, or any other custom object that meets this interface.
 
         """
-        if protocol is not None and bin is not None:
-            raise ValueError, "can't specify both 'protocol' and 'bin'"
-        if bin is not None:
-            warnings.warn("The 'bin' argument to Pickler() is deprecated",
-                          DeprecationWarning)
-            protocol = bin
         if protocol is None:
             protocol = 0
         if protocol < 0:
@@ -212,6 +205,13 @@ class Pickler:
         self.proto = int(protocol)
         self.bin = protocol >= 1
         self.fast = 0
+        ## Stackless addition BEGIN
+        try:
+            from stackless import _pickle_moduledict
+        except ImportError:
+            _pickle_moduledict = lambda self, obj:None
+        self._pickle_moduledict = _pickle_moduledict
+        ## Stackless addition END
 
     def clear_memo(self):
         """Clears the pickler's "memo".
@@ -355,14 +355,7 @@ class Pickler:
 
         # Assert that args is a tuple or None
         if not isinstance(args, TupleType):
-            if args is None:
-                # A hack for Jim Fulton's ExtensionClass, now deprecated.
-                # See load_reduce()
-                warnings.warn("__basicnew__ special case is deprecated",
-                              DeprecationWarning)
-            else:
-                raise PicklingError(
-                    "args from reduce() should be a tuple")
+            raise PicklingError("args from reduce() should be a tuple")
 
         # Assert that func is callable
         if not callable(func):
@@ -652,6 +645,11 @@ class Pickler:
             # else tmp is empty, and we're done
 
     def save_dict(self, obj):
+        ## Stackless addition BEGIN
+        modict_saver = self._pickle_moduledict(self, obj)
+        if modict_saver is not None:
+            return self.save_reduce(*modict_saver)
+        ## Stackless addition END
         write = self.write
 
         if self.bin:
@@ -781,8 +779,30 @@ class Pickler:
         write(GLOBAL + module + '\n' + name + '\n')
         self.memoize(obj)
 
+    def save_function(self, obj):
+        try:
+            return self.save_global(obj)
+        except PicklingError, e:
+            pass
+        # Check copy_reg.dispatch_table
+        reduce = dispatch_table.get(type(obj))
+        if reduce:
+            rv = reduce(obj)
+        else:
+            # Check for a __reduce_ex__ method, fall back to __reduce__
+            reduce = getattr(obj, "__reduce_ex__", None)
+            if reduce:
+                rv = reduce(self.proto)
+            else:
+                reduce = getattr(obj, "__reduce__", None)
+                if reduce:
+                    rv = reduce()
+                else:
+                    raise e
+        return self.save_reduce(obj=obj, *rv)
+
     dispatch[ClassType] = save_global
-    dispatch[FunctionType] = save_global
+    dispatch[FunctionType] = save_function
     dispatch[BuiltinFunctionType] = save_global
     dispatch[TypeType] = save_global
 
@@ -810,6 +830,7 @@ def _keep_alive(x, memo):
 
 classmap = {} # called classmap for backwards compatibility
 
+# This is no longer used to find classes, but still for functions
 def whichmodule(func, funcname):
     """Figure out the module in which a function occurs.
 
@@ -1144,13 +1165,7 @@ class Unpickler:
         stack = self.stack
         args = stack.pop()
         func = stack[-1]
-        if args is None:
-            # A hack for Jim Fulton's ExtensionClass, now deprecated
-            warnings.warn("__basicnew__ special case is deprecated",
-                          DeprecationWarning)
-            value = func.__basicnew__()
-        else:
-            value = func(*args)
+        value = func(*args)
         stack[-1] = value
     dispatch[REDUCE] = load_reduce
 
@@ -1378,12 +1393,12 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-def dump(obj, file, protocol=None, bin=None):
-    Pickler(file, protocol, bin).dump(obj)
+def dump(obj, file, protocol=None):
+    Pickler(file, protocol).dump(obj)
 
-def dumps(obj, protocol=None, bin=None):
+def dumps(obj, protocol=None):
     file = StringIO()
-    Pickler(file, protocol, bin).dump(obj)
+    Pickler(file, protocol).dump(obj)
     return file.getvalue()
 
 def load(file):

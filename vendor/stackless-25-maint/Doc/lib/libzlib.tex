@@ -8,10 +8,15 @@
 
 For applications that require data compression, the functions in this
 module allow compression and decompression, using the zlib library.
-The zlib library has its own home page at \url{http://www.gzip.org/zlib/}.  
+The zlib library has its own home page at \url{http://www.zlib.net}.  
 There are known incompatibilities between the Python module and
 versions of the zlib library earlier than 1.1.3; 1.1.3 has a security
 vulnerability, so we recommend using 1.1.4 or later.
+
+zlib's functions have many options and often need to be used in a
+particular order.  This documentation doesn't attempt to cover all of
+the permutations; consult the zlib manual at
+\url{http://www.zlib.net/manual.html} for authoritative information.
 
 The available exception and functions in this module are:
 
@@ -110,13 +115,18 @@ All pending input is processed, and a string containing the remaining
 compressed output is returned.  \var{mode} can be selected from the
 constants \constant{Z_SYNC_FLUSH},  \constant{Z_FULL_FLUSH},  or 
 \constant{Z_FINISH}, defaulting to \constant{Z_FINISH}.  \constant{Z_SYNC_FLUSH} and 
-\constant{Z_FULL_FLUSH} allow compressing further strings of data and
-are used to allow partial error recovery on decompression, while
+\constant{Z_FULL_FLUSH} allow compressing further strings of data, while
 \constant{Z_FINISH} finishes the compressed stream and 
 prevents compressing any more data.  After calling
 \method{flush()} with \var{mode} set to \constant{Z_FINISH}, the
 \method{compress()} method cannot be called again; the only realistic
 action is to delete the object.  
+\end{methoddesc}
+
+\begin{methoddesc}[Compress]{copy}{}
+Returns a copy of the compression object.  This can be used to efficiently
+compress a set of data that share a common initial prefix.
+\versionadded{2.5}
 \end{methoddesc}
 
 Decompression objects support the following methods, and two attributes:
@@ -162,14 +172,26 @@ continue.  If \var{max_length} is not supplied then the whole input is
 decompressed, and \member{unconsumed_tail} is an empty string.
 \end{methoddesc}
 
-\begin{methoddesc}[Decompress]{flush}{}
+\begin{methoddesc}[Decompress]{flush}{\optional{length}}
 All pending input is processed, and a string containing the remaining
 uncompressed output is returned.  After calling \method{flush()}, the
 \method{decompress()} method cannot be called again; the only realistic
 action is to delete the object.
+
+The optional parameter \var{length} sets the initial size of the
+output buffer.
+\end{methoddesc}
+
+\begin{methoddesc}[Decompress]{copy}{}
+Returns a copy of the decompression object.  This can be used to save the
+state of the decompressor midway through the data stream in order to speed up
+random seeks into the stream at a future point.
+\versionadded{2.5}
 \end{methoddesc}
 
 \begin{seealso}
   \seemodule{gzip}{Reading and writing \program{gzip}-format files.}
-  \seeurl{http://www.gzip.org/zlib/}{The zlib library home page.}
+  \seeurl{http://www.zlib.net}{The zlib library home page.}
+  \seeurl{http://www.zlib.net/manual.html}{The zlib manual explains 
+    the semantics and usage of the library's many functions.}
 \end{seealso}

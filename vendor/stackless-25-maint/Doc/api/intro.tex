@@ -225,25 +225,10 @@ immutable data type.  You should only use
 \cfunction{PyTuple_SetItem()} for tuples that you are creating
 yourself.
 
-Equivalent code for populating a list can be written using 
-\cfunction{PyList_New()} and \cfunction{PyList_SetItem()}.  Such code
-can also use \cfunction{PySequence_SetItem()}; this illustrates the
-difference between the two (the extra \cfunction{Py_DECREF()} calls):
+Equivalent code for populating a list can be written using
+\cfunction{PyList_New()} and \cfunction{PyList_SetItem()}.
 
-\begin{verbatim}
-PyObject *l, *x;
-
-l = PyList_New(3);
-x = PyInt_FromLong(1L);
-PySequence_SetItem(l, 0, x); Py_DECREF(x);
-x = PyInt_FromLong(2L);
-PySequence_SetItem(l, 1, x); Py_DECREF(x);
-x = PyString_FromString("three");
-PySequence_SetItem(l, 2, x); Py_DECREF(x);
-\end{verbatim}
-
-You might find it strange that the ``recommended'' approach takes more
-code.  However, in practice, you will rarely use these ways of
+However, in practice, you will rarely use these ways of
 creating and populating a tuple or list.  There's a generic function,
 \cfunction{Py_BuildValue()}, that can create most common objects from
 C values, directed by a \dfn{format string}.  For example, the
@@ -251,10 +236,10 @@ above two blocks of code could be replaced by the following (which
 also takes care of the error checking):
 
 \begin{verbatim}
-PyObject *t, *l;
+PyObject *tuple, *list;
 
-t = Py_BuildValue("(iis)", 1, 2, "three");
-l = Py_BuildValue("[iis]", 1, 2, "three");
+tuple = Py_BuildValue("(iis)", 1, 2, "three");
+list = Py_BuildValue("[iis]", 1, 2, "three");
 \end{verbatim}
 
 It is much more common to use \cfunction{PyObject_SetItem()} and
@@ -276,8 +261,12 @@ set_all(PyObject *target, PyObject *item)
     if (n < 0)
         return -1;
     for (i = 0; i < n; i++) {
-        if (PyObject_SetItem(target, i, item) < 0)
+        PyObject *index = PyInt_FromLong(i);
+        if (!index)
             return -1;
+        if (PyObject_SetItem(target, index, item) < 0)
+            return -1;
+        Py_DECREF(index);
     }
     return 0;
 }
@@ -572,8 +561,67 @@ defined in \file{Modules/getpath.c}).
 Sometimes, it is desirable to ``uninitialize'' Python.  For instance, 
 the application may want to start over (make another call to 
 \cfunction{Py_Initialize()}) or the application is simply done with its 
-use of Python and wants to free all memory allocated by Python.  This
+use of Python and wants to free memory allocated by Python.  This
 can be accomplished by calling \cfunction{Py_Finalize()}.  The function
 \cfunction{Py_IsInitialized()}\ttindex{Py_IsInitialized()} returns
 true if Python is currently in the initialized state.  More
 information about these functions is given in a later chapter.
+Notice that \cfunction{Py_Finalize} does \emph{not} free all memory
+allocated by the Python interpreter, e.g. memory allocated by extension
+modules currently cannot be released.
+
+
+\section{Debugging Builds \label{debugging}}
+
+Python can be built with several macros to enable extra checks of the
+interpreter and extension modules.  These checks tend to add a large
+amount of overhead to the runtime so they are not enabled by default.
+
+A full list of the various types of debugging builds is in the file
+\file{Misc/SpecialBuilds.txt} in the Python source distribution.
+Builds are available that support tracing of reference counts,
+debugging the memory allocator, or low-level profiling of the main
+interpreter loop.  Only the most frequently-used builds will be
+described in the remainder of this section.
+
+Compiling the interpreter with the \csimplemacro{Py_DEBUG} macro
+defined produces what is generally meant by "a debug build" of Python.
+\csimplemacro{Py_DEBUG} is enabled in the \UNIX{} build by adding
+\longprogramopt{with-pydebug} to the \file{configure} command.  It is also
+implied by the presence of the not-Python-specific
+\csimplemacro{_DEBUG} macro.  When \csimplemacro{Py_DEBUG} is enabled
+in the \UNIX{} build, compiler optimization is disabled.
+
+In addition to the reference count debugging described below, the
+following extra checks are performed:
+
+\begin{itemize}
+      \item Extra checks are added to the object allocator.
+      \item Extra checks are added to the parser and compiler.
+      \item Downcasts from wide types to narrow types are checked for
+            loss of information.
+      \item A number of assertions are added to the dictionary and set
+            implementations.  In addition, the set object acquires a
+            \method{test_c_api} method.
+      \item Sanity checks of the input arguments are added to frame
+            creation. 
+      \item The storage for long ints is initialized with a known
+            invalid pattern to catch reference to uninitialized
+            digits. 
+      \item Low-level tracing and extra exception checking are added
+            to the runtime virtual machine.
+      \item Extra checks are added to the memory arena implementation.
+      \item Extra debugging is added to the thread module.
+\end{itemize}
+
+There may be additional checks not mentioned here.
+
+Defining \csimplemacro{Py_TRACE_REFS} enables reference tracing.  When
+defined, a circular doubly linked list of active objects is maintained
+by adding two extra fields to every \ctype{PyObject}.  Total
+allocations are tracked as well.  Upon exit, all existing references
+are printed.  (In interactive mode this happens after every statement
+run by the interpreter.)  Implied by \csimplemacro{Py_DEBUG}.
+
+Please refer to \file{Misc/SpecialBuilds.txt} in the Python source
+distribution for more detailed information.

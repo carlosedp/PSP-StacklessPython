@@ -504,7 +504,7 @@ Instance methods:
   Return a string representing the date, controlled by an explicit
   format string.  Format codes referring to hours, minutes or seconds
   will see 0 values.
-  See the section on \method{strftime()} behavior.
+  See section~\ref{strftime-behavior} -- \method{strftime()} behavior.
 \end{methoddesc}
 
 
@@ -623,6 +623,17 @@ Other constructors, all class methods:
   \class{datetime} object, its time and \member{tzinfo} members are
   ignored.
   \end{methoddesc}
+
+\begin{methoddesc}{strptime}{date_string, format}
+  Return a \class{datetime} corresponding to \var{date_string}, parsed
+  according to \var{format}.  This is equivalent to
+  \code{datetime(*(time.strptime(date_string,
+  format)[0:6]))}. \exception{ValueError} is raised if the date_string and
+  format can't be parsed by \function{time.strptime()} or if it returns a
+  value which isn't a time tuple.
+
+  \versionadded{2.5}
+\end{methoddesc}
 
 Class attributes:
 
@@ -959,8 +970,8 @@ Instance methods:
 
 \begin{methoddesc}{strftime}{format}
   Return a string representing the date and time, controlled by an
-  explicit format string.  See the section on \method{strftime()}
-  behavior.
+  explicit format string.  See section~\ref{strftime-behavior} --
+  \method{strftime()} behavior.
 \end{methoddesc}
 
 
@@ -1089,7 +1100,8 @@ Instance methods:
 
 \begin{methoddesc}{strftime}{format}
   Return a string representing the time, controlled by an explicit
-  format string.  See the section on \method{strftime()} behavior.
+  format string.  See section~\ref{strftime-behavior} --
+  \method{strftime()} behavior.
 \end{methoddesc}
 
 \begin{methoddesc}{utcoffset}{}
@@ -1357,7 +1369,7 @@ representing only EST (fixed offset -5 hours), or only EDT (fixed offset
 -4 hours)).
 
 
-\subsection{\method{strftime()} Behavior}
+\subsection{\method{strftime()} Behavior\label{strftime-behavior}}
 
 \class{date}, \class{datetime}, and \class{time}
 objects all support a \code{strftime(\var{format})}
@@ -1408,3 +1420,22 @@ C standard added additional format codes.
 The exact range of years for which \method{strftime()} works also
 varies across platforms.  Regardless of platform, years before 1900
 cannot be used.
+
+%%% This example is obsolete, since strptime is now supported by datetime.
+% 
+% \subsection{Examples}
+% 
+% \subsubsection{Creating Datetime Objects from Formatted Strings}
+% 
+% The \class{datetime} class does not directly support parsing formatted time
+% strings.  You can use \function{time.strptime} to do the parsing and create
+% a \class{datetime} object from the tuple it returns:
+% 
+% \begin{verbatim}
+% >>> s = "2005-12-06T12:13:14"
+% >>> from datetime import datetime
+% >>> from time import strptime
+% >>> datetime(*strptime(s, "%Y-%m-%dT%H:%M:%S")[0:6])
+% datetime.datetime(2005, 12, 6, 12, 13, 14)
+% \end{verbatim}
+% 

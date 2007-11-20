@@ -90,6 +90,10 @@ else: raise TestFailed, 'long() does not round properly'
 if float(1) == 1.0 and float(-1) == -1.0 and float(0) == 0.0: pass
 else: raise TestFailed, 'float() does not work properly'
 print '6.4.1 32-bit integers'
+# Ensure the first 256 integers are shared
+a = 256
+b = 128*2
+if a is not b: raise TestFailed, '256 is not shared'
 if 12 + 24 != 36: raise TestFailed, 'int op'
 if 12 + (-24) != -12: raise TestFailed, 'int op'
 if (-12) + 24 != 12: raise TestFailed, 'int op'
@@ -229,6 +233,7 @@ print 'Buffers'
 try: buffer('asdf', -1)
 except ValueError: pass
 else: raise TestFailed, "buffer('asdf', -1) should raise ValueError"
+cmp(buffer("abc"), buffer("def")) # used to raise a warning: tp_compare didn't return -1, 0, or 1
 
 try: buffer(None)
 except TypeError: pass
@@ -272,3 +277,10 @@ else: raise TestFailed, "buffer assignment should raise TypeError"
 try: a[0:1] = 'g'
 except TypeError: pass
 else: raise TestFailed, "buffer slice assignment should raise TypeError"
+
+# array.array() returns an object that does not implement a char buffer,
+# something which int() uses for conversion.
+import array
+try: int(buffer(array.array('c')))
+except TypeError :pass
+else: raise TestFailed, "char buffer (at C level) not working"

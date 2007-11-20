@@ -1,4 +1,4 @@
-# Copyright 2001-2005 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2007 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -21,7 +21,7 @@ comp.lang.python, and influenced by Apache's log4j system.
 Should work under Python versions >= 1.5.2, except that source line
 information is not available unless 'sys._getframe()' is.
 
-Copyright (C) 2001-2004 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2007 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
@@ -40,9 +40,9 @@ except ImportError:
     thread = None
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
-__status__  = "beta"
-__version__ = "0.4.9.7"
-__date__    = "07 October 2005"
+__status__  = "production"
+__version__ = "0.5.0.2"
+__date__    = "16 February 2007"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -68,7 +68,7 @@ def currentframe():
     except:
         return sys.exc_traceback.tb_frame.f_back
 
-if hasattr(sys, '_getframe'): currentframe = sys._getframe
+if hasattr(sys, '_getframe'): currentframe = lambda: sys._getframe(3)
 # done filching
 
 # _srcfile is only used in conjunction with sys._getframe().
@@ -88,6 +88,16 @@ _startTime = time.time()
 #propagated
 #
 raiseExceptions = 1
+
+#
+# If you don't want threading information in the log, set this to zero
+#
+logThreads = 1
+
+#
+# If you don't want process information in the log, set this to zero
+#
+logProcesses = 1
 
 #---------------------------------------------------------------------------
 #   Level related stuff
@@ -203,7 +213,8 @@ class LogRecord:
     the source line where the logging call was made, and any exception
     information to be logged.
     """
-    def __init__(self, name, level, pathname, lineno, msg, args, exc_info):
+    def __init__(self, name, level, pathname, lineno,
+                 msg, args, exc_info, func=None):
         """
         Initialize a logging record with interesting information.
         """
@@ -238,16 +249,17 @@ class LogRecord:
         self.exc_info = exc_info
         self.exc_text = None      # used to cache the traceback text
         self.lineno = lineno
+        self.funcName = func
         self.created = ct
         self.msecs = (ct - long(ct)) * 1000
         self.relativeCreated = (self.created - _startTime) * 1000
-        if thread:
+        if logThreads and thread:
             self.thread = thread.get_ident()
             self.threadName = threading.currentThread().getName()
         else:
             self.thread = None
             self.threadName = None
-        if hasattr(os, 'getpid'):
+        if logProcesses and hasattr(os, 'getpid'):
             self.process = os.getpid()
         else:
             self.process = None
@@ -283,7 +295,7 @@ def makeLogRecord(dict):
     a socket connection (which is sent as a dictionary) into a LogRecord
     instance.
     """
-    rv = LogRecord(None, None, "", 0, "", (), None)
+    rv = LogRecord(None, None, "", 0, "", (), None, None)
     rv.__dict__.update(dict)
     return rv
 
@@ -318,6 +330,7 @@ class Formatter:
     %(module)s          Module (name portion of filename)
     %(lineno)d          Source line number where the logging call was issued
                         (if available)
+    %(funcName)s        Function name
     %(created)f         Time when the LogRecord was created (time.time()
                         return value)
     %(asctime)s         Textual time when the LogRecord was created
@@ -706,7 +719,7 @@ class StreamHandler(Handler):
         If strm is not specified, sys.stderr is used.
         """
         Handler.__init__(self)
-        if not strm:
+        if strm is None:
             strm = sys.stderr
         self.stream = strm
         self.formatter = None
@@ -897,9 +910,12 @@ class Manager:
         Ensure that children of the placeholder ph are connected to the
         specified logger.
         """
-        #for c in ph.loggers:
+        name = alogger.name
+        namelen = len(name)
         for c in ph.loggerMap.keys():
-            if string.find(c.parent.name, alogger.name) <> 0:
+            #The if means ... if not c.parent.name.startswith(nm)
+            #if string.find(c.parent.name, nm) <> 0:
+            if c.parent.name[:namelen] != name:
                 alogger.parent = c.parent
                 c.parent = alogger
 
@@ -1056,14 +1072,20 @@ class Logger(Filterer):
             break
         return rv
 
-    def makeRecord(self, name, level, fn, lno, msg, args, exc_info):
+    def makeRecord(self, name, level, fn, lno, msg, args, exc_info, func=None, extra=None):
         """
         A factory method which can be overridden in subclasses to create
         specialized LogRecords.
         """
-        return LogRecord(name, level, fn, lno, msg, args, exc_info)
+        rv = LogRecord(name, level, fn, lno, msg, args, exc_info, func)
+        if extra:
+            for key in extra:
+                if (key in ["message", "asctime"]) or (key in rv.__dict__):
+                    raise KeyError("Attempt to overwrite %r in LogRecord" % key)
+                rv.__dict__[key] = extra[key]
+        return rv
 
-    def _log(self, level, msg, args, exc_info=None):
+    def _log(self, level, msg, args, exc_info=None, extra=None):
         """
         Low-level logging routine which creates a LogRecord and then calls
         all the handlers of this logger to handle the record.
@@ -1075,7 +1097,7 @@ class Logger(Filterer):
         if exc_info:
             if type(exc_info) != types.TupleType:
                 exc_info = sys.exc_info()
-        record = self.makeRecord(self.name, level, fn, lno, msg, args, exc_info)
+        record = self.makeRecord(self.name, level, fn, lno, msg, args, exc_info, func, extra)
         self.handle(record)
 
     def handle(self, record):
@@ -1318,14 +1340,14 @@ def disable(level):
     """
     root.manager.disable = level
 
-def shutdown():
+def shutdown(handlerList=_handlerList):
     """
     Perform any cleanup actions in the logging system (e.g. flushing
     buffers).
 
     Should be called at application exit.
     """
-    for h in _handlerList[:]: # was _handlers.keys():
+    for h in handlerList[:]:
         #errors might occur, for example, if files are locked
         #we just ignore them if raiseExceptions is not set
         try:

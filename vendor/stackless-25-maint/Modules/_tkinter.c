@@ -98,6 +98,16 @@ Copyright (C) 1994 Steen Lumholt.
 
 #ifdef HAVE_CREATEFILEHANDLER
 
+/* This bit is to ensure that TCL_UNIX_FD is defined and doesn't interfere
+   with the proper calculation of FHANDLETYPE == TCL_UNIX_FD below. */
+#ifndef TCL_UNIX_FD
+#  ifdef TCL_WIN_SOCKET
+#    define TCL_UNIX_FD (! TCL_WIN_SOCKET)
+#  else
+#    define TCL_UNIX_FD 1
+#  endif
+#endif
+
 /* Tcl_CreateFileHandler() changed several times; these macros deal with the
    messiness.  In Tcl 8.0 and later, it is not available on Windows (and on
    Unix, only because Jack added it back); when available on Windows, it only
@@ -636,8 +646,8 @@ Tkapp_New(char *screenName, char *baseName, char *className,
 	}
 
 	strcpy(argv0, className);
-	if (isupper((int)(argv0[0])))
-		argv0[0] = tolower(argv0[0]);
+	if (isupper(Py_CHARMASK(argv0[0])))
+		argv0[0] = tolower(Py_CHARMASK(argv0[0]));
 	Tcl_SetVar(v->interp, "argv0", argv0, TCL_GLOBAL_ONLY);
 	ckfree(argv0);
 
@@ -922,12 +932,13 @@ AsObj(PyObject *value)
 #ifdef Py_USING_UNICODE
 	else if (PyUnicode_Check(value)) {
 		Py_UNICODE *inbuf = PyUnicode_AS_UNICODE(value);
-		int size = PyUnicode_GET_SIZE(value);
+		Py_ssize_t size = PyUnicode_GET_SIZE(value);
 		/* This #ifdef assumes that Tcl uses UCS-2.
 		   See TCL_UTF_MAX test above. */
 #if defined(Py_UNICODE_WIDE) && TCL_UTF_MAX == 3
 		Tcl_UniChar *outbuf;
-		int i;
+		Py_ssize_t i;
+		assert(size < size * sizeof(Tcl_UniChar));
 		outbuf = (Tcl_UniChar*)ckalloc(size * sizeof(Tcl_UniChar));
 		if (!outbuf) {
 			PyErr_NoMemory();
@@ -1264,13 +1275,13 @@ Tkapp_CallProc(Tkapp_CallEvent *e, int flags)
       and perform processing there. */
 
 static PyObject *
-Tkapp_Call(PyObject *_self, PyObject *args)
+Tkapp_Call(PyObject *selfptr, PyObject *args)
 {
 	Tcl_Obj *objStore[ARGSZ];
 	Tcl_Obj **objv = NULL;
 	int objc, i;
 	PyObject *res = NULL;
-	TkappObject *self = (TkappObject*)_self;
+	TkappObject *self = (TkappObject*)selfptr;
 	/* Could add TCL_EVAL_GLOBAL if wrapped by GlobalCall... */
 	int flags = TCL_EVAL_DIRECT;
 
@@ -1316,7 +1327,7 @@ Tkapp_Call(PyObject *_self, PyObject *args)
 		ENTER_OVERLAP
 
 		if (i == TCL_ERROR)
-			Tkinter_Error(_self);
+			Tkinter_Error(selfptr);
 		else
 			res = Tkapp_CallResult(self);
 
@@ -1532,12 +1543,12 @@ var_proc(VarEvent* ev, int flags)
 }
 
 static PyObject*
-var_invoke(EventFunc func, PyObject *_self, PyObject *args, int flags)
+var_invoke(EventFunc func, PyObject *selfptr, PyObject *args, int flags)
 {
-	TkappObject *self = (TkappObject*)_self;
+	TkappObject *self = (TkappObject*)selfptr;
 #ifdef WITH_THREAD
 	if (self->threaded && self->thread_id != Tcl_GetCurrentThread()) {
-		TkappObject *self = (TkappObject*)_self;
+		TkappObject *self = (TkappObject*)selfptr;
 		VarEvent *ev;
 		PyObject *res, *exc_type, *exc_val;
 		
@@ -1549,7 +1560,7 @@ var_invoke(EventFunc func, PyObject *_self, PyObject *args, int flags)
 
 		ev = (VarEvent*)ckalloc(sizeof(VarEvent));
 
-		ev->self = _self;
+		ev->self = selfptr;
 		ev->args = args;
 		ev->flags = flags;
 		ev->func = func;
@@ -1569,7 +1580,7 @@ var_invoke(EventFunc func, PyObject *_self, PyObject *args, int flags)
 	}
 #endif
         /* Tcl is not threaded, or this is the interpreter thread. */
-	return func(_self, args, flags);
+	return func(selfptr, args, flags);
 }
 
 static PyObject *
@@ -2069,9 +2080,9 @@ Tkapp_CommandProc(CommandEvent *ev, int flags)
 }
 
 static PyObject *
-Tkapp_CreateCommand(PyObject *_self, PyObject *args)
+Tkapp_CreateCommand(PyObject *selfptr, PyObject *args)
 {
-	TkappObject *self = (TkappObject*)_self;
+	TkappObject *self = (TkappObject*)selfptr;
 	PythonCmd_ClientData *data;
 	char *cmdName;
 	PyObject *func;
@@ -2093,9 +2104,9 @@ Tkapp_CreateCommand(PyObject *_self, PyObject *args)
 	data = PyMem_NEW(PythonCmd_ClientData, 1);
 	if (!data)
 		return PyErr_NoMemory();
-	Py_XINCREF(self);
-	Py_XINCREF(func);
-	data->self = _self;
+	Py_INCREF(self);
+	Py_INCREF(func);
+	data->self = selfptr;
 	data->func = func;
 	
 	if (self->threaded && self->thread_id != Tcl_GetCurrentThread()) {
@@ -2129,9 +2140,9 @@ Tkapp_CreateCommand(PyObject *_self, PyObject *args)
 
 
 static PyObject *
-Tkapp_DeleteCommand(PyObject *_self, PyObject *args)
+Tkapp_DeleteCommand(PyObject *selfptr, PyObject *args)
 {
-	TkappObject *self = (TkappObject*)_self;
+	TkappObject *self = (TkappObject*)selfptr;
 	char *cmdName;
 	int err;
 
@@ -2482,8 +2493,10 @@ Tkapp_CreateTimerHandler(PyObject *self, PyObject *args)
 	}
 
 	v = Tktt_New(func);
-	v->token = Tcl_CreateTimerHandler(milliseconds, TimerHandler,
-					  (ClientData)v);
+	if (v) {
+		v->token = Tcl_CreateTimerHandler(milliseconds, TimerHandler,
+						  (ClientData)v);
+	}
 
 	return (PyObject *) v;
 }
@@ -2492,10 +2505,10 @@ Tkapp_CreateTimerHandler(PyObject *self, PyObject *args)
 /** Event Loop **/
 
 static PyObject *
-Tkapp_MainLoop(PyObject *_self, PyObject *args)
+Tkapp_MainLoop(PyObject *selfptr, PyObject *args)
 {
 	int threshold = 0;
-	TkappObject *self = (TkappObject*)_self;
+	TkappObject *self = (TkappObject*)selfptr;
 #ifdef WITH_THREAD
 	PyThreadState *tstate = PyThreadState_Get();
 #endif
@@ -2609,20 +2622,32 @@ Tkapp_InterpAddr(PyObject *self, PyObject *args)
 static PyObject	*
 Tkapp_TkInit(PyObject *self, PyObject *args)
 {
+	static int has_failed;
 	Tcl_Interp *interp = Tkapp_Interp(self);
 	Tk_Window main_window;
 	const char * _tk_exists = NULL;
-	PyObject *res =	NULL;
 	int err;
 	main_window = Tk_MainWindow(interp);
 
+	/* In all current versions of Tk (including 8.4.13), Tk_Init
+	   deadlocks on the second call when the first call failed.
+	   To avoid the deadlock, we just refuse the second call through
+	   a static variable. */
+	if (has_failed) {
+		PyErr_SetString(Tkinter_TclError, 
+				"Calling Tk_Init again after a previous call failed might deadlock");
+		return NULL;
+	}
+	   
 	/* We want to guard against calling Tk_Init() multiple times */
 	CHECK_TCL_APPARTMENT;
 	ENTER_TCL
 	err = Tcl_Eval(Tkapp_Interp(self), "info exists	tk_version");
 	ENTER_OVERLAP
 	if (err == TCL_ERROR) {
-		res = Tkinter_Error(self);
+		/* This sets an exception, but we cannot return right
+		   away because we need to exit the overlap first. */
+		Tkinter_Error(self);
 	} else {
 		_tk_exists = Tkapp_Result(self);
 	}
@@ -2633,6 +2658,7 @@ Tkapp_TkInit(PyObject *self, PyObject *args)
 	if (_tk_exists == NULL || strcmp(_tk_exists, "1") != 0)	{
 		if (Tk_Init(interp)	== TCL_ERROR) {
 		        PyErr_SetString(Tkinter_TclError, Tcl_GetStringResult(Tkapp_Interp(self)));
+			has_failed = 1;
 			return NULL;
 		}
 	}
@@ -3080,6 +3106,8 @@ init_tkinter(void)
 #endif
 
 	m = Py_InitModule("_tkinter", moduleMethods);
+	if (m == NULL)
+		return;
 
 	d = PyModule_GetDict(m);
 	Tkinter_TclError = PyErr_NewException("_tkinter.TclError", NULL, NULL);

@@ -21,14 +21,10 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\Include,..\PC,..\..\bzip2-1.0.3"
+				AdditionalIncludeDirectories="..\Include,..\PC,..\..\bzip2-1.0.3,..\Stackless"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\x86-temp-debug\bz2/bz2.pch"
-				AssemblerListingLocation=".\x86-temp-debug\bz2/"
-				ObjectFile=".\x86-temp-debug\bz2/"
-				ProgramDataBaseFileName=".\x86-temp-debug\bz2/"
 				WarningLevel="3"
 				SuppressStartupBanner="TRUE"
 				DebugInformationFormat="3"
@@ -49,13 +45,7 @@
 				ImportLibrary=".\./bz2_d.lib"
 				TargetMachine="1"/>
 			<Tool
-				Name="VCMIDLTool"
-				PreprocessorDefinitions="_DEBUG"
-				MkTypLibCompatible="TRUE"
-				SuppressStartupBanner="TRUE"
-				TargetEnvironment="1"
-				TypeLibraryName=".\./bz2.tlb"
-				HeaderFileName=""/>
+				Name="VCMIDLTool"/>
 			<Tool
 				Name="VCPostBuildEventTool"/>
 			<Tool
@@ -66,9 +56,7 @@
 nmake /nologo /f makefile.msc
 "/>
 			<Tool
-				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="_DEBUG"
-				Culture="1033"/>
+				Name="VCResourceCompilerTool"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
@@ -91,16 +79,12 @@ nmake /nologo /f makefile.msc
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories="..\Include,..\PC,..\..\bzip2-1.0.3"
+				AdditionalIncludeDirectories="..\Include,..\PC,..\..\bzip2-1.0.3,..\Stackless"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				StringPooling="TRUE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="TRUE"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\x86-temp-release\bz2/bz2.pch"
-				AssemblerListingLocation=".\x86-temp-release\bz2/"
-				ObjectFile=".\x86-temp-release\bz2/"
-				ProgramDataBaseFileName=".\x86-temp-release\bz2/"
 				WarningLevel="3"
 				SuppressStartupBanner="TRUE"
 				DebugInformationFormat="3"
@@ -121,13 +105,7 @@ nmake /nologo /f makefile.msc
 				ImportLibrary=".\./bz2.lib"
 				TargetMachine="1"/>
 			<Tool
-				Name="VCMIDLTool"
-				PreprocessorDefinitions="NDEBUG"
-				MkTypLibCompatible="TRUE"
-				SuppressStartupBanner="TRUE"
-				TargetEnvironment="1"
-				TypeLibraryName=".\./bz2.tlb"
-				HeaderFileName=""/>
+				Name="VCMIDLTool"/>
 			<Tool
 				Name="VCPostBuildEventTool"/>
 			<Tool
@@ -138,9 +116,7 @@ nmake /nologo /f makefile.msc
 nmake /nologo /f makefile.msc lib
 "/>
 			<Tool
-				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="NDEBUG"
-				Culture="1033"/>
+				Name="VCResourceCompilerTool"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
@@ -161,10 +137,10 @@ nmake /nologo /f makefile.msc lib
 			ATLMinimizesCRunTimeLibraryUsage="FALSE">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions=" /USECL:MS_ITANIUM"
+				AdditionalOptions=" /USECL:MS_ITANIUM /GS-"
 				Optimization="2"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories="{MSSDKPATH}\include\Win64\atl;{MSSDKPATH}\include\Win64\crt;{MSSDKPATH}\include\Win64\crt\sys;{MSSDKPATH}\include\Win64\mfc;..\Include,..\PC,..\..\bzip2-1.0.3"
+				AdditionalIncludeDirectories="..\Include,..\PC,..\..\bzip2-1.0.3,..\Stackless"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				StringPooling="TRUE"
 				BasicRuntimeChecks="0"
@@ -172,10 +148,6 @@ nmake /nologo /f makefile.msc lib
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\ia64-temp-release\bz2/bz2.pch"
-				AssemblerListingLocation=".\ia64-temp-release\bz2/"
-				ObjectFile=".\ia64-temp-release\bz2/"
-				ProgramDataBaseFileName=".\ia64-temp-release\bz2/"
 				WarningLevel="3"
 				SuppressStartupBanner="TRUE"
 				Detect64BitPortabilityProblems="TRUE"
@@ -198,13 +170,7 @@ nmake /nologo /f makefile.msc lib
 				ImportLibrary=".\./bz2.lib"
 				TargetMachine="0"/>
 			<Tool
-				Name="VCMIDLTool"
-				PreprocessorDefinitions="NDEBUG"
-				MkTypLibCompatible="TRUE"
-				SuppressStartupBanner="TRUE"
-				TargetEnvironment="1"
-				TypeLibraryName=".\./bz2.tlb"
-				HeaderFileName=""/>
+				Name="VCMIDLTool"/>
 			<Tool
 				Name="VCPostBuildEventTool"/>
 			<Tool
@@ -215,9 +181,72 @@ nmake /nologo /f makefile.msc lib
 nmake /nologo /f makefile.msc lib
 "/>
 			<Tool
-				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="NDEBUG"
-				Culture="1033"/>
+				Name="VCResourceCompilerTool"/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
+				Name="VCWebDeploymentTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+		</Configuration>
+		<Configuration
+			Name="ReleaseAMD64|Win32"
+			OutputDirectory="."
+			IntermediateDirectory="amd64-temp-release\bz2"
+			ConfigurationType="2"
+			UseOfMFC="0"
+			ATLMinimizesCRunTimeLibraryUsage="FALSE">
+			<Tool
+				Name="VCCLCompilerTool"
+				AdditionalOptions=" /USECL:MS_OPTERON /GS-"
+				Optimization="2"
+				InlineFunctionExpansion="1"
+				AdditionalIncludeDirectories="..\Include,..\PC,..\..\bzip2-1.0.3,..\Stackless"
+				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
+				StringPooling="TRUE"
+				BasicRuntimeChecks="0"
+				RuntimeLibrary="2"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
+				UsePrecompiledHeader="2"
+				WarningLevel="3"
+				SuppressStartupBanner="TRUE"
+				Detect64BitPortabilityProblems="TRUE"
+				DebugInformationFormat="3"
+				CompileAs="0"/>
+			<Tool
+				Name="VCCustomBuildTool"/>
+			<Tool
+				Name="VCLinkerTool"
+				AdditionalOptions=" /MACHINE:AMD64 /USELINK:MS_SDK"
+				AdditionalDependencies="..\..\bzip2-1.0.3\libbz2.lib"
+				OutputFile="./bz2.pyd"
+				LinkIncremental="1"
+				SuppressStartupBanner="TRUE"
+				IgnoreDefaultLibraryNames="libc"
+				GenerateDebugInformation="TRUE"
+				ProgramDatabaseFile=".\./bz2.pdb"
+				SubSystem="2"
+				BaseAddress="0x1D170000"
+				ImportLibrary=".\./bz2.lib"
+				TargetMachine="0"/>
+			<Tool
+				Name="VCMIDLTool"/>
+			<Tool
+				Name="VCPostBuildEventTool"/>
+			<Tool
+				Name="VCPreBuildEventTool"/>
+			<Tool
+				Name="VCPreLinkEventTool"
+				CommandLine="cd ..\..\bzip2-1.0.3
+nmake /nologo /f makefile.msc lib
+"/>
+			<Tool
+				Name="VCResourceCompilerTool"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
@@ -235,30 +264,6 @@ nmake /nologo /f makefile.msc lib
 	<Files>
 		<File
 			RelativePath="..\Modules\bz2module.c">
-			<FileConfiguration
-				Name="Debug|Win32">
-				<Tool
-					Name="VCCLCompilerTool"
-					Optimization="0"
-					AdditionalIncludeDirectories=""
-					PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS;$(NoInherit)"/>
-			</FileConfiguration>
-			<FileConfiguration
-				Name="Release|Win32">
-				<Tool
-					Name="VCCLCompilerTool"
-					Optimization="2"
-					AdditionalIncludeDirectories=""
-					PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;$(NoInherit)"/>
-			</FileConfiguration>
-			<FileConfiguration
-				Name="ReleaseItanium|Win32">
-				<Tool
-					Name="VCCLCompilerTool"
-					Optimization="2"
-					AdditionalIncludeDirectories=""
-					PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;$(NoInherit)"/>
-			</FileConfiguration>
 		</File>
 	</Files>
 	<Globals>

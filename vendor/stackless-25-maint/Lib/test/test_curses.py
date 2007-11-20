@@ -24,6 +24,9 @@ term = os.environ.get('TERM')
 if not term or term == 'unknown':
     raise TestSkipped, "$TERM=%r, calling initscr() may cause exit" % term
 
+if sys.platform == "cygwin":
+    raise TestSkipped("cygwin's curses mostly just hangs")
+
 def window_funcs(stdscr):
     "Test the methods of windows"
     win = curses.newwin(10,10)
@@ -201,11 +204,20 @@ def module_funcs(stdscr):
         curses.has_key(13)
 
     if hasattr(curses, 'getmouse'):
-        curses.mousemask(curses.BUTTON1_PRESSED)
-        curses.mouseinterval(10)
-        # just verify these don't cause errors
-        m = curses.getmouse()
-        curses.ungetmouse(*m)
+        (availmask, oldmask) = curses.mousemask(curses.BUTTON1_PRESSED)
+        # availmask indicates that mouse stuff not available.
+        if availmask != 0:
+            curses.mouseinterval(10)
+            # just verify these don't cause errors
+            m = curses.getmouse()
+            curses.ungetmouse(*m)
+
+    if hasattr(curses, 'is_term_resized'):
+        curses.is_term_resized(*stdscr.getmaxyx())
+    if hasattr(curses, 'resizeterm'):
+        curses.resizeterm(*stdscr.getmaxyx())
+    if hasattr(curses, 'resize_term'):
+        curses.resize_term(*stdscr.getmaxyx())
 
 def unit_tests():
     from curses import ascii
@@ -229,12 +241,21 @@ def test_userptr_without_set(stdscr):
     except curses.panel.error:
         pass
 
+def test_resize_term(stdscr):
+    if hasattr(curses, 'resizeterm'):
+        lines, cols = curses.LINES, curses.COLS
+        curses.resizeterm(lines - 1, cols + 1)
+        
+        if curses.LINES != lines - 1 or curses.COLS != cols + 1:
+            raise RuntimeError, "Expected resizeterm to update LINES and COLS"
+
 def main(stdscr):
     curses.savetty()
     try:
         module_funcs(stdscr)
         window_funcs(stdscr)
         test_userptr_without_set(stdscr)
+        test_resize_term(stdscr)
     finally:
         curses.resetty()
 

@@ -30,6 +30,9 @@ struct wrapperbase {
 	char *doc;
 	int flags;
 	PyObject *name_strobj;
+#ifdef STACKLESS
+	int slp_offset;
+#endif
 };
 
 /* Flags for above struct */
@@ -65,6 +68,9 @@ typedef struct {
 	PyDescr_COMMON;
 	struct wrapperbase *d_base;
 	void *d_wrapped; /* This can be any function pointer */
+#ifdef STACKLESS
+	int d_slpmask;
+#endif
 } PyWrapperDescrObject;
 
 PyAPI_DATA(PyTypeObject) PyWrapperDescr_Type;

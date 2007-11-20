@@ -2,10 +2,9 @@
 """
 Run all test cases.
 """
-import os
 import sys
 import unittest
-from test.test_support import requires, verbose, run_suite
+from test.test_support import requires, verbose, run_suite, unlink
 
 # When running as a script instead of within the regrtest framework, skip the
 # requires test, since it's obvious we want to run them.
@@ -28,10 +27,7 @@ def suite():
         import bsddb.test.test_1413192
     except:
         for f in ['__db.001', '__db.002', '__db.003', 'log.0000000001']:
-            try:
-                os.unlink(f)
-            except OSError:
-                pass
+            unlink(f)
 
     test_modules = [
         'test_associate',
@@ -48,6 +44,8 @@ def suite():
         'test_queue',
         'test_recno',
         'test_thread',
+        'test_sequence',
+        'test_cursor_pget_bug',
         ]
 
     alltests = unittest.TestSuite()

@@ -31,6 +31,7 @@
  * is returned (according to the sign of the value), and %ERANGE is
  * stored in %errno. If the correct value would cause underflow,
  * zero is returned and %ERANGE is stored in %errno.
+ * If memory allocation fails, %ENOMEM is stored in %errno.
  * 
  * This function resets %errno before calling strtod() so that
  * you can reliably detect overflow and underflow.
@@ -38,18 +39,16 @@
  * Return value: the #gdouble value.
  **/
 double
-PyOS_ascii_strtod(const char  *nptr, 
-	    char       **endptr)
+PyOS_ascii_strtod(const char *nptr, char **endptr)
 {
 	char *fail_pos;
-	double val;
+	double val = -1.0;
 	struct lconv *locale_data;
 	const char *decimal_point;
-	int decimal_point_len;
+	size_t decimal_point_len;
 	const char *p, *decimal_point_pos;
 	const char *end = NULL; /* Silence gcc */
 
-/* 	g_return_val_if_fail (nptr != NULL, 0); */
 	assert(nptr != NULL);
 
 	fail_pos = NULL;
@@ -73,65 +72,50 @@ PyOS_ascii_strtod(const char  *nptr,
 		if (*p == '+' || *p == '-')
 			p++;
 
-		if (p[0] == '0' && 
-		    (p[1] == 'x' || p[1] == 'X'))
+		while (ISDIGIT(*p))
+			p++;
+
+		if (*p == '.')
 		{
-			p += 2;
-			  /* HEX - find the (optional) decimal point */
+			decimal_point_pos = p++;
 
-			while (ISXDIGIT(*p))
-				p++;
-
-			if (*p == '.')
-			{
-				decimal_point_pos = p++;
-
-				while (ISXDIGIT(*p))
-					p++;
-
-				if (*p == 'p' || *p == 'P')
-					p++;
-				if (*p == '+' || *p == '-')
-					p++;
-				while (ISDIGIT(*p))
-					p++;
-				end = p;
-			}
-		}
-		else
-		{
 			while (ISDIGIT(*p))
 				p++;
 
-			if (*p == '.')
-			{
-				decimal_point_pos = p++;
-
-				while (ISDIGIT(*p))
-					p++;
-
-				if (*p == 'e' || *p == 'E')
-					p++;
-				if (*p == '+' || *p == '-')
-					p++;
-				while (ISDIGIT(*p))
-					p++;
-				end = p;
-			}
+			if (*p == 'e' || *p == 'E')
+				p++;
+			if (*p == '+' || *p == '-')
+				p++;
+			while (ISDIGIT(*p))
+				p++;
+			end = p;
 		}
-		  /* For the other cases, we need not convert the decimal point */
+		else if (strncmp(p, decimal_point, decimal_point_len) == 0)
+		{
+			/* Python bug #1417699 */
+			*endptr = (char*)nptr;
+			errno = EINVAL;
+			return val;
+		}
+		/* For the other cases, we need not convert the decimal point */
 	}
 
-	  /* Set errno to zero, so that we can distinguish zero results
-	     and underflows */
+	/* Set errno to zero, so that we can distinguish zero results
+	   and underflows */
 	errno = 0;
 
 	if (decimal_point_pos)
 	{
 		char *copy, *c;
 
-		  /* We need to convert the '.' to the locale specific decimal point */
-		copy = malloc(end - nptr + 1 + decimal_point_len);
+		/* We need to convert the '.' to the locale specific decimal point */
+		copy = (char *)PyMem_MALLOC(end - nptr + 1 + decimal_point_len);
+		if (copy == NULL) {
+			if (endptr)
+				*endptr = (char *)nptr;
+			errno = ENOMEM;
+			return val;
+		}
 
 		c = copy;
 		memcpy(c, nptr, decimal_point_pos - nptr);
@@ -152,11 +136,18 @@ PyOS_ascii_strtod(const char  *nptr,
 				fail_pos = (char *)nptr + (fail_pos - copy);
 		}
 
-		free(copy);
+		PyMem_FREE(copy);
 
 	}
-	else
-		val = strtod(nptr, &fail_pos);
+	else {
+		unsigned i = 0;
+		if (nptr[i] == '-')
+			i++;
+		if (nptr[i] == '0' && (nptr[i+1] == 'x' || nptr[i+1] == 'X'))
+			fail_pos = (char*)nptr;
+		else
+			val = strtod(nptr, &fail_pos);
+	}
 
 	if (endptr)
 		*endptr = fail_pos;
@@ -182,15 +173,14 @@ PyOS_ascii_strtod(const char  *nptr,
  **/
 char *
 PyOS_ascii_formatd(char       *buffer, 
-		   int         buf_len, 
+		   size_t      buf_len, 
 		   const char *format, 
 		   double      d)
 {
 	struct lconv *locale_data;
 	const char *decimal_point;
-	int decimal_point_len;
+	size_t decimal_point_len, rest_len;
 	char *p;
-	int rest_len;
 	char format_char;
 
 /* 	g_return_val_if_fail (buffer != NULL, NULL); */

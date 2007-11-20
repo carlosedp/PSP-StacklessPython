@@ -66,8 +66,9 @@ The module defines the following functions:
   
   If it is false, the buffer's mutability is ignored and behaviour is
   as for a read-only buffer, except that the 1024 byte limit mentioned
-  above is avoided -- so long as the buffer you pass is longer than
-  what the operating system wants to put there, things should work.
+  above is avoided -- so long as the buffer you pass is as least as
+  long as what the operating system wants to put there, things should
+  work.
   
   If \var{mutate_flag} is true, then the buffer is (in effect) passed
   to the underlying \function{ioctl()} system call, the latter's
@@ -78,11 +79,9 @@ The module defines the following functions:
   long which is then passed to \function{ioctl()} and copied back into
   the supplied buffer.
   
-  If \var{mutate_flag} is not supplied, then in 2.3 it defaults to
-  false.  This is planned to change over the next few Python versions:
-  in 2.4 failing to supply \var{mutate_flag} will get a warning but
-  the same behavior and in versions later than 2.5 it will default to
-  true.
+  If \var{mutate_flag} is not supplied, then from Python 2.5 it
+  defaults to true, which is a change from versions 2.3 and 2.4.
+  Supply the argument explicitly if version portability is a priority.
 
   An example:
 
@@ -167,9 +166,9 @@ system dependent --- therefore using the \function{flock()} call may be
 better.
 
 \begin{seealso}
-  \seemodule{os}{The \function{os.open()} function supports locking flags
-                 and is available on a wider variety of platforms than
-                 the \function{lockf()} and \function{flock()}
-                 functions, providing a more platform-independent file
-                 locking facility.}
+  \seemodule{os}{If the locking flags \constant{O_SHLOCK} and
+		 \constant{O_EXLOCK} are present in the \module{os} module,
+  		 the \function{os.open()} function provides a more
+  		 platform-independent alternative to the \function{lockf()}
+  		 and \function{flock()} functions.}
 \end{seealso}

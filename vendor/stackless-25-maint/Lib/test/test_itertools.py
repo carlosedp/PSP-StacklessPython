@@ -52,12 +52,15 @@ class TestBasicOps(unittest.TestCase):
         self.assertEqual(take(2, zip('abc',count(3))), [('a', 3), ('b', 4)])
         self.assertRaises(TypeError, count, 2, 3)
         self.assertRaises(TypeError, count, 'a')
-        c = count(sys.maxint-2)   # verify that rollover doesn't crash
-        c.next(); c.next(); c.next(); c.next(); c.next()
+        self.assertRaises(OverflowError, list, islice(count(sys.maxint-5), 10))
         c = count(3)
         self.assertEqual(repr(c), 'count(3)')
         c.next()
         self.assertEqual(repr(c), 'count(4)')
+        c = count(-9)
+        self.assertEqual(repr(c), 'count(-9)')
+        c.next()
+        self.assertEqual(c.next(), -8)
 
     def test_cycle(self):
         self.assertEqual(take(10, cycle('abc')), list('abcabcabca'))
@@ -260,8 +263,15 @@ class TestBasicOps(unittest.TestCase):
 
         # Test stop=None
         self.assertEqual(list(islice(xrange(10), None)), range(10))
+        self.assertEqual(list(islice(xrange(10), None, None)), range(10))
+        self.assertEqual(list(islice(xrange(10), None, None, None)), range(10))
         self.assertEqual(list(islice(xrange(10), 2, None)), range(2, 10))
         self.assertEqual(list(islice(xrange(10), 1, None, 2)), range(1, 10, 2))
+
+        # Test number of items consumed     SF #1171417
+        it = iter(range(10))
+        self.assertEqual(list(islice(it, 3)), range(3))
+        self.assertEqual(list(it), range(3, 10))
 
         # Test invalid arguments
         self.assertRaises(TypeError, islice, xrange(10))
@@ -364,6 +374,7 @@ class TestBasicOps(unittest.TestCase):
 
         # test values of n
         self.assertRaises(TypeError, tee, 'abc', 'invalid')
+        self.assertRaises(ValueError, tee, [], -1)
         for n in xrange(5):
             result = tee('abc', n)
             self.assertEqual(type(result), tuple)
@@ -663,6 +674,7 @@ class TestVariousIteratorArgs(unittest.TestCase):
 class LengthTransparency(unittest.TestCase):
 
     def test_repeat(self):
+        from test.test_iterlen import len
         self.assertEqual(len(repeat(None, 50)), 50)
         self.assertRaises(TypeError, len, repeat(None))
 
@@ -727,6 +739,21 @@ class RegressionTests(unittest.TestCase):
         self.assertRaises(AssertionError, list, cycle(gen1()))
         self.assertEqual(hist, [0,1])
 
+class SubclassWithKwargsTest(unittest.TestCase):
+    def test_keywords_in_subclass(self):
+        # count is not subclassable...
+        for cls in (repeat, izip, ifilter, ifilterfalse, chain, imap,
+                    starmap, islice, takewhile, dropwhile, cycle):
+            class Subclass(cls):
+                def __init__(self, newarg=None, *args):
+                    cls.__init__(self, *args)
+            try:
+                Subclass(newarg=1)
+            except TypeError, err:
+                # we expect type errors because of wrong argument count
+                self.failIf("does not take keyword arguments" in err.args[0])
+
+
 libreftest = """ Doctest for examples in the library reference: libitertools.tex
 
 
@@ -758,7 +785,7 @@ Samuele
 
 >>> from operator import itemgetter
 >>> d = dict(a=1, b=2, c=1, d=2, e=1, f=2, g=3)
->>> di = sorted(d.iteritems(), key=itemgetter(1))
+>>> di = sorted(sorted(d.iteritems()), key=itemgetter(1))
 >>> for k, g in groupby(di, itemgetter(1)):
 ...     print k, map(itemgetter(0), g)
 ...
@@ -797,26 +824,26 @@ Samuele
 ...     "Returns the nth item"
 ...     return list(islice(iterable, n, n+1))
 
->>> def all(seq, pred=bool):
-...     "Returns True if pred(x) is True for every element in the iterable"
+>>> def all(seq, pred=None):
+...     "Returns True if pred(x) is true for every element in the iterable"
 ...     for elem in ifilterfalse(pred, seq):
 ...         return False
 ...     return True
 
->>> def any(seq, pred=bool):
-...     "Returns True if pred(x) is True for at least one element in the iterable"
+>>> def any(seq, pred=None):
+...     "Returns True if pred(x) is true for at least one element in the iterable"
 ...     for elem in ifilter(pred, seq):
 ...         return True
 ...     return False
 
->>> def no(seq, pred=bool):
-...     "Returns True if pred(x) is False for every element in the iterable"
+>>> def no(seq, pred=None):
+...     "Returns True if pred(x) is false for every element in the iterable"
 ...     for elem in ifilter(pred, seq):
 ...         return False
 ...     return True
 
->>> def quantify(seq, pred=bool):
-...     "Count how many times the predicate is True in the sequence"
+>>> def quantify(seq, pred=None):
+...     "Count how many times the predicate is true in the sequence"
 ...     return sum(imap(pred, seq))
 
 >>> def padnone(seq):
@@ -921,7 +948,8 @@ __test__ = {'libreftest' : libreftest}
 
 def test_main(verbose=None):
     test_classes = (TestBasicOps, TestVariousIteratorArgs, TestGC,
-                    RegressionTests, LengthTransparency)
+                    RegressionTests, LengthTransparency,
+                    SubclassWithKwargsTest)
     test_support.run_unittest(*test_classes)
 
     # verify reference counting

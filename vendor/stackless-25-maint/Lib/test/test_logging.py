@@ -26,8 +26,9 @@ Copyright (C) 2001-2002 Vinay Sajip. All Rights Reserved.
 
 import select
 import os, sys, string, struct, types, cPickle, cStringIO
-import socket, threading, time
+import socket, tempfile, threading, time
 import logging, logging.handlers, logging.config
+from test.test_support import run_with_locale
 
 BANNER = "-- %-10s %-6s ---------------------------------------------------\n"
 
@@ -99,16 +100,15 @@ class LogRecordSocketReceiver(ThreadingTCPServer):
         self.timeout = 1
 
     def serve_until_stopped(self):
-        abort = 0
-        while not abort:
-            rd, wr, ex = select.select([self.socket.fileno()],
-                                       [], [],
+        while not self.abort:
+            rd, wr, ex = select.select([self.socket.fileno()], [], [],
                                        self.timeout)
             if rd:
                 self.handle_request()
-            abort = self.abort
         #notify the main thread that we're about to exit
         socketDataProcessed.set()
+        # close the listen socket
+        self.server_close()
 
     def process_request(self, request, client_address):
         #import threading
@@ -393,6 +393,184 @@ def test3():
     hand.removeFilter(filt)
 
 #----------------------------------------------------------------------------
+# Test 4
+#----------------------------------------------------------------------------
+
+# config0 is a standard configuration.
+config0 = """
+[loggers]
+keys=root
+
+[handlers]
+keys=hand1
+
+[formatters]
+keys=form1
+
+[logger_root]
+level=NOTSET
+handlers=hand1
+
+[handler_hand1]
+class=StreamHandler
+level=NOTSET
+formatter=form1
+args=(sys.stdout,)
+
+[formatter_form1]
+format=%(levelname)s:%(name)s:%(message)s
+datefmt=
+"""
+
+# config1 adds a little to the standard configuration.
+config1 = """
+[loggers]
+keys=root,parser
+
+[handlers]
+keys=hand1
+
+[formatters]
+keys=form1
+
+[logger_root]
+level=NOTSET
+handlers=hand1
+
+[logger_parser]
+level=DEBUG
+handlers=hand1
+propagate=1
+qualname=compiler.parser
+
+[handler_hand1]
+class=StreamHandler
+level=NOTSET
+formatter=form1
+args=(sys.stdout,)
+
+[formatter_form1]
+format=%(levelname)s:%(name)s:%(message)s
+datefmt=
+"""
+
+# config2 has a subtle configuration error that should be reported
+config2 = string.replace(config1, "sys.stdout", "sys.stbout")
+
+# config3 has a less subtle configuration error
+config3 = string.replace(
+    config1, "formatter=form1", "formatter=misspelled_name")
+
+def test4():
+    for i in range(4):
+        conf = globals()['config%d' % i]
+        sys.stdout.write('config%d: ' % i)
+        loggerDict = logging.getLogger().manager.loggerDict
+        logging._acquireLock()
+        try:
+            saved_handlers = logging._handlers.copy()
+            saved_handler_list = logging._handlerList[:]
+            saved_loggers = loggerDict.copy()
+        finally:
+            logging._releaseLock()
+        try:
+            fn = tempfile.mktemp(".ini")
+            f = open(fn, "w")
+            f.write(conf)
+            f.close()
+            try:
+                logging.config.fileConfig(fn)
+                #call again to make sure cleanup is correct
+                logging.config.fileConfig(fn)
+            except:
+                t = sys.exc_info()[0]
+                message(str(t))
+            else:
+                message('ok.')
+            os.remove(fn)
+        finally:
+            logging._acquireLock()
+            try:
+                logging._handlers.clear()
+                logging._handlers.update(saved_handlers)
+                logging._handlerList[:] = saved_handler_list
+                loggerDict = logging.getLogger().manager.loggerDict
+                loggerDict.clear()
+                loggerDict.update(saved_loggers)
+            finally:
+                logging._releaseLock()
+
+#----------------------------------------------------------------------------
+# Test 5
+#----------------------------------------------------------------------------
+
+test5_config = """
+[loggers]
+keys=root
+
+[handlers]
+keys=hand1
+
+[formatters]
+keys=form1
+
+[logger_root]
+level=NOTSET
+handlers=hand1
+
+[handler_hand1]
+class=StreamHandler
+level=NOTSET
+formatter=form1
+args=(sys.stdout,)
+
+[formatter_form1]
+class=test.test_logging.FriendlyFormatter
+format=%(levelname)s:%(name)s:%(message)s
+datefmt=
+"""
+
+class FriendlyFormatter (logging.Formatter):
+    def formatException(self, ei):
+        return "%s... Don't panic!" % str(ei[0])
+
+
+def test5():
+    loggerDict = logging.getLogger().manager.loggerDict
+    logging._acquireLock()
+    try:
+        saved_handlers = logging._handlers.copy()
+        saved_handler_list = logging._handlerList[:]
+        saved_loggers = loggerDict.copy()
+    finally:
+        logging._releaseLock()
+    try:
+        fn = tempfile.mktemp(".ini")
+        f = open(fn, "w")
+        f.write(test5_config)
+        f.close()
+        logging.config.fileConfig(fn)
+        try:
+            raise KeyError
+        except KeyError:
+            logging.exception("just testing")
+        os.remove(fn)
+        hdlr = logging.getLogger().handlers[0]
+        logging.getLogger().handlers.remove(hdlr)
+    finally:
+        logging._acquireLock()
+        try:
+            logging._handlers.clear()
+            logging._handlers.update(saved_handlers)
+            logging._handlerList[:] = saved_handler_list
+            loggerDict = logging.getLogger().manager.loggerDict
+            loggerDict.clear()
+            loggerDict.update(saved_loggers)
+        finally:
+            logging._releaseLock()
+
+
+#----------------------------------------------------------------------------
 # Test Harness
 #----------------------------------------------------------------------------
 def banner(nm, typ):
@@ -408,11 +586,23 @@ def test_main_inner():
     hdlr.setFormatter(fmt)
     rootLogger.addHandler(hdlr)
 
+    # Find an unused port number
+    port = logging.handlers.DEFAULT_TCP_LOGGING_PORT
+    while port < logging.handlers.DEFAULT_TCP_LOGGING_PORT+100:
+        try:
+            tcpserver = LogRecordSocketReceiver(port=port)
+        except socket.error:
+            port += 1
+        else:
+            break
+    else:
+        raise ImportError, "Could not find unused port"
+
+
     #Set up a handler such that all events are sent via a socket to the log
     #receiver (logrecv).
     #The handler will only be added to the rootLogger for some of the tests
-    shdlr = logging.handlers.SocketHandler('localhost',
-                                   logging.handlers.DEFAULT_TCP_LOGGING_PORT)
+    shdlr = logging.handlers.SocketHandler('localhost', port)
 
     #Configure the logger for logrecv so events do not propagate beyond it.
     #The sockLogger output is buffered in memory until the end of the test,
@@ -428,7 +618,6 @@ def test_main_inner():
 
     #Set up servers
     threads = []
-    tcpserver = LogRecordSocketReceiver()
     #sys.stdout.write("About to start TCP server...\n")
     threads.append(threading.Thread(target=runTCP, args=(tcpserver,)))
 
@@ -439,28 +628,27 @@ def test_main_inner():
 
         rootLogger.addHandler(shdlr)
         test0()
+        # XXX(nnorwitz): Try to fix timing related test failures.
+        # This sleep gives us some extra time to read messages.
+        # The test generally only fails on Solaris without this sleep.
+        time.sleep(2.0)
         shdlr.close()
         rootLogger.removeHandler(shdlr)
 
         banner("log_test0", "end")
 
-        banner("log_test1", "begin")
-        test1()
-        banner("log_test1", "end")
-
-        banner("log_test2", "begin")
-        test2()
-        banner("log_test2", "end")
-
-        banner("log_test3", "begin")
-        test3()
-        banner("log_test3", "end")
+        for t in range(1,6):
+            banner("log_test%d" % t, "begin")
+            globals()['test%d' % t]()
+            banner("log_test%d" % t, "end")
 
     finally:
         #wait for TCP receiver to terminate
         socketDataProcessed.wait()
+        # ensure the server dies
+        tcpserver.abort = 1
         for thread in threads:
-            thread.join()
+            thread.join(2.0)
         banner("logrecv output", "begin")
         sys.stdout.write(sockOut.getvalue())
         sockOut.close()
@@ -474,19 +662,11 @@ def test_main_inner():
             pass
         rootLogger.removeHandler(hdlr)
 
+# Set the locale to the platform-dependent default.  I have no idea
+# why the test does this, but in any case we save the current locale
+# first and restore it at the end.
+@run_with_locale('LC_ALL', '')
 def test_main():
-    import locale
-    # Set the locale to the platform-dependent default.  I have no idea
-    # why the test does this, but in any case we save the current locale
-    # first so we can restore it at the end.
-    try:
-        original_locale = locale.setlocale(locale.LC_ALL)
-        locale.setlocale(locale.LC_ALL, '')
-    except (ValueError, locale.Error):
-        # this happens on a Solaris box which only supports "C" locale
-        # or a Mac OS X box which supports very little locale stuff at all
-        original_locale = None
-
     # Save and restore the original root logger level across the tests.
     # Otherwise, e.g., if any test using cookielib runs after test_logging,
     # cookielib's debug-level logger tries to log messages, leading to
@@ -498,8 +678,6 @@ def test_main():
     try:
         test_main_inner()
     finally:
-        if original_locale is not None:
-            locale.setlocale(locale.LC_ALL, original_locale)
         root_logger.setLevel(original_logging_level)
 
 if __name__ == "__main__":

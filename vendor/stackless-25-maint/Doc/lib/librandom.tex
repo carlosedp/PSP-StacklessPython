@@ -23,7 +23,7 @@ Almost all module functions depend on the basic function
 \function{random()}, which generates a random float uniformly in
 the semi-open range [0.0, 1.0).  Python uses the Mersenne Twister as
 the core generator.  It produces 53-bit precision floats and has a
-period of 2**19937-1.  The underlying implementation in C 
+period of 2**19937-1.  The underlying implementation in C
 is both fast and threadsafe.  The Mersenne Twister is one of the most
 extensively tested random number generators in existence.  However, being
 completely deterministic, it is not suitable for all purposes, and is
@@ -34,7 +34,7 @@ hidden instance of the \class{random.Random} class.  You can
 instantiate your own instances of \class{Random} to get generators
 that don't share state.  This is especially useful for multi-threaded
 programs, creating a different instance of \class{Random} for each
-thread, and using the \method{jumpahead()} method to ensure that the
+thread, and using the \method{jumpahead()} method to make it likely that the
 generated sequences seen by each thread don't overlap.
 
 Class \class{Random} can also be subclassed if you want to use a
@@ -47,10 +47,14 @@ over an arbitrarily large range.
 \versionadded[the \method{getrandombits()} method]{2.4}
 
 As an example of subclassing, the \module{random} module provides
-the \class{WichmannHill} class which implements an alternative generator
+the \class{WichmannHill} class that implements an alternative generator
 in pure Python.  The class provides a backward compatible way to
-reproduce results from earlier versions of Python which used the
-Wichmann-Hill algorithm as the core generator.
+reproduce results from earlier versions of Python, which used the
+Wichmann-Hill algorithm as the core generator.  Note that this Wichmann-Hill
+generator can no longer be recommended:  its period is too short by
+contemporary standards, and the sequence generated is known to fail some
+stringent randomness tests.  See the references below for a recent
+variant that repairs these flaws.
 \versionchanged[Substituted MersenneTwister for Wichmann-Hill]{2.3}
 
 
@@ -106,8 +110,8 @@ Bookkeeping functions:
   other generators may also provide it as an optional part of the API.
   When available, \method{getrandbits()} enables \method{randrange()}
   to handle arbitrarily large ranges.
-  \versionadded{2.4}   
-\end{funcdesc} 
+  \versionadded{2.4}
+\end{funcdesc}
 
 Functions for integers:
 
@@ -159,8 +163,8 @@ Functions for sequences:
   population contains repeats, then each occurrence is a possible
   selection in the sample.
 
-  To choose a sample from a range of integers, use \function{xrange}
-  as an argument.  This is especially fast and space efficient for
+  To choose a sample from a range of integers, use an \function{xrange()}
+  object as an argument.  This is especially fast and space efficient for
   sampling from a large population:  \code{sample(xrange(10000000), 60)}.
 \end{funcdesc}
 
@@ -181,7 +185,7 @@ these equations can be found in any statistics text.
 
 \begin{funcdesc}{betavariate}{alpha, beta}
   Beta distribution.  Conditions on the parameters are
-  \code{\var{alpha} > -1} and \code{\var{beta} > -1}.
+  \code{\var{alpha} > 0} and \code{\var{beta} > 0}.
   Returned values range between 0 and 1.
 \end{funcdesc}
 
@@ -232,11 +236,11 @@ these equations can be found in any statistics text.
   \var{beta} is the shape parameter.
 \end{funcdesc}
 
-Alternative Generators
+Alternative Generators:
 
 \begin{classdesc}{WichmannHill}{\optional{seed}}
 Class that implements the Wichmann-Hill algorithm as the core generator.
-Has all of the same methods as \class{Random} plus the \method{whseed}
+Has all of the same methods as \class{Random} plus the \method{whseed()}
 method described below.  Because this class is implemented in pure
 Python, it is not threadsafe and may require locks between calls.  The
 period of the generator is 6,953,607,871,644 which is small enough to
@@ -246,7 +250,7 @@ require care that two independent random sequences do not overlap.
 \begin{funcdesc}{whseed}{\optional{x}}
   This is obsolete, supplied for bit-level compatibility with versions
   of Python prior to 2.1.
-  See \function{seed} for details.  \function{whseed} does not guarantee
+  See \function{seed()} for details.  \function{whseed()} does not guarantee
   that distinct integer arguments yield distinct internal states, and can
   yield no more than about 2**24 distinct internal states in all.
 \end{funcdesc}
@@ -263,14 +267,43 @@ called.
 \versionadded{2.4}
 \end{classdesc}
 
+Examples of basic usage:
+
+\begin{verbatim}
+>>> random.random()        # Random float x, 0.0 <= x < 1.0
+0.37444887175646646
+>>> random.uniform(1, 10)  # Random float x, 1.0 <= x < 10.0
+1.1800146073117523
+>>> random.randint(1, 10)  # Integer from 1 to 10, endpoints included
+7
+>>> random.randrange(0, 101, 2)  # Even integer from 0 to 100
+26
+>>> random.choice('abcdefghij')  # Choose a random element
+'c'
+
+>>> items = [1, 2, 3, 4, 5, 6, 7]
+>>> random.shuffle(items)
+>>> items
+[7, 3, 2, 5, 6, 4, 1]
+
+>>> random.sample([1, 2, 3, 4, 5],  3)  # Choose 3 elements
+[4, 1, 5]
+
+\end{verbatim}
+
 \begin{seealso}
   \seetext{M. Matsumoto and T. Nishimura, ``Mersenne Twister: A
 	   623-dimensionally equidistributed uniform pseudorandom
 	   number generator'',
 	   \citetitle{ACM Transactions on Modeling and Computer Simulation}
 	   Vol. 8, No. 1, January pp.3-30 1998.}
-		  
+
   \seetext{Wichmann, B. A. \& Hill, I. D., ``Algorithm AS 183:
            An efficient and portable pseudo-random number generator'',
            \citetitle{Applied Statistics} 31 (1982) 188-190.}
+
+  \seeurl{http://www.npl.co.uk/ssfm/download/abstracts.html\#196}{A modern
+          variation of the Wichmann-Hill generator that greatly increases
+          the period, and passes now-standard statistical tests that the
+          original generator failed.}
 \end{seealso}

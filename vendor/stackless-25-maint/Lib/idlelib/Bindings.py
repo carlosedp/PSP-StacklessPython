@@ -22,9 +22,9 @@ menudefs = [
    None,
    ('_Save', '<<save-window>>'),
    ('Save _As...', '<<save-window-as-file>>'),
-   ('Save Co_py As...', '<<save-copy-of-window-as-file>>'),
+   ('Save Cop_y As...', '<<save-copy-of-window-as-file>>'),
    None,
-   ('_Print Window', '<<print-window>>'),
+   ('Prin_t Window', '<<print-window>>'),
    None,
    ('_Close', '<<close-window>>'),
    ('E_xit', '<<close-all-windows>>'),
@@ -79,6 +79,32 @@ menudefs = [
    ('Python _Docs', '<<python-docs>>'),
    ]),
 ]
+
+import sys
+if sys.platform == 'darwin' and '.app' in sys.executable:
+    # Running as a proper MacOS application bundle. This block restructures
+    # the menus a little to make them conform better to the HIG.
+
+    quitItem = menudefs[0][1][-1]
+    closeItem = menudefs[0][1][-2]
+
+    # Remove the last 3 items of the file menu: a separator, close window and
+    # quit. Close window will be reinserted just above the save item, where
+    # it should be according to the HIG. Quit is in the application menu.
+    del menudefs[0][1][-3:]
+    menudefs[0][1].insert(6, closeItem)
+
+    # Remove the 'About' entry from the help menu, it is in the application
+    # menu
+    del menudefs[-1][1][0:2]
+
+    menudefs.insert(0,
+            ('application', [
+                ('About IDLE', '<<about-idle>>'),
+                None,
+                ('_Preferences....', '<<open-config-dialog>>'),
+            ]))
+
 
 default_keydefs = idleConf.GetCurrentKeySet()
 

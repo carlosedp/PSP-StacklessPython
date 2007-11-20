@@ -27,7 +27,7 @@ has_spawnl = hasattr(os, 'spawnl')
 # number of files that can be opened at one time (see ulimit -n)
 if sys.platform == 'mac':
     TEST_FILES = 32
-elif sys.platform == 'openbsd3':
+elif sys.platform in ('openbsd3', 'openbsd4'):
     TEST_FILES = 48
 else:
     TEST_FILES = 100
@@ -307,7 +307,7 @@ class test__mkstemp_inner(TC):
         retval = os.spawnl(os.P_WAIT, sys.executable, decorated, tester, v, fd)
         self.failIf(retval < 0,
                     "child process caught fatal signal %d" % -retval)
-        self.failIf(retval > 0, "child process reports failure")
+        self.failIf(retval > 0, "child process reports failure %d"%retval)
 
     def test_textmode(self):
         # _mkstemp_inner can create files in text mode
@@ -390,7 +390,7 @@ test_classes.append(test_gettempdir)
 class test_mkstemp(TC):
     """Test mkstemp()."""
 
-    def do_create(self, dir=None, pre="", suf="", ):
+    def do_create(self, dir=None, pre="", suf=""):
         if dir is None:
             dir = tempfile.gettempdir()
         try:

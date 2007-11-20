@@ -198,6 +198,53 @@ PyMac_BuildHFSUniStr255(HFSUniStr255 *itself)
 
         return Py_BuildValue("u#", itself->unicode, itself->length);
 }
+
+/*
+** Get pathname for a given FSSpec
+*/
+static OSErr
+_PyMac_GetFullPathname(FSSpec *fss, char *path, int len)
+{
+        FSRef fsr;
+        OSErr err;
+
+        *path = '\0';
+        err = FSpMakeFSRef(fss, &fsr);
+        if (err == fnfErr) {
+                /* FSSpecs can point to non-existing files, fsrefs can't. */
+                FSSpec fss2;
+                int tocopy;
+
+                err = FSMakeFSSpec(fss->vRefNum, fss->parID, "", &fss2);
+                if (err)
+                        return err;
+                err = FSpMakeFSRef(&fss2, &fsr);
+                if (err)
+                        return err;
+                err = (OSErr)FSRefMakePath(&fsr, path, len-1);
+                if (err)
+                        return err;
+                /* This part is not 100% safe: we append the filename part, but
+                ** I'm not sure that we don't run afoul of the various 8bit
+                ** encodings here. Will have to look this up at some point...
+                */
+                strcat(path, "/");
+                tocopy = fss->name[0];
+                if ((strlen(path) + tocopy) >= len)
+                        tocopy = len - strlen(path) - 1;
+                if (tocopy > 0)
+                        strncat(path, fss->name+1, tocopy);
+        }
+        else {
+                if (err)
+                        return err;
+                err = (OSErr)FSRefMakePath(&fsr, path, len);
+                if (err)
+                        return err;
+        }
+        return 0;
+}
+
 """
 
 finalstuff = finalstuff + """
@@ -254,7 +301,7 @@ PyMac_GetFSRef(PyObject *v, FSRef *fsr)
         if ( PyString_Check(v) || PyUnicode_Check(v)) {
                 char *path = NULL;
                 if (!PyArg_Parse(v, "et", Py_FileSystemDefaultEncoding, &path))
-                        return NULL;
+                        return 0;
                 if ( (err=FSPathMakeRef(path, fsr, NULL)) )
                         PyMac_Error(err);
                 PyMem_Free(path);
@@ -388,22 +435,22 @@ class FSCatalogInfoDefinition(PEP253Mixin, ObjectDefinition):
     ]
     # The same info, but in a different form
     INITFORMAT = "HhllO&O&O&O&O&llllllb"
-    INITARGS = """&((FSCatalogInfoObject *)self)->ob_itself.nodeFlags,
-            &((FSCatalogInfoObject *)self)->ob_itself.volume,
-            &((FSCatalogInfoObject *)self)->ob_itself.parentDirID,
-            &((FSCatalogInfoObject *)self)->ob_itself.nodeID,
-            UTCDateTime_Convert, &((FSCatalogInfoObject *)self)->ob_itself.createDate,
-            UTCDateTime_Convert, &((FSCatalogInfoObject *)self)->ob_itself.contentModDate,
-            UTCDateTime_Convert, &((FSCatalogInfoObject *)self)->ob_itself.attributeModDate,
-            UTCDateTime_Convert, &((FSCatalogInfoObject *)self)->ob_itself.accessDate,
-            UTCDateTime_Convert, &((FSCatalogInfoObject *)self)->ob_itself.backupDate,
-            &((FSCatalogInfoObject *)self)->ob_itself.valence,
-            &((FSCatalogInfoObject *)self)->ob_itself.dataLogicalSize,
-            &((FSCatalogInfoObject *)self)->ob_itself.dataPhysicalSize,
-            &((FSCatalogInfoObject *)self)->ob_itself.rsrcLogicalSize,
-            &((FSCatalogInfoObject *)self)->ob_itself.rsrcPhysicalSize,
-            &((FSCatalogInfoObject *)self)->ob_itself.sharingFlags,
-            &((FSCatalogInfoObject *)self)->ob_itself.userPrivileges"""
+    INITARGS = """&((FSCatalogInfoObject *)_self)->ob_itself.nodeFlags,
+            &((FSCatalogInfoObject *)_self)->ob_itself.volume,
+            &((FSCatalogInfoObject *)_self)->ob_itself.parentDirID,
+            &((FSCatalogInfoObject *)_self)->ob_itself.nodeID,
+            UTCDateTime_Convert, &((FSCatalogInfoObject *)_self)->ob_itself.createDate,
+            UTCDateTime_Convert, &((FSCatalogInfoObject *)_self)->ob_itself.contentModDate,
+            UTCDateTime_Convert, &((FSCatalogInfoObject *)_self)->ob_itself.attributeModDate,
+            UTCDateTime_Convert, &((FSCatalogInfoObject *)_self)->ob_itself.accessDate,
+            UTCDateTime_Convert, &((FSCatalogInfoObject *)_self)->ob_itself.backupDate,
+            &((FSCatalogInfoObject *)_self)->ob_itself.valence,
+            &((FSCatalogInfoObject *)_self)->ob_itself.dataLogicalSize,
+            &((FSCatalogInfoObject *)_self)->ob_itself.dataPhysicalSize,
+            &((FSCatalogInfoObject *)_self)->ob_itself.rsrcLogicalSize,
+            &((FSCatalogInfoObject *)_self)->ob_itself.rsrcPhysicalSize,
+            &((FSCatalogInfoObject *)_self)->ob_itself.sharingFlags,
+            &((FSCatalogInfoObject *)_self)->ob_itself.userPrivileges"""
     INITNAMES = """
             "nodeFlags",
             "volume",
@@ -428,7 +475,7 @@ class FSCatalogInfoDefinition(PEP253Mixin, ObjectDefinition):
         self.argref = "*"       # Store FSSpecs, but pass them by address
 
     def outputCheckNewArg(self):
-        Output("if (itself == NULL) return Py_None;")
+        Output("if (itself == NULL) { Py_INCREF(Py_None); return Py_None; }")
 
     def output_tp_newBody(self):
         Output("PyObject *self;");
@@ -441,7 +488,7 @@ class FSCatalogInfoDefinition(PEP253Mixin, ObjectDefinition):
     def output_tp_initBody(self):
         Output("static char *kw[] = {%s, 0};", self.INITNAMES)
         Output()
-        Output("if (!PyArg_ParseTupleAndKeywords(args, kwds, \"|%s\", kw, %s))",
+        Output("if (!PyArg_ParseTupleAndKeywords(_args, _kwds, \"|%s\", kw, %s))",
                 self.INITFORMAT, self.INITARGS)
         OutLbrace()
         Output("return -1;")
@@ -497,9 +544,9 @@ class FInfoDefinition(PEP253Mixin, ObjectDefinition):
         Output("%s *itself = NULL;", self.itselftype)
         Output("static char *kw[] = {\"itself\", 0};")
         Output()
-        Output("if (PyArg_ParseTupleAndKeywords(args, kwds, \"|O&\", kw, FInfo_Convert, &itself))")
+        Output("if (PyArg_ParseTupleAndKeywords(_args, _kwds, \"|O&\", kw, FInfo_Convert, &itself))")
         OutLbrace()
-        Output("if (itself) memcpy(&((%s *)self)->ob_itself, itself, sizeof(%s));",
+        Output("if (itself) memcpy(&((%s *)_self)->ob_itself, itself, sizeof(%s));",
                 self.objecttype, self.itselftype)
         Output("return 0;")
         OutRbrace()
@@ -539,7 +586,7 @@ class FSSpecDefinition(PEP253Mixin, ObjectDefinition):
         Output("int rawdatalen = 0;")
         Output("static char *kw[] = {\"itself\", \"rawdata\", 0};")
         Output()
-        Output("if (!PyArg_ParseTupleAndKeywords(args, kwds, \"|Os#\", kw, &v, &rawdata, &rawdatalen))")
+        Output("if (!PyArg_ParseTupleAndKeywords(_args, _kwds, \"|Os#\", kw, &v, &rawdata, &rawdatalen))")
         Output("return -1;")
         Output("if (v && rawdata)")
         OutLbrace()
@@ -559,10 +606,10 @@ class FSSpecDefinition(PEP253Mixin, ObjectDefinition):
                 self.itselftype)
         Output("return -1;")
         OutRbrace()
-        Output("memcpy(&((%s *)self)->ob_itself, rawdata, rawdatalen);", self.objecttype)
+        Output("memcpy(&((%s *)_self)->ob_itself, rawdata, rawdatalen);", self.objecttype)
         Output("return 0;")
         OutRbrace()
-        Output("if (PyMac_GetFSSpec(v, &((%s *)self)->ob_itself)) return 0;", self.objecttype)
+        Output("if (PyMac_GetFSSpec(v, &((%s *)_self)->ob_itself)) return 0;", self.objecttype)
         Output("return -1;")
 
     def outputRepr(self):
@@ -612,7 +659,7 @@ class FSRefDefinition(PEP253Mixin, ObjectDefinition):
         Output("int rawdatalen = 0;")
         Output("static char *kw[] = {\"itself\", \"rawdata\", 0};")
         Output()
-        Output("if (!PyArg_ParseTupleAndKeywords(args, kwds, \"|Os#\", kw, &v, &rawdata, &rawdatalen))")
+        Output("if (!PyArg_ParseTupleAndKeywords(_args, _kwds, \"|Os#\", kw, &v, &rawdata, &rawdatalen))")
         Output("return -1;")
         Output("if (v && rawdata)")
         OutLbrace()
@@ -632,10 +679,10 @@ class FSRefDefinition(PEP253Mixin, ObjectDefinition):
                 self.itselftype)
         Output("return -1;")
         OutRbrace()
-        Output("memcpy(&((%s *)self)->ob_itself, rawdata, rawdatalen);", self.objecttype)
+        Output("memcpy(&((%s *)_self)->ob_itself, rawdata, rawdatalen);", self.objecttype)
         Output("return 0;")
         OutRbrace()
-        Output("if (PyMac_GetFSRef(v, &((%s *)self)->ob_itself)) return 0;", self.objecttype)
+        Output("if (PyMac_GetFSRef(v, &((%s *)_self)->ob_itself)) return 0;", self.objecttype)
         Output("return -1;")
 
 class AliasDefinition(PEP253Mixin, ObjectDefinition):
@@ -688,7 +735,7 @@ class AliasDefinition(PEP253Mixin, ObjectDefinition):
         Output("Handle h;")
         Output("static char *kw[] = {\"itself\", \"rawdata\", 0};")
         Output()
-        Output("if (!PyArg_ParseTupleAndKeywords(args, kwds, \"|O&s#\", kw, %s_Convert, &itself, &rawdata, &rawdatalen))",
+        Output("if (!PyArg_ParseTupleAndKeywords(_args, _kwds, \"|O&s#\", kw, %s_Convert, &itself, &rawdata, &rawdatalen))",
                 self.prefix)
         Output("return -1;")
         Output("if (itself && rawdata)")
@@ -711,10 +758,10 @@ class AliasDefinition(PEP253Mixin, ObjectDefinition):
         Output("HLock(h);")
         Output("memcpy((char *)*h, rawdata, rawdatalen);")
         Output("HUnlock(h);")
-        Output("((%s *)self)->ob_itself = (%s)h;", self.objecttype, self.itselftype)
+        Output("((%s *)_self)->ob_itself = (%s)h;", self.objecttype, self.itselftype)
         Output("return 0;")
         OutRbrace()
-        Output("((%s *)self)->ob_itself = itself;", self.objecttype)
+        Output("((%s *)_self)->ob_itself = itself;", self.objecttype)
         Output("return 0;")
 
 # Alias methods come in two flavors: those with the alias as arg1 and
@@ -797,7 +844,7 @@ OSErr err;
 
 if (!PyArg_ParseTuple(_args, ""))
         return NULL;
-err = PyMac_GetFullPathname(&_self->ob_itself, strbuf, sizeof(strbuf));
+err = _PyMac_GetFullPathname(&_self->ob_itself, strbuf, sizeof(strbuf));
 if ( err ) {
         PyMac_Error(err);
         return NULL;

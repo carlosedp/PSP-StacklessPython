@@ -102,7 +102,7 @@ def getfqdn(name=''):
 
     First the hostname returned by gethostbyaddr() is checked, then
     possibly existing aliases. In case no FQDN is available, hostname
-    as returned by gethostname() is returned.
+    from gethostname() is returned.
     """
     name = name.strip()
     if not name or name == '0.0.0.0':
@@ -121,14 +121,6 @@ def getfqdn(name=''):
     return name
 
 
-#
-# These classes are used by the socket() defined on Windows and BeOS
-# platforms to provide a best-effort implementation of the cleanup
-# semantics needed when sockets can't be dup()ed.
-#
-# These are not actually used on other platforms.
-#
-
 _socketmethods = (
     'bind', 'connect', 'connect_ex', 'fileno', 'listen',
     'getpeername', 'getsockname', 'getsockopt', 'setsockopt',
@@ -138,31 +130,37 @@ _socketmethods = (
 if sys.platform == "riscos":
     _socketmethods = _socketmethods + ('sleeptaskw',)
 
+# All the method names that must be delegated to either the real socket
+# object or the _closedsocket object.
+_delegate_methods = ("recv", "recvfrom", "recv_into", "recvfrom_into",
+                     "send", "sendto")
+
 class _closedsocket(object):
     __slots__ = []
     def _dummy(*args):
         raise error(EBADF, 'Bad file descriptor')
-    send = recv = sendto = recvfrom = __getattr__ = _dummy
+    # All _delegate_methods must also be initialized here.
+    send = recv = recv_into = sendto = recvfrom = recvfrom_into = _dummy
+    __getattr__ = _dummy
 
 class _socketobject(object):
 
     __doc__ = _realsocket.__doc__
 
-    __slots__ = ["_sock", "send", "recv", "sendto", "recvfrom",
-                 "__weakref__"]
+    __slots__ = ["_sock", "__weakref__"] + list(_delegate_methods)
 
     def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, _sock=None):
         if _sock is None:
             _sock = _realsocket(family, type, proto)
         self._sock = _sock
-        self.send = self._sock.send
-        self.recv = self._sock.recv
-        self.sendto = self._sock.sendto
-        self.recvfrom = self._sock.recvfrom
+        for method in _delegate_methods:
+            setattr(self, method, getattr(_sock, method))
 
     def close(self):
         self._sock = _closedsocket()
-        self.send = self.recv = self.sendto = self.recvfrom = self._sock._dummy
+        dummy = self._sock._dummy
+        for method in _delegate_methods:
+            setattr(self, method, dummy)
     close.__doc__ = _realsocket.close.__doc__
 
     def accept(self):
@@ -183,6 +181,10 @@ class _socketobject(object):
         and bufsize arguments are as for the built-in open() function."""
         return _fileobject(self._sock, mode, bufsize)
 
+    family = property(lambda self: self._sock.family, doc="the socket family")
+    type = property(lambda self: self._sock.type, doc="the socket type")
+    proto = property(lambda self: self._sock.proto, doc="the socket protocol")
+
     _s = ("def %s(self, *args): return self._sock.%s(*args)\n\n"
           "%s.__doc__ = _realsocket.%s.__doc__\n")
     for _m in _socketmethods:
@@ -199,9 +201,10 @@ class _fileobject(object):
 
     __slots__ = ["mode", "bufsize", "softspace",
                  # "closed" is a property, see below
-                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf"]
+                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf",
+                 "_close"]
 
-    def __init__(self, sock, mode='rb', bufsize=-1):
+    def __init__(self, sock, mode='rb', bufsize=-1, close=False):
         self._sock = sock
         self.mode = mode # Not actually used in this version
         if bufsize < 0:
@@ -217,6 +220,7 @@ class _fileobject(object):
         self._wbufsize = bufsize
         self._rbuf = "" # A string
         self._wbuf = [] # A list of strings
+        self._close = close
 
     def _getclosed(self):
         return self._sock is None
@@ -227,6 +231,8 @@ class _fileobject(object):
             if self._sock:
                 self.flush()
         finally:
+            if self._close:
+                self._sock.close()
             self._sock = None
 
     def __del__(self):

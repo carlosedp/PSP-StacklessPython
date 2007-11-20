@@ -259,6 +259,11 @@ by functions or loops that truncate the stream.
                  yield element
                  nexti = it.next()          
   \end{verbatim}
+
+  If \var{start} is \code{None}, then iteration starts at zero.
+  If \var{step} is \code{None}, then the step defaults to one.
+  \versionchanged[accept \code{None} values for default \var{start} and
+                  \var{step}]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{izip}{*iterables}
@@ -276,7 +281,8 @@ by functions or loops that truncate the stream.
   \end{verbatim}
 
   \versionchanged[When no iterables are specified, returns a zero length
-                  iterator instead of raising a TypeError exception]{2.4}
+                  iterator instead of raising a \exception{TypeError}
+		  exception]{2.4}
 
   Note, the left-to-right evaluation order of the iterables is guaranteed.
   This makes possible an idiom for clustering a data series into n-length
@@ -468,29 +474,29 @@ def iteritems(mapping):
     return izip(mapping.iterkeys(), mapping.itervalues())
 
 def nth(iterable, n):
-    "Returns the nth item"
-    return list(islice(iterable, n, n+1))
+    "Returns the nth item or raise IndexError"
+    return list(islice(iterable, n, n+1))[0]
 
-def all(seq, pred=bool):
-    "Returns True if pred(x) is True for every element in the iterable"
+def all(seq, pred=None):
+    "Returns True if pred(x) is true for every element in the iterable"
     for elem in ifilterfalse(pred, seq):
         return False
     return True
 
-def any(seq, pred=bool):
-    "Returns True if pred(x) is True for at least one element in the iterable"
+def any(seq, pred=None):
+    "Returns True if pred(x) is true for at least one element in the iterable"
     for elem in ifilter(pred, seq):
         return True
     return False
 
-def no(seq, pred=bool):
-    "Returns True if pred(x) is False for every element in the iterable"
+def no(seq, pred=None):
+    "Returns True if pred(x) is false for every element in the iterable"
     for elem in ifilter(pred, seq):
         return False
     return True
 
-def quantify(seq, pred=bool):
-    "Count how many times the predicate is True in the sequence"
+def quantify(seq, pred=None):
+    "Count how many times the predicate is true in the sequence"
     return sum(imap(pred, seq))
 
 def padnone(seq):
@@ -532,6 +538,9 @@ def pairwise(iterable):
 def grouper(n, iterable, padvalue=None):
     "grouper(3, 'abcdefg', 'x') --> ('a','b','c'), ('d','e','f'), ('g','x','x')"
     return izip(*[chain(iterable, repeat(padvalue, n-1))]*n)
-    
+
+def reverse_map(d):
+    "Return a new dict with swapped keys and values"
+    return dict(izip(d.itervalues(), d))
 
 \end{verbatim}

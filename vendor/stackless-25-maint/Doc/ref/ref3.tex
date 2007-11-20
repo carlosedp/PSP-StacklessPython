@@ -24,7 +24,8 @@ for example, it \emph{is} now possible in some cases to change an
 object's type, under certain controlled conditions.  Until this manual
 undergoes extensive revision, it must now be taken as authoritative
 only regarding ``classic classes'', that are still the default, for
-compatibility purposes, in Python 2.2 and 2.3.}
+compatibility purposes, in Python 2.2 and 2.3.  For more information,
+see \url{http://www.python.org/doc/newstyle.html}.}
 An object's type determines the operations that the object
 supports (e.g., ``does it have a length?'') and also defines the
 possible values for objects of that type.  The
@@ -377,6 +378,41 @@ additional example of a mutable sequence type.
 
 
 \end{description} % Sequences
+
+
+\item[Set types]
+These represent unordered, finite sets of unique, immutable objects.
+As such, they cannot be indexed by any subscript. However, they can be
+iterated over, and the built-in function \function{len()} returns the
+number of items in a set. Common uses for sets are
+fast membership testing, removing duplicates from a sequence, and
+computing mathematical operations such as intersection, union, difference,
+and symmetric difference.
+\bifuncindex{len}
+\obindex{set type}
+
+For set elements, the same immutability rules apply as for dictionary
+keys. Note that numeric types obey the normal rules for numeric
+comparison: if two numbers compare equal (e.g., \code{1} and
+\code{1.0}), only one of them can be contained in a set.
+
+There are currently two intrinsic set types:
+
+\begin{description}
+
+\item[Sets]
+These\obindex{set} represent a mutable set. They are created by the
+built-in \function{set()} constructor and can be modified afterwards
+by several methods, such as \method{add()}.
+
+\item[Frozen sets]
+These\obindex{frozenset} represent an immutable set. They are created by
+the built-in \function{frozenset()} constructor. As a frozenset is
+immutable and hashable, it can be used again as an element of another set,
+or as a dictionary key.
+
+\end{description} % Set types
+
 
 \item[Mappings]
 These represent finite sets of objects indexed by arbitrary index sets.
@@ -761,7 +797,7 @@ user-defined method object whose associated class is the class
 (call it~\class{C}) of the instance for which the attribute reference
 was initiated or one of its bases,
 it is transformed into a bound user-defined method object whose
-\member{im_class} attribute is~\class{C} whose \member{im_self} attribute
+\member{im_class} attribute is~\class{C} and whose \member{im_self} attribute
 is the instance. Static method and class method objects are also
 transformed, as if they had been retrieved from class~\class{C};
 see above under ``Classes''. See section~\ref{descriptors} for
@@ -1031,7 +1067,49 @@ by the built-in \function{classmethod()} constructor.
 
 \end{description} % Types
 
+%=========================================================================
+\section{New-style and classic classes}
 
+Classes and instances come in two flavors: old-style or classic, and new-style.  
+
+Up to Python 2.1, old-style classes were the only flavour available to the
+user.  The concept of (old-style) class is unrelated to the concept of type: if
+\var{x} is an instance of an old-style class, then \code{x.__class__}
+designates the class of \var{x}, but \code{type(x)} is always \code{<type
+'instance'>}.  This reflects the fact that all old-style instances,
+independently of their class, are implemented with a single built-in type,
+called \code{instance}.
+
+New-style classes were introduced in Python 2.2 to unify classes and types.  A
+new-style class neither more nor less than a user-defined type.  If \var{x} is
+an instance of a new-style class, then \code{type(x)} is the same as
+\code{x.__class__}.
+
+The major motivation for introducing new-style classes is to provide a unified
+object model with a full meta-model.  It also has a number of immediate
+benefits, like the ability to subclass most built-in types, or the introduction
+of "descriptors", which enable computed properties.
+
+For compatibility reasons, classes are still old-style by default.  New-style
+classes are created by specifying another new-style class (i.e.\ a type) as a
+parent class, or the "top-level type" \class{object} if no other parent is
+needed.  The behaviour of new-style classes differs from that of old-style
+classes in a number of important details in addition to what \function{type}
+returns.  Some of these changes are fundamental to the new object model, like
+the way special methods are invoked.  Others are "fixes" that could not be
+implemented before for compatibility concerns, like the method resolution order
+in case of multiple inheritance.
+
+This manual is not up-to-date with respect to new-style classes.  For now,
+please see \url{http://www.python.org/doc/newstyle.html} for more information.
+
+The plan is to eventually drop old-style classes, leaving only the semantics of
+new-style classes.  This change will probably only be feasible in Python 3.0.
+\index{class}{new-style}
+\index{class}{classic}
+\index{class}{old-style}
+
+%=========================================================================
 \section{Special method names\label{specialnames}}
 
 A class can implement certain operations that are invoked by special
@@ -1041,7 +1119,9 @@ This is Python's approach to \dfn{operator overloading}, allowing
 classes to define their own behavior with respect to language
 operators.  For instance, if a class defines
 a method named \method{__getitem__()}, and \code{x} is an instance of
-this class, then \code{x[i]} is equivalent to
+this class, then \code{x[i]} is equivalent\footnote{This, and other
+statements, are only roughly true for instances of new-style
+classes.} to
 \code{x.__getitem__(i)}.  Except where mentioned, attempts to execute
 an operation raise an exception when no appropriate method is defined.
 \withsubitem{(mapping object method)}{\ttindex{__getitem__()}}
@@ -1202,10 +1282,14 @@ follows:
 \code{\var{x}.__ne__(\var{y})},
 \code{\var{x}>\var{y}} calls \code{\var{x}.__gt__(\var{y})}, and
 \code{\var{x}>=\var{y}} calls \code{\var{x}.__ge__(\var{y})}.
-These methods can return any value, but if the comparison operator is
-used in a Boolean context, the return value should be interpretable as
-a Boolean value, else a \exception{TypeError} will be raised.
-By convention, \code{False} is used for false and \code{True} for true.
+
+A rich comparison method may return the singleton \code{NotImplemented} if it
+does not implement the operation for a given pair of arguments.
+By convention, \code{False} and \code{True} are returned for a successful
+comparison. However, these methods can return any value, so if the
+comparison operator is used in a Boolean context (e.g., in the condition
+of an \code{if} statement), Python will call \function{bool()} on the
+value to determine if the result is true or false.
 
 There are no implied relationships among the comparison operators.
 The truth of \code{\var{x}==\var{y}} does not imply that \code{\var{x}!=\var{y}}
@@ -1219,9 +1303,7 @@ the right argument does); rather, \method{__lt__()} and
 \method{__ge__()} are each other's reflection, and \method{__eq__()}
 and \method{__ne__()} are their own reflection.
 
-Arguments to rich comparison methods are never coerced.  A rich
-comparison method may return \code{NotImplemented} if it does not
-implement the operation for a given pair of arguments.
+Arguments to rich comparison methods are never coerced.
 \end{methoddesc}
 
 \begin{methoddesc}[object]{__cmp__}{self, other}
@@ -1262,6 +1344,11 @@ defines mutable objects and implements a \method{__cmp__()} or
 since the dictionary implementation requires that a key's hash value
 is immutable (if the object's hash value changes, it will be in the
 wrong hash bucket).
+
+\versionchanged[\method{__hash__()} may now also return a long
+integer object; the 32-bit integer is then derived from the hash
+of that object]{2.5}
+
 \withsubitem{(object method)}{\ttindex{__cmp__()}}
 \end{methoddesc}
 
@@ -1339,8 +1426,8 @@ The following methods only apply to new-style classes.
 
 \begin{methoddesc}[object]{__getattribute__}{self, name}
 Called unconditionally to implement attribute accesses for instances
-of the class. If the class also defines \method{__getattr__()}, the latter
-will not be called unless \method{__getattribute__()} either calls it
+of the class. If the class also defines \method{__getattr__()}, the latter 
+will not be called unless \method{__getattribute__()} either calls it 
 explicitly or raises an \exception{AttributeError}.
 This method should return the (computed) attribute
 value or raise an \exception{AttributeError} exception.
@@ -1830,8 +1917,8 @@ These methods are
 called to implement the binary arithmetic operations (\code{+},
 \code{-}, \code{*}, \code{//}, \code{\%},
 \function{divmod()}\bifuncindex{divmod},
-\function{pow()}\bifuncindex{pow}, \code{**}, \code{<}\code{<},
-\code{>}\code{>}, \code{\&}, \code{\^}, \code{|}).  For instance, to
+\function{pow()}\bifuncindex{pow}, \code{**}, \code{<<},
+\code{>>}, \code{\&}, \code{\^}, \code{|}).  For instance, to
 evaluate the expression \var{x}\code{+}\var{y}, where \var{x} is an
 instance of a class that has an \method{__add__()} method,
 \code{\var{x}.__add__(\var{y})} is called.  The \method{__divmod__()}
@@ -1841,6 +1928,9 @@ method should be the equivalent to using \method{__floordiv__()} and
 \method{__pow__()} should be defined to accept an optional third
 argument if the ternary version of the built-in
 \function{pow()}\bifuncindex{pow} function is to be supported.
+
+If one of those methods does not support the operation with the
+supplied arguments, it should return \code{NotImplemented}.
 \end{methoddesc}
 
 \begin{methoddesc}[numeric object]{__div__}{self, other}
@@ -1870,16 +1960,31 @@ These methods are
 called to implement the binary arithmetic operations (\code{+},
 \code{-}, \code{*}, \code{/}, \code{\%},
 \function{divmod()}\bifuncindex{divmod},
-\function{pow()}\bifuncindex{pow}, \code{**}, \code{<}\code{<},
-\code{>}\code{>}, \code{\&}, \code{\^}, \code{|}) with reflected
+\function{pow()}\bifuncindex{pow}, \code{**}, \code{<<},
+\code{>>}, \code{\&}, \code{\^}, \code{|}) with reflected
 (swapped) operands.  These functions are only called if the left
-operand does not support the corresponding operation.  For instance,
-to evaluate the expression \var{x}\code{-}\var{y}, where \var{y} is an
-instance of a class that has an \method{__rsub__()} method,
-\code{\var{y}.__rsub__(\var{x})} is called.  Note that ternary
+operand does not support the corresponding operation and the
+operands are of different types.\footnote{
+    For operands of the same type, it is assumed that if the
+    non-reflected method (such as \method{__add__()}) fails the
+    operation is not supported, which is why the reflected method
+    is not called.} 
+For instance, to evaluate the expression \var{x}\code{-}\var{y},
+where \var{y} is an instance of a class that has an
+\method{__rsub__()} method, \code{\var{y}.__rsub__(\var{x})}
+is called if \code{\var{x}.__sub__(\var{y})} returns
+\var{NotImplemented}.
+
+Note that ternary
 \function{pow()}\bifuncindex{pow} will not try calling
 \method{__rpow__()} (the coercion rules would become too
 complicated).
+
+\note{If the right operand's type is a subclass of the left operand's
+      type and that subclass provides the reflected method for the
+      operation, this method will be called before the left operand's
+      non-reflected method.  This behavior allows subclasses to
+      override their ancestors' operations.}
 \end{methoddesc}
 
 \begin{methoddesc}[numeric object]{__iadd__}{self, other}
@@ -1896,8 +2001,8 @@ complicated).
 \methodline[numeric object]{__ixor__}{self, other}
 \methodline[numeric object]{__ior__}{self, other}
 These methods are called to implement the augmented arithmetic
-operations (\code{+=}, \code{-=}, \code{*=}, \code{/=}, \code{\%=},
-\code{**=}, \code{<}\code{<=}, \code{>}\code{>=}, \code{\&=},
+operations (\code{+=}, \code{-=}, \code{*=}, \code{/=}, \code{//=},
+\code{\%=}, \code{**=}, \code{<<=}, \code{>>=}, \code{\&=},
 \code{\textasciicircum=}, \code{|=}).  These methods should attempt to do the
 operation in-place (modifying \var{self}) and return the result (which
 could be, but does not have to be, \var{self}).  If a specific method
@@ -1935,6 +2040,13 @@ the appropriate type.
 Called to implement the built-in functions
 \function{oct()}\bifuncindex{oct} and
 \function{hex()}\bifuncindex{hex}.  Should return a string value.
+\end{methoddesc}
+
+\begin{methoddesc}[numeric object]{__index__}{self}
+Called to implement \function{operator.index()}.  Also called whenever
+Python needs an integer object (such as in slicing).  Must return an
+integer (int or long).
+\versionadded{2.5}
 \end{methoddesc}
 
 \begin{methoddesc}[numeric object]{__coerce__}{self, other}
@@ -2005,14 +2117,15 @@ exception is raised.  But see the following exception:
 \item
 
 Exception to the previous item: if the left operand is an instance of
-a built-in type or a new-style class, and the right operand is an
-instance of a proper subclass of that type or class, the right
-operand's \method{__rop__()} method is tried \emph{before} the left
-operand's \method{__op__()} method.  This is done so that a subclass can
-completely override binary operators.  Otherwise, the left operand's
-__op__ method would always accept the right operand: when an instance
-of a given class is expected, an instance of a subclass of that class
-is always acceptable.
+a built-in type or a new-style class, and the right operand is an instance
+of a proper subclass of that type or class and overrides the base's
+\method{__rop__()} method, the right operand's \method{__rop__()} method
+is tried \emph{before} the left operand's \method{__op__()} method.
+
+This is done so that a subclass can completely override binary operators.
+Otherwise, the left operand's \method{__op__()} method would always
+accept the right operand: when an instance of a given class is expected,
+an instance of a subclass of that class is always acceptable.
 
 \item
 
@@ -2058,3 +2171,55 @@ implement a \method{__coerce__()} method, for use by the built-in
 \function{coerce()} function.
 
 \end{itemize}
+
+\subsection{With Statement Context Managers\label{context-managers}}
+
+\versionadded{2.5}
+
+A \dfn{context manager} is an object that defines the runtime
+context to be established when executing a \keyword{with}
+statement. The context manager handles the entry into,
+and the exit from, the desired runtime context for the execution
+of the block of code.  Context managers are normally invoked using
+the \keyword{with} statement (described in section~\ref{with}), but
+can also be used by directly invoking their methods.
+
+\stindex{with}
+\index{context manager}
+
+Typical uses of context managers include saving and
+restoring various kinds of global state, locking and unlocking
+resources, closing opened files, etc.
+
+For more information on context managers, see
+``\ulink{Context Types}{../lib/typecontextmanager.html}'' in the
+\citetitle[../lib/lib.html]{Python Library Reference}.
+
+\begin{methoddesc}[context manager]{__enter__}{self}
+Enter the runtime context related to this object. The \keyword{with}
+statement will bind this method's return value to the target(s)
+specified in the \keyword{as} clause of the statement, if any.
+\end{methoddesc}
+
+\begin{methoddesc}[context manager]{__exit__}
+{self, exc_type, exc_value, traceback}
+Exit the runtime context related to this object. The parameters
+describe the exception that caused the context to be exited. If
+the context was exited without an exception, all three arguments
+will be \constant{None}.
+
+If an exception is supplied, and the method wishes to suppress the
+exception (i.e., prevent it from being propagated), it should return a
+true value. Otherwise, the exception will be processed normally upon
+exit from this method.
+
+Note that \method{__exit__} methods should not reraise the passed-in
+exception; this is the caller's responsibility.
+\end{methoddesc}
+
+\begin{seealso}
+  \seepep{0343}{The "with" statement}
+         {The specification, background, and examples for the
+          Python \keyword{with} statement.}
+\end{seealso}
+

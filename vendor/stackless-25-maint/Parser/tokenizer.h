@@ -43,9 +43,9 @@ struct tok_state {
 	int decoding_state;	/* -1:decoding, 0:init, 1:raw */
 	int decoding_erred;	/* whether erred in decoding  */
 	int read_coding_spec;	/* whether 'coding:...' has been read  */
-	int issued_encoding_warning; /* whether non-ASCII warning was issued */
 	char *encoding;
 	int cont_line;          /* whether we are in a continuation line. */
+	const char* line_start;	/* pointer to start of current line */
 #ifndef PGEN
 	PyObject *decoding_readline; /* codecs.open(...).readline */
 	PyObject *decoding_buffer;

@@ -16,8 +16,9 @@ get started.
 The way new types are defined changed dramatically (and for the
 better) in Python 2.2.  This document documents how to define new
 types for Python 2.2 and later.  If you need to support older
-versions of Python, you will need to refer to older versions of this
-documentation.
+versions of Python, you will need to refer to
+\ulink{older versions of this documentation}
+      {http://www.python.org/doc/versions/}.
 \end{notice}
 
 \section{The Basics
@@ -479,7 +480,7 @@ this?
   1
 \item when we know that deallocation of the object\footnote{This is
   true when we know that the object is a basic type, like a string or
-  a float} will not cause any
+  a float.} will not cause any
   calls back into our type's code
 \item when decrementing a reference count in a \member{tp_dealloc}
   handler when garbage-collections is not supported\footnote{We relied
@@ -488,7 +489,6 @@ this?
   garbage collection, there are calls that can be made to ``untrack''
   the object from garbage collection, however, these calls are
   advanced and not covered here.}
-\item
 \end{itemize}
 
 
@@ -791,9 +791,9 @@ eventually figure out that the list is garbage and free it.
 
 In the second version of the \class{Noddy} example, we allowed any
 kind of object to be stored in the \member{first} or \member{last}
-attributes\footnote{Even in the third version, we aren't guaranteed to
+attributes.\footnote{Even in the third version, we aren't guaranteed to
 avoid cycles.  Instances of string subclasses are allowed and string
-subclasses could allow cycles even if normal strings don't.}. This
+subclasses could allow cycles even if normal strings don't.} This
 means that \class{Noddy} objects can participate in cycles:
 
 \begin{verbatim}
@@ -928,6 +928,102 @@ That's pretty much it.  If we had written custom \member{tp_alloc} or
 \member{tp_free} slots, we'd need to modify them for cyclic-garbage
 collection. Most extensions will use the versions automatically
 provided.
+
+\subsection{Subclassing other types}
+
+It is possible to create new extension types that are derived from existing
+types. It is easiest to inherit from the built in types, since an extension
+can easily use the \class{PyTypeObject} it needs. It can be difficult to
+share these \class{PyTypeObject} structures between extension modules.
+
+In this example we will create a \class{Shoddy} type that inherits from
+the builtin \class{list} type. The new type will be completely compatible
+with regular lists, but will have an additional \method{increment()} method
+that increases an internal counter.
+
+\begin{verbatim}
+>>> import shoddy
+>>> s = shoddy.Shoddy(range(3))
+>>> s.extend(s)
+>>> print len(s)
+6
+>>> print s.increment()
+1
+>>> print s.increment()
+2
+\end{verbatim}
+
+\verbatiminput{shoddy.c}
+
+As you can see, the source code closely resembles the \class{Noddy} examples in previous
+sections. We will break down the main differences between them.
+
+\begin{verbatim}
+typedef struct {
+	PyListObject list;
+	int state;
+} Shoddy;
+\end{verbatim}
+
+The primary difference for derived type objects is that the base type's
+object structure must be the first value. The base type will already
+include the \cfunction{PyObject_HEAD} at the beginning of its structure.
+
+When a Python object is a \class{Shoddy} instance, its \var{PyObject*} pointer
+can be safely cast to both \var{PyListObject*} and \var{Shoddy*}.
+
+\begin{verbatim}
+static int
+Shoddy_init(Shoddy *self, PyObject *args, PyObject *kwds)
+{
+	if (PyList_Type.tp_init((PyObject *)self, args, kwds) < 0)
+		return -1;
+	self->state = 0;
+	return 0;
+}
+\end{verbatim}
+
+In the \member{__init__} method for our type, we can see how to call through
+to the \member{__init__} method of the base type.
+
+This pattern is important when writing a type with custom \member{new} and
+\member{dealloc} methods. The \member{new} method should not actually create the
+memory for the object with \member{tp_alloc}, that will be handled by
+the base class when calling its \member{tp_new}.
+
+When filling out the \cfunction{PyTypeObject} for the \class{Shoddy} type,
+you see a slot for \cfunction{tp_base}. Due to cross platform compiler
+issues, you can't fill that field directly with the \cfunction{PyList_Type};
+it can be done later in the module's \cfunction{init} function.
+
+\begin{verbatim}
+PyMODINIT_FUNC
+initshoddy(void)
+{
+	PyObject *m;
+
+	ShoddyType.tp_base = &PyList_Type;
+	if (PyType_Ready(&ShoddyType) < 0)
+		return;
+
+	m = Py_InitModule3("shoddy", NULL, "Shoddy module");
+	if (m == NULL)
+		return;
+
+	Py_INCREF(&ShoddyType);
+	PyModule_AddObject(m, "Shoddy", (PyObject *) &ShoddyType);
+}
+\end{verbatim}
+
+Before calling \cfunction{PyType_Ready}, the type structure must have the
+\member{tp_base} slot filled in. When we are deriving a new type, it is
+not necessary to fill out the \member{tp_alloc} slot with
+\cfunction{PyType_GenericNew} -- the allocate function from the base type
+will be inherited.
+
+After that, calling \cfunction{PyType_Ready} and adding the type object
+to the module is the same as with the basic \class{Noddy} examples.
+
 
 \section{Type Methods
          \label{dnt-type-methods}}
@@ -1562,6 +1658,85 @@ one.  If the iteration has reached the end, it may return \NULL{}
 without setting an exception or it may set \exception{StopIteration};
 avoiding the exception can yield slightly better performance.  If an
 actual error occurs, it should set an exception and return \NULL.
+
+
+\subsection{Weak Reference Support\label{weakref-support}}
+
+One of the goals of Python's weak-reference implementation is to allow
+any type to participate in the weak reference mechanism without
+incurring the overhead on those objects which do not benefit by weak
+referencing (such as numbers).
+
+For an object to be weakly referencable, the extension must include a
+\ctype{PyObject*} field in the instance structure for the use of the
+weak reference mechanism; it must be initialized to \NULL{} by the
+object's constructor.  It must also set the \member{tp_weaklistoffset}
+field of the corresponding type object to the offset of the field.
+For example, the instance type is defined with the following
+structure:
+
+\begin{verbatim}
+typedef struct {
+    PyObject_HEAD
+    PyClassObject *in_class;       /* The class object */
+    PyObject      *in_dict;        /* A dictionary */
+    PyObject      *in_weakreflist; /* List of weak references */
+} PyInstanceObject;
+\end{verbatim}
+
+The statically-declared type object for instances is defined this way:
+
+\begin{verbatim}
+PyTypeObject PyInstance_Type = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,
+    "module.instance",
+
+    /* Lots of stuff omitted for brevity... */
+
+    Py_TPFLAGS_DEFAULT,                         /* tp_flags */
+    0,                                          /* tp_doc */
+    0,                                          /* tp_traverse */
+    0,                                          /* tp_clear */
+    0,                                          /* tp_richcompare */
+    offsetof(PyInstanceObject, in_weakreflist), /* tp_weaklistoffset */
+};
+\end{verbatim}
+
+The type constructor is responsible for initializing the weak reference
+list to \NULL:
+
+\begin{verbatim}
+static PyObject *
+instance_new() {
+    /* Other initialization stuff omitted for brevity */
+
+    self->in_weakreflist = NULL;
+
+    return (PyObject *) self;
+}
+\end{verbatim}
+
+The only further addition is that the destructor needs to call the
+weak reference manager to clear any weak references.  This should be
+done before any other parts of the destruction have occurred, but is
+only required if the weak reference list is non-\NULL:
+
+\begin{verbatim}
+static void
+instance_dealloc(PyInstanceObject *inst)
+{
+    /* Allocate temporaries if needed, but do not begin
+       destruction just yet.
+     */
+
+    if (inst->in_weakreflist != NULL)
+        PyObject_ClearWeakRefs((PyObject *) inst);
+
+    /* Proceed with object destruction normally. */
+}
+\end{verbatim}
+
 
 \subsection{More Suggestions}
 

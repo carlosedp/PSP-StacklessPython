@@ -6,7 +6,7 @@ are always available.  They are listed here in alphabetical order.
 
 \setindexsubitem{(built-in function)}
 
-\begin{funcdesc}{__import__}{name\optional{, globals\optional{, locals\optional{, fromlist}}}}
+\begin{funcdesc}{__import__}{name\optional{, globals\optional{, locals\optional{, fromlist\optional{, level}}}}}
   This function is invoked by the \keyword{import}\stindex{import}
   statement.  It mainly exists so that you can replace it with another
   function that has a compatible interface, in order to change the
@@ -20,9 +20,9 @@ are always available.  They are listed here in alphabetical order.
 
   For example, the statement \samp{import spam} results in the
   following call: \code{__import__('spam',} \code{globals(),}
-  \code{locals(), [])}; the statement \samp{from spam.ham import eggs}
+  \code{locals(), [], -1)}; the statement \samp{from spam.ham import eggs}
   results in \samp{__import__('spam.ham', globals(), locals(),
-  ['eggs'])}.  Note that even though \code{locals()} and
+  ['eggs'], -1)}.  Note that even though \code{locals()} and
   \code{['eggs']} are passed in as arguments, the
   \function{__import__()} function does not set the local variable
   named \code{eggs}; this is done by subsequent code that is generated
@@ -52,12 +52,47 @@ def my_import(name):
         mod = getattr(mod, comp)
     return mod
 \end{verbatim}
+
+  \var{level} specifies whether to use absolute or relative imports.
+  The default is \code{-1} which indicates both absolute and relative
+  imports will be attempted.  \code{0} means only perform absolute imports.
+  Positive values for \var{level} indicate the number of parent directories
+  to search relative to the directory of the module calling
+  \function{__import__}.
+\versionchanged[The level parameter was added]{2.5}
+\versionchanged[Keyword support for parameters was added]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{abs}{x}
   Return the absolute value of a number.  The argument may be a plain
   or long integer or a floating point number.  If the argument is a
   complex number, its magnitude is returned.
+\end{funcdesc}
+
+\begin{funcdesc}{all}{iterable}
+  Return True if all elements of the \var{iterable} are true.
+  Equivalent to:
+  \begin{verbatim}
+     def all(iterable):
+         for element in iterable:
+             if not element:
+                 return False
+         return True
+  \end{verbatim}
+  \versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{any}{iterable}
+  Return True if any element of the \var{iterable} is true.
+  Equivalent to:
+  \begin{verbatim}
+     def any(iterable):
+         for element in iterable:
+             if element:
+                 return True
+         return False
+  \end{verbatim}
+  \versionadded{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{basestring}{}
@@ -202,11 +237,11 @@ class C:
   \code{del \var{x}.\var{foobar}}.
 \end{funcdesc}
 
-\begin{funcdesc}{dict}{\optional{mapping-or-sequence}}
+\begin{funcdesc}{dict}{\optional{arg}}
   Return a new dictionary initialized from an optional positional
   argument or from a set of keyword arguments.
   If no arguments are given, return a new empty dictionary.
-  If the positional argument is a mapping object, return a dictionary
+  If the positional argument \var{arg} is a mapping object, return a dictionary
   mapping the same keys to the same values as does the mapping object.
   Otherwise the positional argument must be a sequence, a container that
   supports iteration, or an iterator object.  The elements of the argument
@@ -275,7 +310,7 @@ class C:
   consisting of their quotient and remainder when using long division.  With
   mixed operand types, the rules for binary arithmetic operators apply.  For
   plain and long integers, the result is the same as
-  \code{(\var{a} / \var{b}, \var{a} \%{} \var{b})}.
+  \code{(\var{a} // \var{b}, \var{a} \%{} \var{b})}.
   For floating point numbers the result is \code{(\var{q}, \var{a} \%{}
   \var{b})}, where \var{q} is usually \code{math.floor(\var{a} /
   \var{b})} but may be 1 less than that.  In any case \code{\var{q} *
@@ -366,80 +401,31 @@ class C:
 \end{funcdesc}
 
 \begin{funcdesc}{file}{filename\optional{, mode\optional{, bufsize}}}
-  Return a new file object (described in
-  section~\ref{bltin-file-objects}, ``\ulink{File
-  Objects}{bltin-file-objects.html}'').
-  The first two arguments are the same as for \code{stdio}'s
-  \cfunction{fopen()}: \var{filename} is the file name to be opened,
-  \var{mode} indicates how the file is to be opened: \code{'r'} for
-  reading, \code{'w'} for writing (truncating an existing file), and
-  \code{'a'} opens it for appending (which on \emph{some} \UNIX{}
-  systems means that \emph{all} writes append to the end of the file,
-  regardless of the current seek position).
+  Constructor function for the \class{file} type, described further 
+  in section~\ref{bltin-file-objects}, ``\ulink{File
+  Objects}{bltin-file-objects.html}''.  The constructor's arguments
+  are the same as those of the \function{open()} built-in function
+  described below.
 
-  Modes \code{'r+'}, \code{'w+'} and \code{'a+'} open the file for
-  updating (note that \code{'w+'} truncates the file).  Append
-  \code{'b'} to the mode to open the file in binary mode, on systems
-  that differentiate between binary and text files (else it is
-  ignored).  If the file cannot be opened, \exception{IOError} is
-  raised.
+  When opening a file, it's preferable to use \function{open()} instead of 
+  invoking this constructor directly.  \class{file} is more suited to
+  type testing (for example, writing \samp{isinstance(f, file)}).
 
-  In addition to the standard \cfunction{fopen()} values \var{mode}
-  may be \code{'U'} or \code{'rU'}. If Python is built with universal
-  newline support (the default) the file is opened as a text file, but
-  lines may be terminated by any of \code{'\e n'}, the Unix end-of-line
-  convention,
-  \code{'\e r'}, the Macintosh convention or \code{'\e r\e n'}, the Windows
-  convention. All of these external representations are seen as
-  \code{'\e n'}
-  by the Python program. If Python is built without universal newline support
-  \var{mode} \code{'U'} is the same as normal text mode.  Note that
-  file objects so opened also have an attribute called
-  \member{newlines} which has a value of \code{None} (if no newlines
-  have yet been seen), \code{'\e n'}, \code{'\e r'}, \code{'\e r\e n'},
-  or a tuple containing all the newline types seen.
-
-  If \var{mode} is omitted, it defaults to \code{'r'}.  When opening a
-  binary file, you should append \code{'b'} to the \var{mode} value
-  for improved portability.  (It's useful even on systems which don't
-  treat binary and text files differently, where it serves as
-  documentation.)
-  \index{line-buffered I/O}\index{unbuffered I/O}\index{buffer size, I/O}
-  \index{I/O control!buffering}
-  The optional \var{bufsize} argument specifies the
-  file's desired buffer size: 0 means unbuffered, 1 means line
-  buffered, any other positive value means use a buffer of
-  (approximately) that size.  A negative \var{bufsize} means to use
-  the system default, which is usually line buffered for tty
-  devices and fully buffered for other files.  If omitted, the system
-  default is used.\footnote{
-    Specifying a buffer size currently has no effect on systems that
-    don't have \cfunction{setvbuf()}.  The interface to specify the
-    buffer size is not done using a method that calls
-    \cfunction{setvbuf()}, because that may dump core when called
-    after any I/O has been performed, and there's no reliable way to
-    determine whether this is the case.}
-
-  The \function{file()} constructor is new in Python 2.2 and is an
-  alias for \function{open()}.  Both spellings are equivalent.  The
-  intent is for \function{open()} to continue to be preferred for use
-  as a factory function which returns a new \class{file} object.  The
-  spelling, \class{file} is more suited to type testing (for example,
-  writing \samp{isinstance(f, file)}).
+  \versionadded{2.2}
 \end{funcdesc}
 
-\begin{funcdesc}{filter}{function, list}
-  Construct a list from those elements of \var{list} for which
-  \var{function} returns true.  \var{list} may be either a sequence, a
-  container which supports iteration, or an iterator,  If \var{list}
-  is a string or a tuple, the result also has that type; otherwise it
-  is always a list.  If \var{function} is \code{None}, the identity
-  function is assumed, that is, all elements of \var{list} that are false
-  (zero or empty) are removed.
+\begin{funcdesc}{filter}{function, iterable}
+  Construct a list from those elements of \var{iterable} for which
+  \var{function} returns true.  \var{iterable} may be either a sequence, a
+  container which supports iteration, or an iterator,  If \var{iterable}
+  is a string or a tuple, the result
+  also has that type; otherwise it is always a list.  If \var{function} is
+  \code{None}, the identity function is assumed, that is, all elements of
+  \var{iterable} that are false are removed.
 
-  Note that \code{filter(function, \var{list})} is equivalent to
-  \code{[item for item in \var{list} if function(item)]} if function is
-  not \code{None} and \code{[item for item in \var{list} if item]} if
+  Note that \code{filter(function, \var{iterable})} is equivalent to
+  \code{[item for item in \var{iterable} if function(item)]} if function is
+  not \code{None} and \code{[item for item in \var{iterable} if item]} if
   function is \code{None}.
 \end{funcdesc}
 
@@ -562,8 +548,9 @@ class C:
 \begin{funcdesc}{isinstance}{object, classinfo}
   Return true if the \var{object} argument is an instance of the
   \var{classinfo} argument, or of a (direct or indirect) subclass
-  thereof.  Also return true if \var{classinfo} is a type object and
-  \var{object} is an object of that type.  If \var{object} is not a
+  thereof.  Also return true if \var{classinfo} is a type object
+  (new-style class) and \var{object} is an object of that type or of a
+  (direct or indirect) subclass thereof.  If \var{object} is not a
   class instance or an object of the given type, the function always
   returns false.  If \var{classinfo} is neither a class object nor a
   type object, it may be a tuple of class or type objects, or may
@@ -605,12 +592,12 @@ class C:
   may be a sequence (string, tuple or list) or a mapping (dictionary).
 \end{funcdesc}
 
-\begin{funcdesc}{list}{\optional{sequence}}
+\begin{funcdesc}{list}{\optional{iterable}}
   Return a list whose items are the same and in the same order as
-  \var{sequence}'s items.  \var{sequence} may be either a sequence, a
+  \var{iterable}'s items.  \var{iterable} may be either a sequence, a
   container that supports iteration, or an iterator object.  If
-  \var{sequence} is already a list, a copy is made and returned,
-  similar to \code{\var{sequence}[:]}.  For instance,
+  \var{iterable} is already a list, a copy is made and returned,
+  similar to \code{\var{iterable}[:]}.  For instance,
   \code{list('abc')} returns \code{['a', 'b', 'c']} and \code{list(
   (1, 2, 3) )} returns \code{[1, 2, 3]}.  If no argument is given,
   returns a new empty list, \code{[]}.
@@ -636,33 +623,45 @@ class C:
   are given, returns \code{0L}.
 \end{funcdesc}
 
-\begin{funcdesc}{map}{function, list, ...}
-  Apply \var{function} to every item of \var{list} and return a list
-  of the results.  If additional \var{list} arguments are passed,
+\begin{funcdesc}{map}{function, iterable, ...}
+  Apply \var{function} to every item of \var{iterable} and return a list
+  of the results.  If additional \var{iterable} arguments are passed,
   \var{function} must take that many arguments and is applied to the
-  items of all lists in parallel; if a list is shorter than another it
+  items from all iterables in parallel.  If one iterable is shorter than another it
   is assumed to be extended with \code{None} items.  If \var{function}
   is \code{None}, the identity function is assumed; if there are
-  multiple list arguments, \function{map()} returns a list consisting
-  of tuples containing the corresponding items from all lists (a kind
-  of transpose operation).  The \var{list} arguments may be any kind
-  of sequence; the result is always a list.
+  multiple arguments, \function{map()} returns a list consisting
+  of tuples containing the corresponding items from all iterables (a kind
+  of transpose operation).  The \var{iterable} arguments may be a sequence 
+  or any iterable object; the result is always a list.
 \end{funcdesc}
 
-\begin{funcdesc}{max}{s\optional{, args...}}
-  With a single argument \var{s}, return the largest item of a
-  non-empty sequence (such as a string, tuple or list).  With more
+\begin{funcdesc}{max}{iterable\optional{, args...}\optional{key}}
+  With a single argument \var{iterable}, return the largest item of a
+  non-empty iterable (such as a string, tuple or list).  With more
   than one argument, return the largest of the arguments.
+
+  The optional \var{key} argument specifies a one-argument ordering
+  function like that used for \method{list.sort()}.  The \var{key}
+  argument, if supplied, must be in keyword form (for example,
+  \samp{max(a,b,c,key=func)}).
+  \versionchanged[Added support for the optional \var{key} argument]{2.5}
 \end{funcdesc}
 
-\begin{funcdesc}{min}{s\optional{, args...}}
-  With a single argument \var{s}, return the smallest item of a
-  non-empty sequence (such as a string, tuple or list).  With more
+\begin{funcdesc}{min}{iterable\optional{, args...}\optional{key}}
+  With a single argument \var{iterable}, return the smallest item of a
+  non-empty iterable (such as a string, tuple or list).  With more
   than one argument, return the smallest of the arguments.
+
+  The optional \var{key} argument specifies a one-argument ordering
+  function like that used for \method{list.sort()}.  The \var{key}
+  argument, if supplied, must be in keyword form (for example,
+  \samp{min(a,b,c,key=func)}).
+  \versionchanged[Added support for the optional \var{key} argument]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{object}{}
-  Return a new featureless object.  \function{object()} is a base
+  Return a new featureless object.  \class{object} is a base
   for all new style classes.  It has the methods that are common
   to all instances of new style classes.
   \versionadded{2.2}
@@ -678,7 +677,71 @@ class C:
 \end{funcdesc}
 
 \begin{funcdesc}{open}{filename\optional{, mode\optional{, bufsize}}}
-  An alias for the \function{file()} function above.
+  Open a file, returning an object of the \class{file} type described
+  in section~\ref{bltin-file-objects}, ``\ulink{File
+  Objects}{bltin-file-objects.html}''.  If the file cannot be opened,
+  \exception{IOError} is raised.  When opening a file, it's
+  preferable to use \function{open()} instead of invoking the
+  \class{file} constructor directly.
+
+  The first two arguments are the same as for \code{stdio}'s
+  \cfunction{fopen()}: \var{filename} is the file name to be opened,
+  and \var{mode} is a string indicating how the file is to be opened.
+
+  The most commonly-used values of \var{mode} are \code{'r'} for
+  reading, \code{'w'} for writing (truncating the file if it already
+  exists), and \code{'a'} for appending (which on \emph{some} \UNIX{}
+  systems means that \emph{all} writes append to the end of the file
+  regardless of the current seek position).  If \var{mode} is omitted,
+  it defaults to \code{'r'}.  When opening a binary file, you should
+  append \code{'b'} to the \var{mode} value to open the file in binary
+  mode, which will improve portability.  (Appending \code{'b'} is
+  useful even on systems that don't treat binary and text files
+  differently, where it serves as documentation.)  See below for more
+  possible values of \var{mode}.
+
+  \index{line-buffered I/O}\index{unbuffered I/O}\index{buffer size, I/O}
+  \index{I/O control!buffering}
+  The optional \var{bufsize} argument specifies the
+  file's desired buffer size: 0 means unbuffered, 1 means line
+  buffered, any other positive value means use a buffer of
+  (approximately) that size.  A negative \var{bufsize} means to use
+  the system default, which is usually line buffered for tty
+  devices and fully buffered for other files.  If omitted, the system
+  default is used.\footnote{
+    Specifying a buffer size currently has no effect on systems that
+    don't have \cfunction{setvbuf()}.  The interface to specify the
+    buffer size is not done using a method that calls
+    \cfunction{setvbuf()}, because that may dump core when called
+    after any I/O has been performed, and there's no reliable way to
+    determine whether this is the case.}
+
+  Modes \code{'r+'}, \code{'w+'} and \code{'a+'} open the file for
+  updating (note that \code{'w+'} truncates the file).  Append
+  \code{'b'} to the mode to open the file in binary mode, on systems
+  that differentiate between binary and text files; on systems
+  that don't have this distinction, adding the \code{'b'} has no effect.
+  
+  In addition to the standard \cfunction{fopen()} values \var{mode}
+  may be \code{'U'} or \code{'rU'}.  Python is usually built with universal
+  newline support; supplying \code{'U'} opens the file as a text file, but
+  lines may be terminated by any of the following: the \UNIX{} end-of-line
+  convention \code{'\e n'}, 
+  the Macintosh convention \code{'\e r'}, or the Windows
+  convention \code{'\e r\e n'}. All of these external representations are seen as
+  \code{'\e n'}
+  by the Python program. If Python is built without universal newline support
+  a \var{mode} with \code{'U'} is the same as normal text mode.  Note that
+  file objects so opened also have an attribute called
+  \member{newlines} which has a value of \code{None} (if no newlines
+  have yet been seen), \code{'\e n'}, \code{'\e r'}, \code{'\e r\e n'},
+  or a tuple containing all the newline types seen.
+
+  Python enforces that the mode, after stripping \code{'U'}, begins with
+  \code{'r'}, \code{'w'} or \code{'a'}.
+
+  \versionchanged[Restriction on first letter of mode string
+                  introduced]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{ord}{c}
@@ -697,8 +760,11 @@ class C:
 \begin{funcdesc}{pow}{x, y\optional{, z}}
   Return \var{x} to the power \var{y}; if \var{z} is present, return
   \var{x} to the power \var{y}, modulo \var{z} (computed more
-  efficiently than \code{pow(\var{x}, \var{y}) \%\ \var{z}}).  The
-  arguments must have numeric types.  With mixed operand types, the
+  efficiently than \code{pow(\var{x}, \var{y}) \%\ \var{z}}).
+  The two-argument form \code{pow(\var{x}, \var{y})} is equivalent to using
+  the power operator: \code{\var{x}**\var{y}}.
+  
+  The arguments must have numeric types.  With mixed operand types, the
   coercion rules for binary arithmetic operators apply.  For int and
   long int operands, the result has the same type as the operands
   (after coercion) unless the second argument is negative; in that
@@ -726,14 +792,34 @@ class C:
 
 \begin{verbatim}
 class C(object):
-    def __init__(self): self.__x = None
-    def getx(self): return self.__x
-    def setx(self, value): self.__x = value
-    def delx(self): del self.__x
+    def __init__(self): self._x = None
+    def getx(self): return self._x
+    def setx(self, value): self._x = value
+    def delx(self): del self._x
     x = property(getx, setx, delx, "I'm the 'x' property.")
 \end{verbatim}
 
+  If given, \var{doc} will be the docstring of the property attribute.
+  Otherwise, the property will copy \var{fget}'s docstring (if it
+  exists).  This makes it possible to create read-only properties
+  easily using \function{property()} as a decorator:
+
+\begin{verbatim}
+class Parrot(object):
+    def __init__(self):
+        self._voltage = 100000
+
+    @property
+    def voltage(self):
+        """Get the current voltage."""
+        return self._voltage
+\end{verbatim}
+
+  turns the \method{voltage()} method into a ``getter'' for a read-only
+  attribute with the same name.
+
   \versionadded{2.2}
+  \versionchanged[Use \var{fget}'s docstring if no \var{doc} given]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{range}{\optional{start,} stop\optional{, step}}
@@ -786,17 +872,17 @@ class C(object):
   line editing and history features.
 \end{funcdesc}
 
-\begin{funcdesc}{reduce}{function, sequence\optional{, initializer}}
+\begin{funcdesc}{reduce}{function, iterable\optional{, initializer}}
   Apply \var{function} of two arguments cumulatively to the items of
-  \var{sequence}, from left to right, so as to reduce the sequence to
+  \var{iterable}, from left to right, so as to reduce the iterable to
   a single value.  For example, \code{reduce(lambda x, y: x+y, [1, 2,
   3, 4, 5])} calculates \code{((((1+2)+3)+4)+5)}.  The left argument,
   \var{x}, is the accumulated value and the right argument, \var{y},
-  is the update value from the \var{sequence}.  If the optional
+  is the update value from the \var{iterable}.  If the optional
   \var{initializer} is present, it is placed before the items of the
-  sequence in the calculation, and serves as a default when the
-  sequence is empty.  If \var{initializer} is not given and
-  \var{sequence} contains only one item, the first item is returned.
+  iterable in the calculation, and serves as a default when the
+  iterable is empty.  If \var{initializer} is not given and
+  \var{iterable} contains only one item, the first item is returned.
 \end{funcdesc}
 
 \begin{funcdesc}{reload}{module}
@@ -934,8 +1020,30 @@ except NameError:
 \begin{funcdesc}{sorted}{iterable\optional{, cmp\optional{,
                          key\optional{, reverse}}}}
   Return a new sorted list from the items in \var{iterable}.
-  The optional arguments \var{cmp}, \var{key}, and \var{reverse}
-  have the same meaning as those for the \method{list.sort()} method.
+
+  The optional arguments \var{cmp}, \var{key}, and \var{reverse} have
+  the same meaning as those for the \method{list.sort()} method
+  (described in section~\ref{typesseq-mutable}).
+
+  \var{cmp} specifies a custom comparison function of two arguments
+  (iterable elements) which should return a negative, zero or positive
+  number depending on whether the first argument is considered smaller
+  than, equal to, or larger than the second argument:
+  \samp{\var{cmp}=\keyword{lambda} \var{x},\var{y}:
+  \function{cmp}(x.lower(), y.lower())}
+     
+  \var{key} specifies a function of one argument that is used to
+     extract a comparison key from each list element:
+     \samp{\var{key}=\function{str.lower}}
+
+  \var{reverse} is a boolean value.  If set to \code{True}, then the
+     list elements are sorted as if each comparison were reversed.
+
+  In general, the \var{key} and \var{reverse} conversion processes are
+  much faster than specifying an equivalent \var{cmp} function.  This is
+  because \var{cmp} is called multiple times for each list element while
+  \var{key} and \var{reverse} touch each element only once.
+
   \versionadded{2.4}
 \end{funcdesc}
 
@@ -980,11 +1088,11 @@ class C:
   string, \code{''}.
 \end{funcdesc}
 
-\begin{funcdesc}{sum}{sequence\optional{, start}}
-  Sums \var{start} and the items of a \var{sequence}, from left to
-  right, and returns the total.  \var{start} defaults to \code{0}.
-  The \var{sequence}'s items are normally numbers, and are not allowed
-  to be strings.  The fast, correct way to concatenate sequence of
+\begin{funcdesc}{sum}{iterable\optional{, start}}
+  Sums \var{start} and the items of an \var{iterable} from left to
+  right and returns the total.  \var{start} defaults to \code{0}.
+  The \var{iterable}'s items are normally numbers, and are not allowed
+  to be strings.  The fast, correct way to concatenate a sequence of
   strings is by calling \code{''.join(\var{sequence})}.
   Note that \code{sum(range(\var{n}), \var{m})} is equivalent to
   \code{reduce(operator.add, range(\var{n}), \var{m})}
@@ -1014,11 +1122,11 @@ class C(B):
 \versionadded{2.2}
 \end{funcdesc}
 
-\begin{funcdesc}{tuple}{\optional{sequence}}
+\begin{funcdesc}{tuple}{\optional{iterable}}
   Return a tuple whose items are the same and in the same order as
-  \var{sequence}'s items.  \var{sequence} may be a sequence, a
+  \var{iterable}'s items.  \var{iterable} may be a sequence, a
   container that supports iteration, or an iterator object.
-  If \var{sequence} is already a tuple, it
+  If \var{iterable} is already a tuple, it
   is returned unchanged.  For instance, \code{tuple('abc')} returns
   \code{('a', 'b', 'c')} and \code{tuple([1, 2, 3])} returns
   \code{(1, 2, 3)}.  If no argument is given, returns a new empty

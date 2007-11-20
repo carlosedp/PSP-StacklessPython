@@ -15,7 +15,7 @@ else:
     raise TestFailed("import of RAnDoM should have failed (case mismatch)")
 
 # Another brief digression to test the accuracy of manifest float constants.
-import double_const  # don't blink -- that *was* the test
+from test import double_const  # don't blink -- that *was* the test
 
 def remove_files(name):
     for f in (name + os.extsep + "py",
@@ -192,3 +192,45 @@ def test_failing_reload():
             del sys.modules[TESTFN]
 
 test_failing_reload()
+
+def test_import_name_binding():
+    # import x.y.z binds x in the current namespace
+    import test as x
+    import test.test_support
+    assert x is test, x.__name__
+    assert hasattr(test.test_support, "__file__")
+
+    # import x.y.z as w binds z as w
+    import test.test_support as y
+    assert y is test.test_support, y.__name__
+
+test_import_name_binding()
+
+def test_import_initless_directory_warning():
+    import warnings
+    oldfilters = warnings.filters[:]
+    warnings.simplefilter('error', ImportWarning);
+    try:
+        # Just a random non-package directory we always expect to be
+        # somewhere in sys.path...
+        __import__("site-packages")
+    except ImportWarning:
+        pass
+    else:
+        raise AssertionError
+    finally:
+        warnings.filters = oldfilters
+
+test_import_initless_directory_warning()
+
+def test_infinite_reload():
+     # Bug #742342 reports that Python segfaults (infinite recursion in C)
+     #  when faced with self-recursive reload()ing.
+
+     sys.path.insert(0, os.path.dirname(__file__))
+     try:
+         import infinite_reload
+     finally:
+         sys.path.pop(0)
+
+test_infinite_reload()

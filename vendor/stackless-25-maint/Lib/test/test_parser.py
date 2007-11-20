@@ -29,10 +29,21 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
 
     def test_yield_statement(self):
         self.check_suite("def f(): yield 1")
+        self.check_suite("def f(): yield")
+        self.check_suite("def f(): x += yield")
+        self.check_suite("def f(): x = yield 1")
+        self.check_suite("def f(): x = y = yield 1")
+        self.check_suite("def f(): x = yield")
+        self.check_suite("def f(): x = y = yield")
+        self.check_suite("def f(): 1 + (yield)*2")
+        self.check_suite("def f(): (yield 1)*2")
         self.check_suite("def f(): return; yield 1")
         self.check_suite("def f(): yield 1; return")
         self.check_suite("def f():\n"
                          "    for x in range(30):\n"
+                         "        yield x\n")
+        self.check_suite("def f():\n"
+                         "    if (yield):\n"
                          "        yield x\n")
 
     def test_expressions(self):
@@ -40,6 +51,10 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_expr("[1, 2, 3]")
         self.check_expr("[x**3 for x in range(20)]")
         self.check_expr("[x**3 for x in range(20) if x % 3]")
+        self.check_expr("[x**3 for x in range(20) if x % 2 if x % 3]")
+        self.check_expr("list(x**3 for x in range(20))")
+        self.check_expr("list(x**3 for x in range(20) if x % 3)")
+        self.check_expr("list(x**3 for x in range(20) if x % 2 if x % 3)")
         self.check_expr("foo(*args)")
         self.check_expr("foo(*args, **kw)")
         self.check_expr("foo(**kw)")
@@ -126,6 +141,9 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
                          "def f(): pass")
         self.check_suite("@funcattrs()\n"
                          "def f(): pass")
+
+    def test_class_defs(self):
+        self.check_suite("class foo():pass")
 
     def test_import_from_statement(self):
         self.check_suite("from sys.path import *")
@@ -397,10 +415,32 @@ class IllegalSyntaxTestCase(unittest.TestCase):
                 (0, ''))
         self.check_bad_tree(tree, "malformed global ast")
 
+
+class CompileTestCase(unittest.TestCase):
+
+    # These tests are very minimal. :-(
+
+    def test_compile_expr(self):
+        st = parser.expr('2 + 3')
+        code = parser.compilest(st)
+        self.assertEquals(eval(code), 5)
+
+    def test_compile_suite(self):
+        st = parser.suite('x = 2; y = x + 3')
+        code = parser.compilest(st)
+        globs = {}
+        exec code in globs
+        self.assertEquals(globs['y'], 5)
+
+    def test_compile_error(self):
+        st = parser.suite('1 = 3 + 4')
+        self.assertRaises(SyntaxError, parser.compilest, st)
+
 def test_main():
     test_support.run_unittest(
         RoundtripLegalSyntaxTestCase,
-        IllegalSyntaxTestCase
+        IllegalSyntaxTestCase,
+        CompileTestCase,
     )
 
 

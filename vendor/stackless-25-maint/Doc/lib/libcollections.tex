@@ -8,12 +8,15 @@
 \versionadded{2.4}
 
 
-This module implements high-performance container datatypes.  Currently, the
-only datatype is a deque.  Future additions may include B-trees
-and Fibonacci heaps.
+This module implements high-performance container datatypes.  Currently,
+there are two datatypes, deque and defaultdict.
+Future additions may include balanced trees and ordered dictionaries.
+\versionchanged[Added defaultdict]{2.5}
+
+\subsection{\class{deque} objects \label{deque-objects}}
 
 \begin{funcdesc}{deque}{\optional{iterable}}
-  Returns a new deque objected initialized left-to-right (using
+  Returns a new deque object initialized left-to-right (using
   \method{append()}) with data from \var{iterable}.  If \var{iterable}
   is not specified, the new deque is empty.
 
@@ -56,12 +59,18 @@ Deque objects support the following methods:
 
 \begin{methoddesc}{pop}{}
    Remove and return an element from the right side of the deque.
-   If no elements are present, raises a \exception{IndexError}.
+   If no elements are present, raises an \exception{IndexError}.
 \end{methoddesc}
 
 \begin{methoddesc}{popleft}{}
    Remove and return an element from the left side of the deque.
-   If no elements are present, raises a \exception{IndexError}.   
+   If no elements are present, raises an \exception{IndexError}.   
+\end{methoddesc}
+
+\begin{methoddesc}{remove}{value}
+   Removed the first occurrence of \var{value}.  If not found,
+   raises a \exception{ValueError}.
+   \versionadded{2.5}
 \end{methoddesc}
 
 \begin{methoddesc}{rotate}{n}
@@ -130,7 +139,7 @@ IndexError: pop from an empty deque
 deque(['c', 'b', 'a'])
 \end{verbatim}
 
-\subsection{Recipes \label{deque-recipes}}
+\subsubsection{Recipes \label{deque-recipes}}
 
 This section shows various approaches to working with deques.
 
@@ -204,4 +213,129 @@ def maketree(iterable):
 >>> print maketree('abcdefgh')
 [[[['a', 'b'], ['c', 'd']], [['e', 'f'], ['g', 'h']]]]
 
+\end{verbatim}
+
+
+
+\subsection{\class{defaultdict} objects \label{defaultdict-objects}}
+
+\begin{funcdesc}{defaultdict}{\optional{default_factory\optional{, ...}}}
+  Returns a new dictionary-like object.  \class{defaultdict} is a subclass
+  of the builtin \class{dict} class.  It overrides one method and adds one
+  writable instance variable.  The remaining functionality is the same as
+  for the \class{dict} class and is not documented here.
+
+  The first argument provides the initial value for the
+  \member{default_factory} attribute; it defaults to \code{None}.
+  All remaining arguments are treated the same as if they were
+  passed to the \class{dict} constructor, including keyword arguments.
+
+ \versionadded{2.5}
+\end{funcdesc}
+
+\class{defaultdict} objects support the following method in addition to
+the standard \class{dict} operations:
+
+\begin{methoddesc}{__missing__}{key}
+  If the \member{default_factory} attribute is \code{None}, this raises
+  an \exception{KeyError} exception with the \var{key} as argument.
+
+  If \member{default_factory} is not \code{None}, it is called without
+  arguments to provide a default value for the given \var{key}, this
+  value is inserted in the dictionary for the \var{key}, and returned.
+
+  If calling \member{default_factory} raises an exception this exception
+  is propagated unchanged.
+
+  This method is called by the \method{__getitem__} method of the
+  \class{dict} class when the requested key is not found; whatever it
+  returns or raises is then returned or raised by \method{__getitem__}.
+\end{methoddesc}
+
+\class{defaultdict} objects support the following instance variable:
+
+\begin{datadesc}{default_factory}
+  This attribute is used by the \method{__missing__} method; it is initialized
+  from the first argument to the constructor, if present, or to \code{None}, 
+  if absent.
+\end{datadesc}
+
+
+\subsubsection{\class{defaultdict} Examples \label{defaultdict-examples}}
+
+Using \class{list} as the \member{default_factory}, it is easy to group
+a sequence of key-value pairs into a dictionary of lists:
+
+\begin{verbatim}
+>>> s = [('yellow', 1), ('blue', 2), ('yellow', 3), ('blue', 4), ('red', 1)]
+>>> d = defaultdict(list)
+>>> for k, v in s:
+        d[k].append(v)
+
+>>> d.items()
+[('blue', [2, 4]), ('red', [1]), ('yellow', [1, 3])]
+\end{verbatim}
+
+When each key is encountered for the first time, it is not already in the
+mapping; so an entry is automatically created using the
+\member{default_factory} function which returns an empty \class{list}.  The
+\method{list.append()} operation then attaches the value to the new list.  When
+keys are encountered again, the look-up proceeds normally (returning the list
+for that key) and the \method{list.append()} operation adds another value to
+the list. This technique is simpler and faster than an equivalent technique
+using \method{dict.setdefault()}:
+
+\begin{verbatim}
+>>> d = {}
+>>> for k, v in s:
+	d.setdefault(k, []).append(v)
+
+>>> d.items()
+[('blue', [2, 4]), ('red', [1]), ('yellow', [1, 3])]
+\end{verbatim}
+
+Setting the \member{default_factory} to \class{int} makes the
+\class{defaultdict} useful for counting (like a bag or multiset in other
+languages):
+
+\begin{verbatim}
+>>> s = 'mississippi'
+>>> d = defaultdict(int)
+>>> for k in s:
+        d[k] += 1
+
+>>> d.items()
+[('i', 4), ('p', 2), ('s', 4), ('m', 1)]
+\end{verbatim}
+
+When a letter is first encountered, it is missing from the mapping, so the
+\member{default_factory} function calls \function{int()} to supply a default
+count of zero.  The increment operation then builds up the count for each
+letter.
+
+The function \function{int()} which always returns zero is just a special
+case of constant functions.  A faster and more flexible way to create
+constant functions is to use \function{itertools.repeat()} which can supply
+any constant value (not just zero):
+
+\begin{verbatim}
+>>> def constant_factory(value):
+...     return itertools.repeat(value).next
+>>> d = defaultdict(constant_factory('<missing>'))
+>>> d.update(name='John', action='ran')
+>>> '%(name)s %(action)s to %(object)s' % d
+'John ran to <missing>'
+\end{verbatim}
+
+Setting the \member{default_factory} to \class{set} makes the
+\class{defaultdict} useful for building a dictionary of sets:
+
+\begin{verbatim}
+>>> s = [('red', 1), ('blue', 2), ('red', 3), ('blue', 4), ('red', 1), ('blue', 4)]
+>>> d = defaultdict(set)
+>>> for k, v in s:
+        d[k].add(v)
+
+>>> d.items()
+[('blue', set([2, 4])), ('red', set([1, 3]))]
 \end{verbatim}

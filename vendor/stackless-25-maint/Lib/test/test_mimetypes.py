@@ -1,13 +1,13 @@
 import mimetypes
 import StringIO
 import unittest
-from sets import Set
 
 from test import test_support
 
 # Tell it we don't know about external files:
 mimetypes.knownfiles = []
 mimetypes.inited = False
+mimetypes._default_mime_types()
 
 
 class MimeTypesTestCase(unittest.TestCase):
@@ -51,8 +51,8 @@ class MimeTypesTestCase(unittest.TestCase):
         # First try strict.  Use a set here for testing the results because if
         # test_urllib2 is run before test_mimetypes, global state is modified
         # such that the 'all' set will have more items in it.
-        all = Set(self.db.guess_all_extensions('text/plain', strict=True))
-        unless(all >= Set(['.bat', '.c', '.h', '.ksh', '.pl', '.txt']))
+        all = set(self.db.guess_all_extensions('text/plain', strict=True))
+        unless(all >= set(['.bat', '.c', '.h', '.ksh', '.pl', '.txt']))
         # And now non-strict
         all = self.db.guess_all_extensions('image/jpg', strict=False)
         all.sort()

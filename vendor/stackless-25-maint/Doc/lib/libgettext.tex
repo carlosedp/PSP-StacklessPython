@@ -102,9 +102,9 @@ If no translation is found, return \var{singular} if \var{n} is 1;
 return \var{plural} otherwise.
 
 The Plural formula is taken from the catalog header. It is a C or
-Python expression that has a free variable n; the expression evaluates
+Python expression that has a free variable \var{n}; the expression evaluates
 to the index of the plural in the catalog. See the GNU gettext
-documentation for the precise syntax to be used in .po files, and the
+documentation for the precise syntax to be used in \file{.po} files and the
 formulas for a variety of languages.
 
 \versionadded{2.3}
@@ -219,12 +219,15 @@ true.
 \end{funcdesc}
 
 \begin{funcdesc}{install}{domain\optional{, localedir\optional{, unicode
-			  \optional{, codeset}}}}
+			  \optional{, codeset\optional{, names}}}}}
 This installs the function \function{_} in Python's builtin namespace,
 based on \var{domain}, \var{localedir}, and \var{codeset} which are
 passed to the function \function{translation()}.  The \var{unicode}
 flag is passed to the resulting translation object's \method{install}
 method.
+
+For the \var{names} parameter, please see the description of the
+translation object's \method{install} method.
 
 As seen below, you usually mark the strings in your application that are
 candidates for translation, by wrapping them in a call to the
@@ -239,6 +242,7 @@ Python's builtin namespace, so it is easily accessible in all modules
 of your application.  
 
 \versionchanged[Added the \var{codeset} parameter]{2.4}
+\versionchanged[Added the \var{names} parameter]{2.5}
 \end{funcdesc}
 
 \subsubsection{The \class{NullTranslations} class}
@@ -332,11 +336,20 @@ defines the encoding used to return translated messages.
 \versionadded{2.4}
 \end{methoddesc}
 
-\begin{methoddesc}[NullTranslations]{install}{\optional{unicode}}
+\begin{methoddesc}[NullTranslations]{install}{\optional{unicode
+                                              \optional{, names}}}
 If the \var{unicode} flag is false, this method installs
 \method{self.gettext()} into the built-in namespace, binding it to
 \samp{_}.  If \var{unicode} is true, it binds \method{self.ugettext()}
 instead.  By default, \var{unicode} is false.
+
+If the \var{names} parameter is given, it must be a sequence containing
+the names of functions you want to install in the builtin namespace in
+addition to \function{_()}. Supported names are \code{'gettext'} (bound
+to \method{self.gettext()} or \method{self.ugettext()} according to the
+\var{unicode} flag), \code{'ngettext'} (bound to \method{self.ngettext()}
+or \method{self.ungettext()} according to the \var{unicode} flag),
+\code{'lgettext'} and \code{'lngettext'}.
 
 Note that this is only one way, albeit the most convenient way, to
 make the \function{_} function available to your application.  Because it
@@ -353,6 +366,8 @@ _ = t.gettext
 
 This puts \function{_} only in the module's global namespace and so
 only affects calls within this module.
+
+\versionchanged[Added the \var{names} parameter]{2.5}
 \end{methoddesc}
 
 \subsubsection{The \class{GNUTranslations} class}
@@ -534,7 +549,7 @@ The \program{pygettext}\footnote{Fran\c cois Pinard has
 written a program called
 \program{xpot} which does a similar job.  It is available as part of
 his \program{po-utils} package at
-\url{http://www.iro.umontreal.ca/contrib/po-utils/HTML/}.} program
+\url{http://po-utils.progiciels-bpi.ca/}.} program
 scans all your Python source code looking for the strings you
 previously marked as translatable.  It is similar to the GNU
 \program{gettext} program except that it understands all the
@@ -570,8 +585,8 @@ files are what the \module{gettext} module uses for the actual
 translation processing during run-time.
 
 How you use the \module{gettext} module in your code depends on
-whether you are internationalizing your entire application or a single
-module.
+whether you are internationalizing a single module or your entire application.
+The next two sections will discuss each case.
 
 \subsubsection{Localizing your module}
 

@@ -15,7 +15,7 @@ Data members:
 */
 
 #include "Python.h"
-#include "compile.h"
+#include "code.h"
 #include "frameobject.h"
 #include "eval.h"
 
@@ -125,7 +125,7 @@ sys_displayhook(PyObject *self, PyObject *o)
 PyDoc_STRVAR(displayhook_doc,
 "displayhook(object) -> None\n"
 "\n"
-"Print an object to sys.stdout and also save it in __builtin__._\n"
+"Print an object to sys.stdout and also save it in __builtin__.\n"
 );
 
 static PyObject *
@@ -200,7 +200,7 @@ static PyObject *
 sys_exit(PyObject *self, PyObject *args)
 {
 	PyObject *exit_code = 0;
-	if (!PyArg_ParseTuple(args, "|O:exit", &exit_code))
+	if (!PyArg_UnpackTuple(args, "exit", 0, 1, &exit_code))
 		return NULL;
 	/* Raise SystemExit so callers may catch it or clean up. */
 	PyErr_SetObject(PyExc_SystemExit, exit_code);
@@ -457,16 +457,16 @@ sys_settscdump(PyObject *self, PyObject *args)
 		tstate->interp->tscdump = 0;
 	Py_INCREF(Py_None);
 	return Py_None;
-	
+
 }
 
-PyDoc_STRVAR(settscdump_doc, 
+PyDoc_STRVAR(settscdump_doc,
 "settscdump(bool)\n\
 \n\
 If true, tell the Python interpreter to dump VM measurements to\n\
 stderr.  If false, turn off dump.  The measurements are based on the\n\
 processor's time-stamp counter."
-); 
+);
 #endif /* TSC */
 
 static PyObject *
@@ -476,8 +476,8 @@ sys_setrecursionlimit(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "i:setrecursionlimit", &new_limit))
 		return NULL;
 	if (new_limit <= 0) {
-		PyErr_SetString(PyExc_ValueError, 
-				"recursion limit must be positive");  
+		PyErr_SetString(PyExc_ValueError,
+				"recursion limit must be positive");
 		return NULL;
 	}
 	Py_SetRecursionLimit(new_limit);
@@ -597,17 +597,16 @@ sys_mdebug(PyObject *self, PyObject *args)
 static PyObject *
 sys_getrefcount(PyObject *self, PyObject *arg)
 {
-	return PyInt_FromLong(arg->ob_refcnt);
+	return PyInt_FromSsize_t(arg->ob_refcnt);
 }
 
 #ifdef Py_REF_DEBUG
 static PyObject *
 sys_gettotalrefcount(PyObject *self)
 {
-	return PyInt_FromLong(_Py_RefTotal);
+	return PyInt_FromSsize_t(_Py_GetRefTotal());
 }
-
-#endif /* Py_TRACE_REFS */
+#endif /* Py_REF_DEBUG */
 
 PyDoc_STRVAR(getrefcount_doc,
 "getrefcount(object) -> integer\n\
@@ -650,6 +649,10 @@ sys_getframe(PyObject *self, PyObject *args)
 
 	while (depth > 0 && f != NULL) {
 		f = f->f_back;
+#ifdef STACKLESS
+		if (f != NULL && !PyFrame_Check(f))
+			continue;
+#endif
 		--depth;
 	}
 	if (f == NULL) {
@@ -659,6 +662,21 @@ sys_getframe(PyObject *self, PyObject *args)
 	}
 	Py_INCREF(f);
 	return (PyObject*)f;
+}
+
+PyDoc_STRVAR(current_frames_doc,
+"_current_frames() -> dictionary\n\
+\n\
+Return a dictionary mapping each current thread T's thread id to T's\n\
+current stack frame.\n\
+\n\
+This function should be used for specialized purposes only."
+);
+
+static PyObject *
+sys_current_frames(PyObject *self, PyObject *noargs)
+{
+	return _PyThread_CurrentFrames();
 }
 
 PyDoc_STRVAR(call_tracing_doc,
@@ -673,7 +691,7 @@ static PyObject *
 sys_call_tracing(PyObject *self, PyObject *args)
 {
 	PyObject *func, *funcargs;
-	if (!PyArg_ParseTuple(args, "OO:call_tracing", &func, &funcargs))
+	if (!PyArg_UnpackTuple(args, "call_tracing", 2, 2, &func, &funcargs))
 		return NULL;
 	return _PyEval_CallTracing(func, funcargs);
 }
@@ -701,6 +719,10 @@ a 11-tuple where the entries in the tuple are counts of:\n\
 10. Number of stack pops performed by call_function()"
 );
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef Py_TRACE_REFS
 /* Defined in objects.c because it uses static globals if that file */
 extern PyObject *_Py_GetObjects(PyObject *, PyObject *);
@@ -711,21 +733,27 @@ extern PyObject *_Py_GetObjects(PyObject *, PyObject *);
 extern PyObject *_Py_GetDXProfile(PyObject *,  PyObject *);
 #endif
 
+#ifdef __cplusplus
+}
+#endif
+
 static PyMethodDef sys_methods[] = {
 	/* Might as well keep this in alphabetic order */
-	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS, 
+	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS,
 	 callstats_doc},
+	{"_current_frames", sys_current_frames, METH_NOARGS,
+	 current_frames_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
 	{"exc_info",	sys_exc_info, METH_NOARGS, exc_info_doc},
 	{"exc_clear",	sys_exc_clear, METH_NOARGS, exc_clear_doc},
 	{"excepthook",	sys_excepthook, METH_VARARGS, excepthook_doc},
 	{"exit",	sys_exit, METH_VARARGS, exit_doc},
 #ifdef Py_USING_UNICODE
-	{"getdefaultencoding", (PyCFunction)sys_getdefaultencoding, 
-	 METH_NOARGS, getdefaultencoding_doc}, 
+	{"getdefaultencoding", (PyCFunction)sys_getdefaultencoding,
+	 METH_NOARGS, getdefaultencoding_doc},
 #endif
 #ifdef HAVE_DLOPEN
-	{"getdlopenflags", (PyCFunction)sys_getdlopenflags, METH_NOARGS, 
+	{"getdlopenflags", (PyCFunction)sys_getdlopenflags, METH_NOARGS,
 	 getdlopenflags_doc},
 #endif
 #ifdef COUNT_ALLOCS
@@ -736,7 +764,7 @@ static PyMethodDef sys_methods[] = {
 #endif
 #ifdef Py_USING_UNICODE
 	{"getfilesystemencoding", (PyCFunction)sys_getfilesystemencoding,
-	 METH_NOARGS, getfilesystemencoding_doc}, 
+	 METH_NOARGS, getfilesystemencoding_doc},
 #endif
 #ifdef Py_TRACE_REFS
 	{"getobjects",	_Py_GetObjects, METH_VARARGS},
@@ -757,14 +785,14 @@ static PyMethodDef sys_methods[] = {
 #endif
 #ifdef Py_USING_UNICODE
 	{"setdefaultencoding", sys_setdefaultencoding, METH_VARARGS,
-	 setdefaultencoding_doc}, 
+	 setdefaultencoding_doc},
 #endif
 	{"setcheckinterval",	sys_setcheckinterval, METH_VARARGS,
-	 setcheckinterval_doc}, 
+	 setcheckinterval_doc},
 	{"getcheckinterval",	sys_getcheckinterval, METH_NOARGS,
-	 getcheckinterval_doc}, 
+	 getcheckinterval_doc},
 #ifdef HAVE_DLOPEN
-	{"setdlopenflags", sys_setdlopenflags, METH_VARARGS, 
+	{"setdlopenflags", sys_setdlopenflags, METH_VARARGS,
 	 setdlopenflags_doc},
 #endif
 	{"setprofile",	sys_setprofile, METH_O, setprofile_doc},
@@ -934,6 +962,95 @@ _check_and_flush (FILE *stream)
   return fflush (stream) || prev_fail ? EOF : 0;
 }
 
+/* Subversion branch and revision management */
+static const char _patchlevel_revision[] = PY_PATCHLEVEL_REVISION;
+static const char headurl[] = "$HeadURL: http://svn.python.org/projects/stackless/tags/python-2.51/Python/sysmodule.c $";
+static int svn_initialized;
+static char patchlevel_revision[50]; /* Just the number */
+static char branch[50];
+static char shortbranch[50];
+static const char *svn_revision;
+
+static void
+svnversion_init(void)
+{
+	const char *python, *br_start, *br_end, *br_end2, *svnversion;
+	Py_ssize_t len;
+	int istag;
+
+	if (svn_initialized)
+		return;
+
+#if defined(STACKLESS) || defined(STACKLESS_OFF)
+	python = strstr(headurl, "/stackless/");
+#else
+	python = strstr(headurl, "/python/");
+#endif
+	if (!python)
+		Py_FatalError("subversion keywords missing");
+
+	br_start = python + 11;
+	br_end = strchr(br_start, '/');
+	assert(br_end);
+
+	/* Works even for trunk,
+	   as we are in trunk/Python/sysmodule.c */
+	br_end2 = strchr(br_end+1, '/');
+
+	istag = strncmp(br_start, "tags", 4) == 0;
+	if (strncmp(br_start, "trunk", 5) == 0) {
+		strcpy(branch, "trunk");
+		strcpy(shortbranch, "trunk");
+
+	}
+	else if (istag || strncmp(br_start, "branches", 8) == 0) {
+		len = br_end2 - br_start;
+		strncpy(branch, br_start, len);
+		branch[len] = '\0';
+
+		len = br_end2 - (br_end + 1);
+		strncpy(shortbranch, br_end + 1, len);
+		shortbranch[len] = '\0';
+	}
+	else {
+		Py_FatalError("bad HeadURL");
+		return;
+	}
+
+
+	svnversion = _Py_svnversion();
+	if (strcmp(svnversion, "exported") != 0)
+		svn_revision = svnversion;
+	else if (istag) {
+		len = strlen(_patchlevel_revision);
+		strncpy(patchlevel_revision, _patchlevel_revision + 11,
+			len - 13);
+		patchlevel_revision[len - 13] = '\0';
+		svn_revision = patchlevel_revision;
+	}
+	else
+		svn_revision = "";
+
+	svn_initialized = 1;
+}
+
+/* Return svnversion output if available.
+   Else return Revision of patchlevel.h if on branch.
+   Else return empty string */
+const char*
+Py_SubversionRevision()
+{
+	svnversion_init();
+	return svn_revision;
+}
+
+const char*
+Py_SubversionShortBranch()
+{
+	svnversion_init();
+	return shortbranch;
+}
+
 PyObject *
 _PySys_Init(void)
 {
@@ -941,10 +1058,12 @@ _PySys_Init(void)
 	PyObject *sysin, *sysout, *syserr;
 	char *s;
 #ifdef MS_WINDOWS
-	char buf[10];
+	char buf[128];
 #endif
 
 	m = Py_InitModule3("sys", sys_methods, sys_doc);
+	if (m == NULL)
+		return NULL;
 	sysdict = PyModule_GetDict(m);
 
 	{
@@ -952,7 +1071,10 @@ _PySys_Init(void)
 		struct stat sb;
 		if (fstat(fileno(stdin), &sb) == 0 &&
 		    S_ISDIR(sb.st_mode)) {
-			Py_FatalError("<stdin> is a directory");
+			/* There's nothing more we can do. */
+			/* Py_FatalError() will core dump, so just exit. */
+			PySys_WriteStderr("Python error: <stdin> is a directory, cannot continue\n");
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -971,14 +1093,19 @@ _PySys_Init(void)
 	if (PyErr_Occurred())
 		return NULL;
 #ifdef MS_WINDOWS
-	if(isatty(_fileno(stdin))){
+	if(isatty(_fileno(stdin)) && PyFile_Check(sysin)) {
 		sprintf(buf, "cp%d", GetConsoleCP());
 		if (!PyFile_SetEncoding(sysin, buf))
 			return NULL;
 	}
-	if(isatty(_fileno(stdout))) {
+	if(isatty(_fileno(stdout)) && PyFile_Check(sysout)) {
 		sprintf(buf, "cp%d", GetConsoleOutputCP());
 		if (!PyFile_SetEncoding(sysout, buf))
+			return NULL;
+	}
+	if(isatty(_fileno(stderr)) && PyFile_Check(syserr)) {
+		sprintf(buf, "cp%d", GetConsoleOutputCP());
+		if (!PyFile_SetEncoding(syserr, buf))
 			return NULL;
 	}
 #endif
@@ -1003,6 +1130,10 @@ _PySys_Init(void)
 	PyDict_SetItemString(sysdict, "hexversion",
 			     v = PyInt_FromLong(PY_VERSION_HEX));
 	Py_XDECREF(v);
+	svnversion_init();
+	v = Py_BuildValue("(ssz)", "CPython", branch, svn_revision);
+	PyDict_SetItemString(sysdict, "subversion", v);
+	Py_XDECREF(v);
 	/*
 	 * These release level checks are mutually exclusive and cover
 	 * the field, so don't get too fancy with the pre-processor!
@@ -1016,41 +1147,38 @@ _PySys_Init(void)
 #elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_FINAL
 	s = "final";
 #endif
-	PyDict_SetItemString(sysdict, "version_info",
-			     v = Py_BuildValue("iiisi", PY_MAJOR_VERSION,
+
+#define SET_SYS_FROM_STRING(key, value)			\
+	v = value;					\
+	if (v != NULL)					\
+		PyDict_SetItemString(sysdict, key, v);	\
+	Py_XDECREF(v)
+
+	SET_SYS_FROM_STRING("version_info",
+			    Py_BuildValue("iiisi", PY_MAJOR_VERSION,
 					       PY_MINOR_VERSION,
 					       PY_MICRO_VERSION, s,
 					       PY_RELEASE_SERIAL));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "api_version",
-			     v = PyInt_FromLong(PYTHON_API_VERSION));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "copyright",
-			     v = PyString_FromString(Py_GetCopyright()));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "platform",
-			     v = PyString_FromString(Py_GetPlatform()));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "executable",
-			     v = PyString_FromString(Py_GetProgramFullPath()));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "prefix",
-			     v = PyString_FromString(Py_GetPrefix()));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "exec_prefix",
-		   v = PyString_FromString(Py_GetExecPrefix()));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "maxint",
-			     v = PyInt_FromLong(PyInt_GetMax()));
-	Py_XDECREF(v);
+	SET_SYS_FROM_STRING("api_version",
+			    PyInt_FromLong(PYTHON_API_VERSION));
+	SET_SYS_FROM_STRING("copyright",
+			    PyString_FromString(Py_GetCopyright()));
+	SET_SYS_FROM_STRING("platform",
+			    PyString_FromString(Py_GetPlatform()));
+	SET_SYS_FROM_STRING("executable",
+			    PyString_FromString(Py_GetProgramFullPath()));
+	SET_SYS_FROM_STRING("prefix",
+			    PyString_FromString(Py_GetPrefix()));
+	SET_SYS_FROM_STRING("exec_prefix",
+		   	    PyString_FromString(Py_GetExecPrefix()));
+	SET_SYS_FROM_STRING("maxint",
+			    PyInt_FromLong(PyInt_GetMax()));
 #ifdef Py_USING_UNICODE
-	PyDict_SetItemString(sysdict, "maxunicode",
-			     v = PyInt_FromLong(PyUnicode_GetMax()));
-	Py_XDECREF(v);
+	SET_SYS_FROM_STRING("maxunicode",
+			    PyInt_FromLong(PyUnicode_GetMax()));
 #endif
-	PyDict_SetItemString(sysdict, "builtin_module_names",
-		   v = list_builtin_module_names());
-	Py_XDECREF(v);
+	SET_SYS_FROM_STRING("builtin_module_names",
+			    list_builtin_module_names());
 	{
 		/* Assumes that longs are at least 2 bytes long.
 		   Should be safe! */
@@ -1062,18 +1190,16 @@ _PySys_Init(void)
 			value = "big";
 		else
 			value = "little";
-		PyDict_SetItemString(sysdict, "byteorder",
-				     v = PyString_FromString(value));
-		Py_XDECREF(v);
+		SET_SYS_FROM_STRING("byteorder",
+				    PyString_FromString(value));
 	}
 #ifdef MS_COREDLL
-	PyDict_SetItemString(sysdict, "dllhandle",
-			     v = PyLong_FromVoidPtr(PyWin_DLLhModule));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "winver",
-			     v = PyString_FromString(PyWin_DLLVersionString));
-	Py_XDECREF(v);
+	SET_SYS_FROM_STRING("dllhandle",
+			    PyLong_FromVoidPtr(PyWin_DLLhModule));
+	SET_SYS_FROM_STRING("winver",
+			    PyString_FromString(PyWin_DLLVersionString));
 #endif
+#undef SET_SYS_FROM_STRING
 	if (warnoptions == NULL) {
 		warnoptions = PyList_New(0);
 	}
@@ -1083,7 +1209,7 @@ _PySys_Init(void)
 	if (warnoptions != NULL) {
 		PyDict_SetItemString(sysdict, "warnoptions", warnoptions);
 	}
-	
+
 	if (PyErr_Occurred())
 		return NULL;
 	return m;
@@ -1095,7 +1221,7 @@ makepathobject(char *path, int delim)
 	int i, n;
 	char *p;
 	PyObject *v, *w;
-	
+
 	n = 1;
 	p = path;
 	while ((p = strchr(p, delim)) != NULL) {
@@ -1109,7 +1235,7 @@ makepathobject(char *path, int delim)
 		p = strchr(path, delim);
 		if (p == NULL)
 			p = strchr(path, '\0'); /* End of string */
-		w = PyString_FromStringAndSize(path, (int) (p - path));
+		w = PyString_FromStringAndSize(path, (Py_ssize_t) (p - path));
 		if (w == NULL) {
 			Py_DECREF(v);
 			return NULL;
@@ -1191,7 +1317,7 @@ PySys_SetArgv(int argc, char **argv)
 	if (path != NULL) {
 		char *argv0 = argv[0];
 		char *p = NULL;
-		int n = 0;
+		Py_ssize_t n = 0;
 		PyObject *a;
 #ifdef HAVE_READLINK
 		char link[MAXPATHLEN+1];
@@ -1318,7 +1444,7 @@ mywrite(char *name, FILE *fp, const char *format, va_list va)
 			PyErr_Clear();
 			fputs(buffer, fp);
 		}
-		if (written < 0 || written >= sizeof(buffer)) {
+		if (written < 0 || (size_t)written >= sizeof(buffer)) {
 			const char *truncated = "... truncated";
 			if (PyFile_WriteString(truncated, file) != 0) {
 				PyErr_Clear();

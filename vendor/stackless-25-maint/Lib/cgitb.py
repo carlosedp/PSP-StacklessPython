@@ -22,7 +22,8 @@ The default handler displays output as HTML.
 """
 
 __author__ = 'Ka-Ping Yee'
-__version__ = '$Revision: 39082 $'
+
+__version__ = '$Revision: 39758 $'
 
 import sys
 
@@ -149,7 +150,7 @@ function calls leading up to the error, in the order they occurred.</p>'''
             if name in done: continue
             done[name] = 1
             if value is not __UNDEF__:
-                if where in ['global', 'builtin']:
+                if where in ('global', 'builtin'):
                     name = ('<em>%s</em> ' % where) + strong(name)
                 elif where == 'local':
                     name = strong(name)

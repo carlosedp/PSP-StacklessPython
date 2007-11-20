@@ -28,13 +28,15 @@ Python; typically Microsoft Visual \Cpp.
 \section{A Cookbook Approach \label{win-cookbook}}
 
 There are two approaches to building extension modules on Windows,
-just as there are on \UNIX: use the \refmodule{distutils} package to
+just as there are on \UNIX: use the
+\ulink{\module{distutils}}{../lib/module-distutils.html} package to
 control the build process, or do things manually.  The distutils
 approach works well for most extensions; documentation on using
-\refmodule{distutils} to build and package extension modules is
-available in \citetitle[../dist/dist.html]{Distributing Python
-Modules}.  This section describes the manual approach to building
-Python extensions written in C or \Cpp.
+\ulink{\module{distutils}}{../lib/module-distutils.html} to build and
+package extension modules is available in
+\citetitle[../dist/dist.html]{Distributing Python Modules}.  This
+section describes the manual approach to building Python extensions
+written in C or \Cpp.
 
 To build extensions using these instructions, you need to have a copy
 of the Python sources of the same version as your installed Python.
@@ -88,7 +90,7 @@ described here are distributed with the Python sources in the
     Once the Debug build has succeeded, bring up a DOS box, and change
     to the \file{example_nt\textbackslash Debug} directory.  You
     should now be able to repeat the following session (\code{C>} is
-    the DOS prompt, \code{>\code{>}>} is the Python prompt; note that
+    the DOS prompt, \code{>>>} is the Python prompt; note that
     build information and various debug output from Python may not
     match this screen dump exactly):
 

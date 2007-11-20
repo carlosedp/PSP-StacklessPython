@@ -1,7 +1,3 @@
-#
-# Instant Python
-# $Id: tkMessageBox.py 37376 2004-09-18 16:01:23Z loewis $
-#
 # tk common message boxes
 #
 # this module provides an interface to the native message boxes
@@ -67,9 +63,10 @@ class Message(Dialog):
 #
 # convenience stuff
 
-def _show(title=None, message=None, icon=None, type=None, **options):
-    if icon:    options["icon"] = icon
-    if type:    options["type"] = type
+# Rename _icon and _type options to allow overriding them in options
+def _show(title=None, message=None, _icon=None, _type=None, **options):
+    if _icon and "icon" not in options:    options["icon"] = _icon
+    if _type and "type" not in options:    options["type"] = _type
     if title:   options["title"] = title
     if message: options["message"] = message
     res = Message(**options).show()

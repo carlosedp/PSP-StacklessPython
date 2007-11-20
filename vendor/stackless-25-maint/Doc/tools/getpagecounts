@@ -2,7 +2,7 @@
 
 """Generate a page count report of the PostScript version of the manuals."""
 
-__version__ = '$Revision: 39597 $'
+__version__ = '$Revision: 39598 $'
 
 import getopt
 import sys

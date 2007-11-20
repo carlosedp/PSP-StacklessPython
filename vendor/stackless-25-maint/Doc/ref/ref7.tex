@@ -46,6 +46,7 @@ Summarizing:
   \productioncont{| \token{while_stmt}}
   \productioncont{| \token{for_stmt}}
   \productioncont{| \token{try_stmt}}
+  \productioncont{| \token{with_stmt}}
   \productioncont{| \token{funcdef}}
   \productioncont{| \token{classdef}}
   \production{suite}
@@ -195,26 +196,25 @@ The \keyword{try} statement specifies exception handlers and/or cleanup
 code for a group of statements:
 
 \begin{productionlist}
-  \production{try_stmt}
-             {\token{try_exc_stmt} | \token{try_fin_stmt}}
-  \production{try_exc_stmt}
+  \production{try_stmt} {try1_stmt | try2_stmt}
+  \production{try1_stmt}
              {"try" ":" \token{suite}}
   \productioncont{("except" [\token{expression}
                              ["," \token{target}]] ":" \token{suite})+}
   \productioncont{["else" ":" \token{suite}]}
-  \production{try_fin_stmt}
-             {"try" ":" \token{suite}
-              "finally" ":" \token{suite}}
+  \productioncont{["finally" ":" \token{suite}]}
+  \production{try2_stmt}
+             {"try" ":" \token{suite}}
+  \productioncont{"finally" ":" \token{suite}}
 \end{productionlist}
 
-There are two forms of \keyword{try} statement:
-\keyword{try}...\keyword{except} and
-\keyword{try}...\keyword{finally}.  These forms cannot be mixed (but
-they can be nested in each other).
+\versionchanged[In previous versions of Python,
+\keyword{try}...\keyword{except}...\keyword{finally} did not work.
+\keyword{try}...\keyword{except} had to be nested in
+\keyword{try}...\keyword{finally}]{2.5}
 
-The \keyword{try}...\keyword{except} form specifies one or more
-exception handlers
-(the \keyword{except} clauses).  When no exception occurs in the
+The \keyword{except} clause(s) specify one or more exception handlers.
+When no exception occurs in the
 \keyword{try} clause, no exception handler is executed.  When an
 exception occurs in the \keyword{try} suite, a search for an exception
 handler is started.  This search inspects the except clauses in turn until
@@ -223,15 +223,17 @@ clause, if present, must be last; it matches any exception.  For an
 except clause with an expression, that expression is evaluated, and the
 clause matches the exception if the resulting object is ``compatible''
 with the exception.  An object is compatible with an exception if it
-is either the object that identifies the exception, or (for exceptions
-that are classes) it is a base class of the exception, or it is a
-tuple containing an item that is compatible with the exception.  Note
-that the object identities must match, i.e. it must be the same
-object, not just an object with the same value.
+is the class or a base class of the exception object, a tuple
+containing an item compatible with the exception, or, in the
+(deprecated) case of string exceptions, is the raised string itself
+(note that the object identities must match, i.e. it must be the same
+string object, not just a string with the same value).
 \kwindex{except}
 
 If no except clause matches the exception, the search for an exception
 handler continues in the surrounding code and on the invocation stack.
+\footnote{The exception is propogated to the invocation stack only if
+there is no \keyword{finally} clause that negates the exception.}
 
 If the evaluation of an expression in the header of an except clause
 raises an exception, the original search for a handler is canceled
@@ -239,14 +241,14 @@ and a search starts for the new exception in the surrounding code and
 on the call stack (it is treated as if the entire \keyword{try} statement
 raised the exception).
 
-When a matching except clause is found, the exception's parameter is
-assigned to the target specified in that except clause, if present,
-and the except clause's suite is executed.  All except clauses must
-have an executable block.  When the end of this block
-is reached, execution continues normally after the entire try
-statement.  (This means that if two nested handlers exist for the same
-exception, and the exception occurs in the try clause of the inner
-handler, the outer handler will not handle the exception.)
+When a matching except clause is found, the exception is assigned to
+the target specified in that except clause, if present, and the except
+clause's suite is executed.  All except clauses must have an
+executable block.  When the end of this block is reached, execution
+continues normally after the entire try statement.  (This means that
+if two nested handlers exist for the same exception, and the exception
+occurs in the try clause of the inner handler, the outer handler will
+not handle the exception.)
 
 Before an except clause's suite is executed, details about the
 exception are assigned to three variables in the
@@ -277,18 +279,16 @@ preceding \keyword{except} clauses.
 \stindex{break}
 \stindex{continue}
 
-The \keyword{try}...\keyword{finally} form specifies a `cleanup' handler.  The
-\keyword{try} clause is executed.  When no exception occurs, the
-\keyword{finally} clause is executed.  When an exception occurs in the
-\keyword{try} clause, the exception is temporarily saved, the
-\keyword{finally} clause is executed, and then the saved exception is
-re-raised.  If the \keyword{finally} clause raises another exception or
+If \keyword{finally} is present, it specifies a `cleanup' handler.  The
+\keyword{try} clause is executed, including any \keyword{except} and
+\keyword{else} clauses.  If an exception occurs in any of the clauses
+and is not handled, the exception is temporarily saved. The
+\keyword{finally} clause is executed.  If there is a saved exception,
+it is re-raised at the end of the \keyword{finally} clause.
+If the \keyword{finally} clause raises another exception or
 executes a \keyword{return} or \keyword{break} statement, the saved
-exception is lost.  A \keyword{continue} statement is illegal in the
-\keyword{finally} clause.  (The reason is a problem with the current
-implementation -- this restriction may be lifted in the future).  The
-exception information is not available to the program during execution of
-the \keyword{finally} clause.
+exception is lost.  The exception information is not available to the
+program during execution of the \keyword{finally} clause.
 \kwindex{finally}
 
 When a \keyword{return}, \keyword{break} or \keyword{continue} statement is
@@ -305,6 +305,75 @@ Additional information on exceptions can be found in
 section~\ref{exceptions}, and information on using the \keyword{raise}
 statement to generate exceptions may be found in section~\ref{raise}.
 
+
+\section{The \keyword{with} statement\label{with}}
+\stindex{with}
+
+\versionadded{2.5}
+
+The \keyword{with} statement is used to wrap the execution of a block
+with methods defined by a context manager (see
+section~\ref{context-managers}). This allows common
+\keyword{try}...\keyword{except}...\keyword{finally} usage patterns to
+be encapsulated for convenient reuse.
+
+\begin{productionlist}
+  \production{with_stmt}
+  {"with" \token{expression} ["as" \token{target}] ":" \token{suite}}
+\end{productionlist}
+
+The execution of the \keyword{with} statement proceeds as follows:
+
+\begin{enumerate}
+
+\item The context expression is evaluated to obtain a context manager.
+
+\item The context manager's \method{__enter__()} method is invoked.
+
+\item If a target was included in the \keyword{with}
+statement, the return value from \method{__enter__()} is assigned to it.
+
+\note{The \keyword{with} statement guarantees that if the
+\method{__enter__()} method returns without an error, then
+\method{__exit__()} will always be called. Thus, if an error occurs
+during the assignment to the target list, it will be treated the same as
+an error occurring within the suite would be. See step 5 below.}
+
+\item The suite is executed.
+
+\item The context manager's \method{__exit__()} method is invoked. If
+an exception caused the suite to be exited, its type, value, and
+traceback are passed as arguments to \method{__exit__()}. Otherwise,
+three \constant{None} arguments are supplied.
+
+If the suite was exited due to an exception, and the return
+value from the \method{__exit__()} method was false, the exception is
+reraised. If the return value was true, the exception is suppressed, and
+execution continues with the statement following the \keyword{with}
+statement.
+
+If the suite was exited for any reason other than an exception, the
+return value from \method{__exit__()} is ignored, and execution proceeds
+at the normal location for the kind of exit that was taken.
+
+\end{enumerate}
+
+\begin{notice}
+In Python 2.5, the \keyword{with} statement is only allowed
+when the \code{with_statement} feature has been enabled.  It will always
+be enabled in Python 2.6.  This \code{__future__} import statement can
+be used to enable the feature:
+
+\begin{verbatim}
+from __future__ import with_statement
+\end{verbatim}
+\end{notice}
+
+\begin{seealso}
+  \seepep{0343}{The "with" statement}
+         {The specification, background, and examples for the
+          Python \keyword{with} statement.}
+\end{seealso}
 
 \section{Function definitions\label{function}}
 \indexii{function}{definition}
@@ -441,7 +510,7 @@ A class definition defines a class object (see section~\ref{types}):
              {"class" \token{classname} [\token{inheritance}] ":"
               \token{suite}}
   \production{inheritance}
-             {"(" \token{expression_list} ")"}
+             {"(" [\token{expression_list}] ")"}
   \production{classname}
              {\token{identifier}}
 \end{productionlist}
