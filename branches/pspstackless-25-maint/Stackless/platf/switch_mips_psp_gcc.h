@@ -2,7 +2,9 @@
  * this is the internal transfer function.
  *
  * HISTORY
- * 18-Jun-07 File creation. Ported from Arm Thumb. Carlos Eduardo de Paula
+ * 18-Jun-07 File creation. Ported from Arm Thumb. - Carlos Eduardo de Paula
+ * 01-Oct-07 Added registers "ra", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"
+ *           that prevented Stackless to shut down appropriately freezing PSP.
  *
  * NOTES
  *
@@ -16,7 +18,7 @@
 
 #ifdef SLP_EVAL
 #define STACK_MAGIC 0
-#define REGS_TO_SAVE "$sp", "$fp"
+#define REGS_TO_SAVE "fp", "sp", "ra", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"
 
 
 static int

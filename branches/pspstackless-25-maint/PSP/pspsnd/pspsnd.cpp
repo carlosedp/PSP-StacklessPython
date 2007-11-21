@@ -48,8 +48,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 PyObject* PySndError;
 
 static PyObject* pspsnd_setMusicVolume(PyObject *self,
-                                       PyObject *args,
-                                       PyObject *kwargs)
+                                       PyObject *args)
 {
     int volume;
 
@@ -72,8 +71,7 @@ static PyObject* pspsnd_setMusicVolume(PyObject *self,
 }
 
 static PyObject* pspsnd_setSndFxVolume(PyObject *self,
-                                       PyObject *args,
-                                       PyObject *kwargs)
+                                       PyObject *args)
 {
     int volume;
 

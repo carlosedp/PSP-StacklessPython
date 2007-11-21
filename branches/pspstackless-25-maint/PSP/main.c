@@ -1,14 +1,25 @@
-
 #include <pspkernel.h>
 #include <pspdebug.h>
 #include <pspctrl.h>
 #include <pspsdk.h>
 #include <pspiofilemgr.h>
 #include <psppower.h>
-
+#include <psputility_netmodules.h>
+#include <psputility_sysparam.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+#ifdef WITH_SSL
+/* Include OpenSSL header files */
+#include "openssl/rsa.h"
+#include "openssl/crypto.h"
+#include "openssl/x509.h"
+#include "openssl/pem.h"
+#include "openssl/ssl.h"
+#include "openssl/err.h"
+#include "openssl/rand.h"
+#endif
 
 #ifdef WITH_PSP2D
 #include <pspgu.h>
@@ -20,151 +31,129 @@
 
 #include "Python.h"
 
-#define SYNCSTDOUT
-
-PSP_MODULE_INFO("Python", 0x1000, 1, 1);
-PSP_MAIN_THREAD_ATTR(0);
+#define VERS    2
+#define REVS    51
+PSP_MODULE_INFO("StacklessPython", 0, VERS, REVS);
+PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER|PSP_THREAD_ATTR_VFPU);
+PSP_HEAP_SIZE_KB(18*1024); /* Use 18Mb */
+PSP_MAIN_THREAD_STACK_SIZE_KB(64);
 
 volatile int pspInterruptOccurred = 0;
 
-static char* save_argv0;
-
-/* Output handler */
-
-static SceUID fd_stdout = 0;
-
-static int my_stdout(const char *data, int len)
-{
-    if (!fd_stdout)
-       fd_stdout = sceIoOpen("ms0:/pytrace.txt", PSP_O_WRONLY|PSP_O_CREAT
-#ifdef SYNCSTDOUT
-                             |PSP_O_APPEND
-#else
-                             |PSP_O_TRUNC
-#endif
-                             , 0777);
-
-    if (fd_stdout)
-    {
-       int w = sceIoWrite(fd_stdout, data, len);
-#ifdef SYNCSTDOUT
-       sceIoClose(fd_stdout);
-       fd_stdout = 0;
-#endif
-       return w;
-    }
-    else
-       return len;
-}
-
-/* Exit callback */
-int exit_callback(int arg1, int arg2, void *common)
-{
+/*!
+*	Exit callback function
+*/
+int exit_callback(int arg1, int arg2, void *common) {
 #ifdef WITH_OSL
     osl_quit = 1;
 #else
     pspInterruptOccurred = 1;
 #endif
-
+    fclose(stdout);
+    fclose(stderr);
+    sceKernelExitGame();
     return 0;
 }
 
-/* Callback thread */
-int CallbackThread(SceSize args, void *argp)
-{
+/*!
+*	Callback thread function
+*/
+int CallbackThread(SceSize args, void *argp) {
     int cbid;
 
     cbid = sceKernelCreateCallback("Exit Callback", exit_callback, NULL);
     sceKernelRegisterExitCallback(cbid);
+
     sceKernelSleepThreadCB();
 
     return 0;
 }
 
-/* Sets up the callback thread and returns its thread id */
-int SetupCallbacks(void)
-{
+/*!
+*	Sets up the callback thread and
+*	returns its thread id function
+*/
+int SetupCallbacks(void) {
     int thid = 0;
 
-    thid = sceKernelCreateThread("update_thread", CallbackThread,
-                                 0x11, 0xFA0, 0, 0);
-    if(thid >= 0)
-    {
-       sceKernelStartThread(thid, 0, 0);
+    thid = sceKernelCreateThread("update_thread", CallbackThread, 0x11, 0xFA0, 0, 0);   //als er foutenzijn dan  kan het hieraanliggen
+    if(thid >= 0) {
+        sceKernelStartThread(thid, 0, 0);
     }
 
     return thid;
 }
 
-int main_thread(SceSize args, void *argp)
-{
-    FILE *fp;
-    int argc = 1;
-    char *argv[] = {save_argv0};
+/*!
+*	Inits timezone based on PSP settings
+*/
 
-    /*
-    char *path;
-    int sz;
-    */
 
+void initTimezone() {
+    int tzOffset = 0;
+    sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIMEZONE, &tzOffset);
+    int tzOffsetAbs = tzOffset < 0 ? -tzOffset : tzOffset;
+    int hours = tzOffsetAbs / 60;
+    int minutes = tzOffsetAbs - hours * 60;
+    int pspDaylight = 0;
+    sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_DAYLIGHTSAVINGS, &pspDaylight);
+    static char tz[18];
+    sprintf(tz, "GMT%s%02i:%02i%s", tzOffset < 0 ? "+" : "-", hours, minutes, pspDaylight ? " DST" : "");
+    setenv("TZ", tz, 1);
+    tzset();
+}
+
+int main(int argc, char *argv[]) {
     SetupCallbacks();
+    stdout = fopen("ms0:/pytrace.txt", "a+");
+    stderr = stdout;
 
-    if (pspSdkInetInit())
-       return 1;
+    initTimezone();
+    time_t now;
+    sceKernelLibcTime(&now);
+
+    if (sceUtilityLoadNetModule(1) < 0)
+        return 1;
+    if(sceUtilityLoadNetModule(3) < 0)
+        return 1;
+    if(pspSdkInetInit() != 0)
+        return 1;
 
 #ifdef WITH_PSP2D
     sceGuInit();
 #endif
+#ifdef WITH_OSLIB
+    oslInit(1);
+#endif
 
-    /*
+#ifdef WITH_SSL
+    /* Start the random number generator */
+    time_t start_time;
+    start_time = time(NULL);
+    RAND_seed((unsigned char *)&start_time, sizeof(time_t));
+#endif
 
-    path = strdup(save_argv0);
-    sz = strlen(path);
+    char path[1024];
+    printf("-------------- Python-PSP started %s\n", ctime(&now));
+    printf("Free memory: %d\n", sceKernelTotalFreeMemSize());
+    printf("PyPSP running in: %s\n", getcwd(path, sizeof(path)));
+    printf("Search path: %s\n", Py_GetPath());
+    printf("\n");
 
-    if (sz > 0)
-    {
-       if (path[sz - 1] == '/')
-       {
-          chdir(path);
-       }
-       else
-       {
-          int k = sz - 1;
-
-          while ((k >= 0) && (path[k] != '/'))
-          {
-             --k;
-          }
-
-          if (k >= 0)
-          {
-             path[k + 1] = 0;
-
-             chdir(path);
-          }
-       }
-    }
-
-    free(path);
-
-    */
-
+    scePowerSetClockFrequency(333, 333, 166);
+    FILE *fp;
     PySys_ResetWarnOptions();
     Py_SetProgramName("python");
 
     Py_Initialize();
-
     PySys_SetArgv(argc, argv);
-
+    
     fp = fopen("script.py", "r");
-    if (fp)
-    {
-       PyRun_SimpleFile(fp, "script.py");
-       fclose(fp);
-    }
-    else
-    {
-       printf("Error - could not open script.py\n");
+    if (fp) {
+        PyRun_SimpleFile(fp, "script.py");
+        fclose(fp);
+    } else {
+        printf("Error - could not open script.py\n");
     }
 
     Py_Finalize();
@@ -172,54 +161,15 @@ int main_thread(SceSize args, void *argp)
 #ifdef WITH_PSP2D
     sceGuTerm();
 #endif
-
-    pspSdkInetTerm();
-
-    if (fd_stdout)
-       sceIoClose(fd_stdout);
-
-    sceKernelExitGame();
-
-    return 0;
-}
-
-int main(int argc, char *argv[])
-{
-#ifndef WITH_OSLIB
-    SceUID thid;
-#endif
-    tzset();
-    time_t now;
-
-    save_argv0 = strdup(argv[0]);
-
-#ifdef WITH_OSLIB
-    oslInit(1);
-#endif
-
-    if(pspSdkLoadInetModules() < 0)
-       return 1;
-
-    pspDebugInstallStdoutHandler(my_stdout);
-    pspDebugInstallStderrHandler(my_stdout);
-
-    now = time(NULL);
-    printf("Python-PSP started %s\n", ctime(&now));
-    printf("Free memory: %d\n", sceKernelTotalFreeMemSize());
-    printf("Search path: %s\n", Py_GetPath());
-    printf("\n");
-
-    scePowerSetClockFrequency(333, 333, 166);
-
-#ifdef WITH_OSLIB
-    main_thread(0, NULL);
+    //pspSdkInetTerm();
+#ifdef WITH_OSL
+    osl_quit = 1;
 #else
-    thid = sceKernelCreateThread("python_thread", main_thread, 0x18, 0x10000,
-                                 PSP_THREAD_ATTR_USER|PSP_THREAD_ATTR_VFPU, NULL);
-    sceKernelStartThread(thid, 0, NULL);
-
-    sceKernelExitDeleteThread(0);
+    pspInterruptOccurred = 1;
 #endif
-
+    printf("--------------------------------------------------------------------------------\n");
+    fclose(stdout);
+    fclose(stderr);
+    sceKernelExitGame();
     return 0;
 }

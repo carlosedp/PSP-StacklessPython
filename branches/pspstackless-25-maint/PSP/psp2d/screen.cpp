@@ -30,6 +30,9 @@ static PyObject* screen_new(PyTypeObject *type,
 {
     PyScreen *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyScreen*)type->tp_alloc(type, 0);
 
     if (self)
@@ -42,7 +45,10 @@ static int screen_init(PyScreen *self,
                       PyObject *args,
                       PyObject *kwargs)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":__init__"))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     self->scr = Screen::getInstance();
@@ -55,17 +61,21 @@ static PyObject* screen_blit(PyScreen *self,
                              PyObject *kwargs)
 {
     int sx = 0, sy = 0, w = -1, h = -1, dx = 0, dy = 0, blend = 0, dw = -1, dh = -1;
+    double scaleX, scaleY;
     PyImage *img;
 
     static char* kwids[] = { "src", "sx", "sy", "w", "h", "dx", "dy", "blend", "dw", "dh", NULL };
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "O|iiiiiiiii", kwids,
+                                     "O|iiiiiiiii:blit", kwids,
                                      &img,
                                      &sx, &sy, &w, &h,
                                      &dx, &dy,
                                      &blend,
                                      &dw, &dh))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)img)->ob_type, PPyImageType))
@@ -83,6 +93,15 @@ static PyObject* screen_blit(PyScreen *self,
     if (h == -1)
        h = (int)img->img->getHeight();
 
+    if (dw < 0)
+       dw = w;
+
+    if (dh < 0)
+       dh = h;
+
+    scaleX = (double)dw / w;
+    scaleY = (double)dh / h;
+
     // Sanity checks
 
     if ((dx >= SCREEN_WIDTH) || (dy >= SCREEN_HEIGHT))
@@ -91,11 +110,13 @@ static PyObject* screen_blit(PyScreen *self,
        return Py_None;
     }
 
-    w = MIN(w, SCREEN_WIDTH - dx);
     w = MIN(w, (int)img->img->getWidth() - sx);
+    if (dx + scaleX * w >= SCREEN_WIDTH)
+       w = (int)((SCREEN_WIDTH - dx) / scaleX);
 
-    h = MIN(h, SCREEN_HEIGHT - dy);
     h = MIN(h, (int)img->img->getHeight() - sy);
+    if (dy + scaleY * h >= SCREEN_HEIGHT)
+       h = (int)((SCREEN_HEIGHT - dy) / scaleY);
 
     if ((w <= 0) || (h <= 0))
     {
@@ -105,19 +126,21 @@ static PyObject* screen_blit(PyScreen *self,
 
     // OK
 
-    self->scr->blit(img->img, sx, sy, w, h, dx, dy, blend, dw, dh);
+    self->scr->blit(img->img, sx, sy, w, h, dx, dy, blend, scaleX, scaleY);
 
     Py_INCREF(Py_None);
     return Py_None;
 }
 
 static PyObject* screen_clear(PyScreen *self,
-                              PyObject *args,
-                              PyObject *kwargs)
+                              PyObject *args)
 {
     PyColor *color;
 
     if (!PyArg_ParseTuple(args, "O:clear", &color))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)color)->ob_type, PPyColorType))
@@ -136,14 +159,16 @@ static PyObject* screen_clear(PyScreen *self,
 }
 
 static PyObject* screen_fillRect(PyScreen *self,
-                                 PyObject *args,
-                                 PyObject *kwargs)
+                                 PyObject *args)
 {
     PyColor *color;
     int x, y, w, h;
 
     if (!PyArg_ParseTuple(args, "iiiiO:fillRect", &x, &y,
                           &w, &h, &color))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)color)->ob_type, PPyColorType))
@@ -162,8 +187,7 @@ static PyObject* screen_fillRect(PyScreen *self,
 }
 
 static PyObject* screen_swap(PyScreen *self,
-                             PyObject *args,
-                             PyObject *kwargs)
+                             PyObject *args)
 {
     if (!PyArg_ParseTuple(args, ":swap"))
        return NULL;
@@ -178,14 +202,16 @@ static PyObject* screen_swap(PyScreen *self,
 }
 
 static PyObject* screen_saveToFile(PyScreen *self,
-                                   PyObject *args,
-                                   PyObject *kwargs)
+                                   PyObject *args)
 {
     char *filename;
     int type = (int)IMG_PNG;
     ImageType etype = IMG_PNG;
 
-    if (!PyArg_ParseTuple(args, "s|i", &filename, &type))
+    if (!PyArg_ParseTuple(args, "s|i:saveToFile", &filename, &type))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     switch (type)
@@ -205,13 +231,15 @@ static PyObject* screen_saveToFile(PyScreen *self,
 }
 
 static PyObject* screen_putPixel(PyScreen *self,
-                                 PyObject *args,
-                                 PyObject *kwargs)
+                                 PyObject *args)
 {
     int x, y;
     PyColor *color;
 
-    if (!PyArg_ParseTuple(args, "iiO", &x, &y, &color))
+    if (!PyArg_ParseTuple(args, "iiO:putPixel", &x, &y, &color))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)color)->ob_type, PPyColorType))
@@ -227,15 +255,17 @@ static PyObject* screen_putPixel(PyScreen *self,
 }
 
 static PyObject* screen_getPixel(PyScreen *self,
-                                 PyObject *args,
-                                 PyObject *kwargs)
+                                 PyObject *args)
 {
     int x, y;
     PyColor *color;
     PyObject *nargs;
     u32 c;
 
-    if (!PyArg_ParseTuple(args, "ii", &x, &y))
+    if (!PyArg_ParseTuple(args, "ii:getPixel", &x, &y))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     c = self->scr->getPixel(x, y);
@@ -250,14 +280,16 @@ static PyObject* screen_getPixel(PyScreen *self,
 }
 
 static PyObject* screen_drawLine(PyScreen *self,
-                                 PyObject *args,
-                                 PyObject *kwargs)
+                                 PyObject *args)
 {
     int x1, y1, x2, y2;
     PyColor *colorobj = NULL;
     u32 color = 0xFFFFFFFFU;
 
     if (!PyArg_ParseTuple(args, "iiii|O:drawLine", &x1, &y1, &x2, &y2, &colorobj))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (colorobj)
@@ -278,8 +310,7 @@ static PyObject* screen_drawLine(PyScreen *self,
 }
 
 static PyObject* screen_drawText(PyScreen *self,
-                                 PyObject *args,
-                                 PyObject *kwargs)
+                                 PyObject *args)
 {
     int x, y;
     char *text;
@@ -287,6 +318,9 @@ static PyObject* screen_drawText(PyScreen *self,
     u32 color = 0xFFFFFFFFU;
 
     if (!PyArg_ParseTuple(args, "iis|O:drawText", &x, &y, &text, &colorobj))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (colorobj)

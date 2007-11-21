@@ -25,6 +25,9 @@ static PyObject* controller_new(PyTypeObject *type,
 {
     PyController *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyController*)type->tp_alloc(type, 0);
 
     if (self)
@@ -37,7 +40,7 @@ static int controller_init(PyController *self,
                            PyObject *args,
                            PyObject *kwargs)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":__init__"))
        return -1;
 
     if (PyErr_CheckSignals())

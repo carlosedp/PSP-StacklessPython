@@ -106,8 +106,12 @@ PyMODINIT_FUNC initpsp2d(void)
     Py_INCREF(PPyTimerType);
     PyModule_AddObject(mdl, "Timer", (PyObject*)PPyTimerType);
 
+    PyModule_AddIntConstant(mdl, "TR_USER", TR_USER);
     PyModule_AddIntConstant(mdl, "TR_PLUS", TR_PLUS);
     PyModule_AddIntConstant(mdl, "TR_MULT", TR_MULT);
+    PyModule_AddIntConstant(mdl, "TR_G2A", TR_G2A);
+    PyModule_AddIntConstant(mdl, "TR_GRAY", TR_GRAY);
+    PyModule_AddIntConstant(mdl, "TR_BW", TR_BW);
 
     PyModule_AddIntConstant(mdl, "IMG_PNG", (int)PSP2D::IMG_PNG);
     PyModule_AddIntConstant(mdl, "IMG_JPEG", (int)PSP2D::IMG_JPEG);

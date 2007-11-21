@@ -36,6 +36,9 @@ static PyObject* image_new(PyTypeObject *type,
 {
     PyImage *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyImage*)type->tp_alloc(type, 0);
 
     if (self)
@@ -50,7 +53,10 @@ static int image_init(PyImage *self,
 {
     PyObject *a, *b = NULL;
 
-    if (!PyArg_ParseTuple(args, "O|O", &a, &b))
+    if (!PyArg_ParseTuple(args, "O|O:__init__", &a, &b))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     if (a->ob_type == PPyImageType)
@@ -137,20 +143,31 @@ static PyObject* image_getheight(PyImage *self, void *closure)
     return Py_BuildValue("i", self->img->getHeight());
 }
 
+static PyObject* image_getsize(PyImage *self, void *closure)
+{
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    return Py_BuildValue("ii", self->img->getWidth(), self->img->getHeight());
+}
+
 static PyGetSetDef image_getset[] = {
    { "width", (getter)image_getwidth, NULL, "Width of the image", NULL },
    { "height", (getter)image_getheight, NULL, "Height of the image", NULL },
+   { "size", (getter)image_getsize, NULL, "Size as a 2-tuple", NULL },
 
    { NULL }
 };
 
 static PyObject* image_clear(PyImage *self,
-                             PyObject *args,
-                             PyObject *kwargs)
+                             PyObject *args)
 {
     PyColor *color;
 
     if (!PyArg_ParseTuple(args, "O:clear", &color))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)color)->ob_type, PPyColorType))
@@ -158,9 +175,6 @@ static PyObject* image_clear(PyImage *self,
        PyErr_SetString(PyExc_TypeError, "Argument must be a Color.");
        return NULL;
     }
-
-    if (PyErr_CheckSignals())
-       return NULL;
 
     self->img->clear(color->color);
 
@@ -176,16 +190,20 @@ static PyObject* image_blit(PyImage *self,
     int sx = 0, sy = 0, w = -1, h = -1, dx = 0, dy = 0, dw = -1, dh = -1;
     int blend = 0;
     int dtype = 0; // 0: image, 1: screen
+    double scaleX, scaleY;
 
     static char* kwids[] = { "src", "sx", "sy", "w", "h", "dx", "dy", "blend", "dw", "dh", NULL };
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "O|iiiiiiiii", kwids,
+                                     "O|iiiiiiiii:blit", kwids,
                                      &src,
                                      &sx, &sy, &w, &h,
                                      &dx, &dy,
                                      &blend,
                                      &dw, &dh))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)src)->ob_type, PPyImageType))
@@ -202,9 +220,6 @@ static PyObject* image_blit(PyImage *self,
     {
        dtype = 0;
     }
-
-    if (PyErr_CheckSignals())
-       return NULL;
 
     switch (dtype)
     {
@@ -229,6 +244,15 @@ static PyObject* image_blit(PyImage *self,
 
     // Sanity checks
 
+    if (dw < 0)
+       dw = w;
+
+    if (dh < 0)
+       dh = h;
+
+    scaleX = (double)dw / w;
+    scaleY = (double)dh / h;
+
     if ((dx >= (int)self->img->getWidth()) || (dy >= (int)self->img->getHeight()))
     {
        Py_INCREF(Py_None);
@@ -238,19 +262,20 @@ static PyObject* image_blit(PyImage *self,
     w = MIN(w, (int)self->img->getWidth() - dx);
     h = MIN(h, (int)self->img->getHeight() - dy);
 
-    switch (dtype)
     {
-       case 0:
-          w = MIN(w, (int)src->img->getWidth() - sx);
-          h = MIN(h, (int)src->img->getHeight() - sy);
+       int targetW = SCREEN_WIDTH, targetH = SCREEN_HEIGHT;
 
-          break;
+       if (dtype == 0)
+       {
+          targetW = (int)src->img->getWidth() - sx;
+          targetH = (int)src->img->getHeight() - sy;
+       }
 
-       case 1:
-          w = MIN(w, SCREEN_WIDTH - sx);
-          h = MIN(h, SCREEN_HEIGHT - sy);
+       if (dx + scaleX * w >= targetW)
+          w = (int)((targetW - dx) / scaleX);
 
-          break;
+       if (dy + scaleY * h >= targetH)
+          h = (int)((targetH - dy) / scaleY);
     }
 
     if ((w <= 0) || (h <= 0))
@@ -262,11 +287,11 @@ static PyObject* image_blit(PyImage *self,
     switch (dtype)
     {
        case 0:
-          self->img->blit(src->img, sx, sy, w, h, dx, dy, blend, dw, dh);
+          self->img->blit(src->img, sx, sy, w, h, dx, dy, blend, scaleX, scaleY);
           break;
 
        case 1:
-          self->img->blit(((PyScreen*)src)->scr, sx, sy, w, h, dx, dy, blend, dw, dh);
+          self->img->blit(((PyScreen*)src)->scr, sx, sy, w, h, dx, dy, blend, scaleX, scaleY);
           break;
     }
 
@@ -275,8 +300,7 @@ static PyObject* image_blit(PyImage *self,
 }
 
 static PyObject* image_fillRect(PyImage *self,
-                                PyObject *args,
-                                PyObject *kwargs)
+                                PyObject *args)
 {
     int x, y, w, h;
     PyColor *color;
@@ -285,14 +309,14 @@ static PyObject* image_fillRect(PyImage *self,
                           &color))
        return NULL;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     if (!PyType_IsSubtype(((PyObject*)color)->ob_type, PPyColorType))
     {
        PyErr_SetString(PyExc_TypeError, "Fifth argument must be a Color.");
        return NULL;
     }
-
-    if (PyErr_CheckSignals())
-       return NULL;
 
     self->img->fillRect(color->color, x, y, w, h);
 
@@ -301,14 +325,16 @@ static PyObject* image_fillRect(PyImage *self,
 }
 
 static PyObject* image_saveToFile(PyImage *self,
-                                  PyObject *args,
-                                  PyObject *kwargs)
+                                  PyObject *args)
 {
     char *filename;
     int type = (int)IMG_PNG;
     ImageType etype = IMG_PNG;
 
     if (!PyArg_ParseTuple(args, "s|i:saveToFile", &filename, &type))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     switch (type)
@@ -328,37 +354,47 @@ static PyObject* image_saveToFile(PyImage *self,
 }
 
 static PyObject* image_putPixel(PyImage *self,
-                                PyObject *args,
-                                PyObject *kwargs)
+                                PyObject *args)
 {
     int x, y;
-    PyColor *color;
+    PyColor *color = NULL;
+    u32 col = 0xFFFFFFFFU;
 
-    if (!PyArg_ParseTuple(args, "iiO", &x, &y, &color))
+    if (!PyArg_ParseTuple(args, "ii|O:putPixel", &x, &y, &color))
        return NULL;
 
-    if (!PyType_IsSubtype(((PyObject*)color)->ob_type, PPyColorType))
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    if (color)
     {
-       PyErr_SetString(PyExc_TypeError, "Third argument must be a Color.");
-       return NULL;
+       if (!PyType_IsSubtype(((PyObject*)color)->ob_type, PPyColorType))
+       {
+          PyErr_SetString(PyExc_TypeError, "Third argument must be a Color.");
+          return NULL;
+       }
+
+       col = color->color;
     }
 
-    self->img->putPixel(color->color, x, y);
+    self->img->putPixel(col, x, y);
 
     Py_INCREF(Py_None);
     return Py_None;
 }
 
 static PyObject* image_getPixel(PyImage *self,
-                                PyObject *args,
-                                PyObject *kwargs)
+                                PyObject *args)
 {
     int x, y;
     PyColor *color;
     PyObject *nargs;
     u32 c;
 
-    if (!PyArg_ParseTuple(args, "ii", &x, &y))
+    if (!PyArg_ParseTuple(args, "ii:getPixel", &x, &y))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     c = self->img->getPixel(x, y);
@@ -373,14 +409,16 @@ static PyObject* image_getPixel(PyImage *self,
 }
 
 static PyObject* image_drawLine(PyImage *self,
-                                PyObject *args,
-                                PyObject *kwargs)
+                                PyObject *args)
 {
     int x1, y1, x2, y2;
     PyColor *colorobj = NULL;
     u32 color = 0xFFFFFFFFU;
 
     if (!PyArg_ParseTuple(args, "iiii|O:drawLine", &x1, &y1, &x2, &y2, &colorobj))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (colorobj)
@@ -401,8 +439,7 @@ static PyObject* image_drawLine(PyImage *self,
 }
 
 static PyObject* image_drawText(PyImage *self,
-                                PyObject *args,
-                                PyObject *kwargs)
+                                PyObject *args)
 {
     int x, y;
     char *text;
@@ -410,6 +447,9 @@ static PyObject* image_drawText(PyImage *self,
     u32 color = 0xFFFFFFFFU;
 
     if (!PyArg_ParseTuple(args, "iis|O:drawText", &x, &y, &text, &colorobj))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (colorobj)
@@ -429,6 +469,124 @@ static PyObject* image_drawText(PyImage *self,
     return Py_None;
 }
 
+static PyObject* image_erode(PyImage *self,
+                             PyObject *args)
+{
+    PyObject *pykernel;
+    bool *kernel;
+    int sz, i;
+    PyImage *pyresult;
+    Image *result;
+
+    if (!PyArg_ParseTuple(args, "O:erode", &pykernel))
+       return NULL;
+
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    if (!PyList_Check(pykernel))
+    {
+       PyErr_SetString(PyExc_TypeError, "Kernel must be a list");
+       return NULL;
+    }
+
+    sz = PyList_Size(pykernel);
+
+    if ((int)sqrt(sz) * (int)sqrt(sz) != sz)
+    {
+       PyErr_SetString(PyExc_ValueError, "Kernel must be square");
+       return NULL;
+    }
+
+    kernel = new bool[sz];
+
+    for (i = 0; i < sz; ++i)
+    {
+       PyObject *val = PyList_GetItem(pykernel, i);
+
+       if (!PyInt_Check(val))
+       {
+          PyErr_SetString(PyExc_TypeError, "Kernel elements must be integers");
+          delete[] kernel;
+          return NULL;
+       }
+
+       kernel[i] = (PyInt_AsLong(val) != 0);
+    }
+
+    Py_INCREF((PyObject*)self);
+    Py_BEGIN_ALLOW_THREADS
+       result = self->img->erode(kernel, (int)sqrt(sz));
+    Py_END_ALLOW_THREADS
+    Py_DECREF((PyObject*)self);
+
+    pyresult = (PyImage*)PyType_GenericNew(PPyImageType, NULL, NULL);
+    pyresult->img = result;
+
+    delete[] kernel;
+
+    return (PyObject*)pyresult;
+}
+
+static PyObject* image_dilate(PyImage *self,
+                              PyObject *args)
+{
+    PyObject *pykernel;
+    bool *kernel;
+    int sz, i;
+    PyImage *pyresult;
+    Image *result;
+
+    if (!PyArg_ParseTuple(args, "O:dilate", &pykernel))
+       return NULL;
+
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    if (!PyList_Check(pykernel))
+    {
+       PyErr_SetString(PyExc_TypeError, "Kernel must be a list");
+       return NULL;
+    }
+
+    sz = PyList_Size(pykernel);
+
+    if ((int)sqrt(sz) * (int)sqrt(sz) != sz)
+    {
+       PyErr_SetString(PyExc_ValueError, "Kernel must be square");
+       return NULL;
+    }
+
+    kernel = new bool[sz];
+
+    for (i = 0; i < sz; ++i)
+    {
+       PyObject *val = PyList_GetItem(pykernel, i);
+
+       if (!PyInt_Check(val))
+       {
+          PyErr_SetString(PyExc_TypeError, "Kernel elements must be integers");
+          delete[] kernel;
+          return NULL;
+       }
+
+       kernel[i] = (PyInt_AsLong(val) != 0);
+    }
+
+    Py_INCREF((PyObject*)self);
+    Py_BEGIN_ALLOW_THREADS
+       result = self->img->dilate(kernel, (int)sqrt(sz));
+    Py_END_ALLOW_THREADS
+    Py_DECREF((PyObject*)self);
+
+    pyresult = (PyImage*)PyType_GenericNew(PPyImageType, NULL, NULL);
+    pyresult->img = result;
+
+    delete[] kernel;
+
+    return (PyObject*)pyresult;
+}
+
 static PyMethodDef image_methods[] = {
    { "clear", (PyCFunction)image_clear, METH_VARARGS, "" },
    { "blit", (PyCFunction)image_blit, METH_VARARGS|METH_KEYWORDS, "" },
@@ -438,6 +596,8 @@ static PyMethodDef image_methods[] = {
    { "getPixel", (PyCFunction)image_getPixel, METH_VARARGS, "" },
    { "drawLine", (PyCFunction)image_drawLine, METH_VARARGS, "" },
    { "drawText", (PyCFunction)image_drawText, METH_VARARGS, "" },
+   { "erode", (PyCFunction)image_erode, METH_VARARGS, "" },
+   { "dilate", (PyCFunction)image_dilate, METH_VARARGS, "" },
 
    { NULL }
 };

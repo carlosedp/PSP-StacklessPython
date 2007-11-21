@@ -27,6 +27,9 @@ static PyObject* transform_new(PyTypeObject *type,
 {
     PyTransform *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyTransform*)type->tp_alloc(type, 0);
     if (self)
     {
@@ -45,7 +48,10 @@ static int transform_init(PyTransform *self,
     PyObject *p;
     float param = 0.0;
 
-    if (!PyArg_ParseTuple(args, "O|f", &p, &param))
+    if (!PyArg_ParseTuple(args, "O|f:__init__", &p, &param))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     if (PyInt_Check(p))
@@ -69,14 +75,16 @@ static int transform_init(PyTransform *self,
 }
 
 static PyObject* transform_apply(PyTransform *self,
-                                 PyObject *args,
-                                 PyObject *kwargs)
+                                 PyObject *args)
 {
     PyImage *img;
     u32 x, y, k;
     u8 * rgba;
 
-    if (!PyArg_ParseTuple(args, "O", &img))
+    if (!PyArg_ParseTuple(args, "O:apply", &img))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)img)->ob_type, PPyImageType))
@@ -163,6 +171,18 @@ static PyObject* transform_apply(PyTransform *self,
                       rgba[k] = (u8)r;
                    }
                    break;
+
+                case TR_G2A:
+                   rgba[3] = (u8)(((int)rgba[0] + (int)rgba[1] + (int)rgba[2]) / 3);
+                   break;
+
+                case TR_GRAY:
+                   rgba[0] = rgba[1] = rgba[2] = (u8)(((int)rgba[0] + (int)rgba[1] + (int)rgba[2]) / 3);
+                   break;
+
+                case TR_BW:
+                   rgba[0] = rgba[1] = rgba[2] = ((u8)(((int)rgba[0] + (int)rgba[1] +
+                                                        (int)rgba[2]) / 3) > (int)self->param) ? 255 : 0;
              }
           }
        }

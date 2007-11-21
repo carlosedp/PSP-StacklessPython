@@ -31,6 +31,9 @@ static PyObject* mask_new(PyTypeObject *type,
 {
     PyMask *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyMask*)type->tp_alloc(type, 0);
 
     if (self)
@@ -46,16 +49,17 @@ static int mask_init(PyMask *self,
     PyImage *img;
     int x, y, w, h, t = 127;
 
-    if (!PyArg_ParseTuple(args, "Oiiii|i", &img, &x, &y, &w, &h, &t))
+    if (!PyArg_ParseTuple(args, "Oiiii|i:__init__", &img, &x, &y, &w, &h, &t))
        return -1;
 
-#ifdef CHEKTYPE
+    if (PyErr_CheckSignals())
+       return -1;
+
     if (((PyObject*)img)->ob_type != PPyImageType)
     {
        PyErr_SetString(PyExc_TypeError, "First argument must be a Image.");
        return -1;
     }
-#endif
 
     self->msk = new Mask(img->img, x, y, w, h, t);
 
@@ -63,12 +67,14 @@ static int mask_init(PyMask *self,
 }
 
 static PyObject* mask_collide(PyMask *self,
-                              PyObject *args,
-                              PyObject *kwargs)
+                              PyObject *args)
 {
     PyMask *other;
 
-    if (!PyArg_ParseTuple(args, "O", &other))
+    if (!PyArg_ParseTuple(args, "O:collide", &other))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)other)->ob_type, PPyMaskType))
@@ -76,20 +82,19 @@ static PyObject* mask_collide(PyMask *self,
        PyErr_SetString(PyExc_TypeError, "Argument must be a Mask.");
        return NULL;
     }
-
-    if (PyErr_CheckSignals())
-       return NULL;
 
     return Py_BuildValue("i", self->msk->collide(other->msk));
 }
 
 static PyObject* mask_union(PyMask *self,
-                            PyObject *args,
-                            PyObject *kwargs)
+                            PyObject *args)
 {
     PyMask *other;
 
-    if (!PyArg_ParseTuple(args, "O", &other))
+    if (!PyArg_ParseTuple(args, "O:union", &other))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (!PyType_IsSubtype(((PyObject*)other)->ob_type, PPyMaskType))
@@ -97,9 +102,6 @@ static PyObject* mask_union(PyMask *self,
        PyErr_SetString(PyExc_TypeError, "Argument must be a Mask.");
        return NULL;
     }
-
-    if (PyErr_CheckSignals())
-       return NULL;
 
     self->msk->set(other->msk);
 
@@ -108,12 +110,11 @@ static PyObject* mask_union(PyMask *self,
 }
 
 static PyObject* mask_isIn(PyMask *self,
-                           PyObject *args,
-                           PyObject *kwargs)
+                           PyObject *args)
 {
     int x, y;
 
-    if (!PyArg_ParseTuple(args, "ii", &x, &y))
+    if (!PyArg_ParseTuple(args, "ii:isIn", &x, &y))
        return NULL;
 
     if (PyErr_CheckSignals())
