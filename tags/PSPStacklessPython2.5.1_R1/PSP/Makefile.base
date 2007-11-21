@@ -1,0 +1,311 @@
+TARGET = StacklessPSP
+BUILD_PRX = 1
+PSP_FW_VERSION = 371
+RELEASE_NAME = StacklessPSP
+RELEASE_VERSION = 2.5.1
+RELEASE_DIRECTORY = ~/$(RELEASE_NAME)-$(RELEASE_VERSION)
+
+EXTRA_TARGETS = EBOOT.PBP
+PSP_EBOOT_TITLE = Stackless PyPSP 2.5.1
+PSP_EBOOT_ICON = icon_slp251.png
+#PSP_EBOOT_UNKPNG = pic0.png
+#PSP_EBOOT_PIC1 = pic1.png
+#PSP_EBOOT_SND0 = snd0.at3
+
+MODULES_STATIC = \
+	Modules/config.o \
+	Modules/pspos.o \
+	../Modules/main.o \
+	../Modules/getbuildinfo.o \
+	../Modules/gcmodule.o \
+	../Modules/getpath.o \
+	../Modules/timemodule.o \
+	../Modules/mathmodule.o \
+	../Modules/_struct.o \
+	../Modules/binascii.o \
+	../Modules/_randommodule.o \
+	../Modules/_sre.o \
+	../Modules/cStringIO.o \
+	../Modules/_typesmodule.o \
+	../Modules/errnomodule.o \
+	../Modules/threadmodule.o \
+	../Modules/collectionsmodule.o \
+	../Modules/md5module.o \
+	../Modules/md5.o \
+	../Modules/socketmodule.o \
+	../Modules/selectmodule.o \
+	../Modules/pspsocket.o \
+	../Modules/zipimport.o \
+	../Modules/shamodule.o \
+	../Modules/sha256module.o \
+	../Modules/sha512module.o \
+	../Modules/_codecsmodule.o \
+	../Modules/datetimemodule.o \
+	../Modules/_bisectmodule.o \
+	../Modules/_csv.o \
+	../Modules/_heapqmodule.o \
+	../Modules/_weakref.o \
+	../Modules/arraymodule.o \
+	../Modules/audioop.o \
+	../Modules/cPickle.o \
+	../Modules/cmathmodule.o \
+	../Modules/itertoolsmodule.o \
+	../Modules/operator.o \
+	../Modules/parsermodule.o \
+	../Modules/symtablemodule.o \
+	../Modules/timingmodule.o \
+	../Modules/unicodedata.o \
+	../Modules/zlibmodule.o \
+    ../Modules/stropmodule.o \
+	../Modules/_localemodule.o \
+	../Modules/pyexpat.o \
+	../Modules/expat/xmlparse.o \
+	../Modules/expat/xmlrole.o \
+	../Modules/expat/xmltok.o \
+	../Modules/_elementtree.o \
+	../Modules/_functoolsmodule.o \
+	../Modules/_hashopenssl.o \
+	../Modules/bz2module.o
+
+OBJECTS_PYTHON = \
+    ../Python/ast.o \
+    ../Python/Python-ast.o \
+    ../Python/asdl.o \
+    ../Python/atof.o \
+    ../Python/pyarena.o \
+	../Python/traceback.o \
+	../Python/sysmodule.o \
+	../Python/structmember.o \
+	../Python/strdup.o \
+	../Python/sigcheck.o \
+	../Python/pythonrun.o \
+	../Python/pystate.o \
+	../Python/pyfpe.o \
+	../Python/mystrtoul.o \
+	../Python/mysnprintf.o \
+	../Python/modsupport.o \
+	../Python/marshal.o \
+	../Python/importdl.o \
+	../Python/import.o \
+	../Python/graminit.o \
+	../Python/getversion.o \
+	../Python/getplatform.o \
+	../Python/getopt.o \
+	../Python/getcopyright.o \
+	../Python/getcompiler.o \
+	../Python/getargs.o \
+	../Python/frozenmain.o \
+	../Python/frozen.o \
+	../Python/errors.o \
+	../Python/compile.o \
+	../Python/ceval.o \
+	../Python/bltinmodule.o \
+	../Python/codecs.o \
+	../Python/symtable.o \
+	../Python/future.o \
+	../Python/dynload_stub.o \
+	../Python/pystrtod.o \
+	../Python/thread.o \
+	../Python/getmtime.o
+
+OBJECTS_OBJECTS = \
+	../Objects/typeobject.o \
+	../Objects/tupleobject.o \
+	../Objects/stringobject.o \
+	../Objects/sliceobject.o \
+	../Objects/rangeobject.o \
+	../Objects/object.o \
+	../Objects/obmalloc.o \
+	../Objects/moduleobject.o \
+	../Objects/methodobject.o \
+	../Objects/longobject.o \
+	../Objects/listobject.o \
+	../Objects/intobject.o \
+	../Objects/boolobject.o \
+	../Objects/iterobject.o \
+	../Objects/funcobject.o \
+	../Objects/frameobject.o \
+	../Objects/floatobject.o \
+	../Objects/fileobject.o \
+	../Objects/enumobject.o \
+	../Objects/dictobject.o \
+	../Objects/complexobject.o \
+	../Objects/cobject.o \
+	../Objects/classobject.o \
+	../Objects/cellobject.o \
+	../Objects/bufferobject.o \
+	../Objects/abstract.o \
+	../Objects/unicodectype.o \
+	../Objects/unicodeobject.o \
+	../Objects/descrobject.o \
+	../Objects/weakrefobject.o \
+	../Objects/structseq.o \
+	../Objects/setobject.o \
+	../Objects/exceptions.o \
+	../Objects/genobject.o \
+	../Objects/codeobject.o
+
+
+OBJECTS_PARSER = \
+	../Parser/tokenizer.o \
+	../Parser/printgrammar.o \
+	../Parser/parsetok.o \
+	../Parser/parser.o \
+	../Parser/node.o \
+	../Parser/myreadline.o \
+	../Parser/metagrammar.o \
+	../Parser/listnode.o \
+	../Parser/intrcheck.o \
+	../Parser/grammar1.o \
+	../Parser/grammar.o \
+	../Parser/firstsets.o \
+	../Parser/bitset.o \
+	../Parser/acceler.o
+
+OBJS_STACKLESS = ../Stackless/core/cframeobject.o \
+	../Stackless/core/slp_transfer.o \
+	../Stackless/core/stackless_util.o \
+	../Stackless/core/stacklesseval.o \
+	../Stackless/module/channelobject.o \
+	../Stackless/module/flextype.o \
+	../Stackless/module/scheduling.o \
+	../Stackless/module/stacklessmodule.o \
+	../Stackless/module/taskletobject.o \
+	../Stackless/pickling/prickelpit.o \
+	../Stackless/pickling/safe_pickle.o
+
+OBJS_SQLITE = ../Modules/_sqlite/cache.o \
+              ../Modules/_sqlite/connection.o \
+              ../Modules/_sqlite/cursor.o \
+              ../Modules/_sqlite/microprotocols.o \
+              ../Modules/_sqlite/module.o \
+              ../Modules/_sqlite/prepare_protocol.o \
+              ../Modules/_sqlite/row.o \
+              ../Modules/_sqlite/statement.o \
+              ../Modules/_sqlite/util.o
+
+OBJS_PSP2D = \
+	psp2d/psp2d.o \
+	psp2d/color.o \
+	psp2d/image.o \
+	psp2d/controller.o \
+	psp2d/screen.o \
+	psp2d/mask.o \
+	psp2d/font.o \
+	psp2d/transform.o \
+	psp2d/blitbatch.o \
+	psp2d/timer.o
+
+OBJS_PSPSND = \
+	pspsnd/pspsnd.o \
+	pspsnd/sound.o \
+	pspsnd/music.o
+
+OBJS_PSPNET = pspnet/pspnet.o
+
+OBJS_OSLIB = osl/osl.o osl/image.o osl/ctrl.o osl/sound.o osl/map.o osl/font.o
+
+OBJS_PSPOGG = pspogg/oggplayer.o pspogg/pspogg.o
+
+OBJS_PSPMP3 = pspmp3/MusicEngine.o pspmp3/pspmp3.o
+
+OBJS_SSL = ../Modules/_ssl.o
+
+OBJS = main.o psperror.o support.o \
+	$(MODULES_STATIC) $(OBJECTS_PYTHON) $(OBJECTS_OBJECTS) $(OBJECTS_PARSER) $(OBJS_STACKLESS)
+
+CPPFLAGS=-I../../cpplibs
+LDFLAGS=-L../../cpplibs
+LIBS=
+
+ifeq ($(WITH_SQLITE),1)
+OBJS += $(OBJS_SQLITE)
+CPPFLAGS += -I../Modules/_sqlite -DMODULE_NAME=\"sqlite3\" -DWITH_SQLITE
+LIBS += -lsqlite3
+endif
+
+ifeq ($(WITH_PSP2D),1)
+OBJS += $(OBJS_PSP2D)
+LDFAGS += -Llibpsp2d
+LIBS += -lpsp2d -ljpeg -lpng -lz -lpspgu
+CPPFLAGS += -DWITH_PSP2D
+endif
+
+ifeq ($(WITH_PSPSND),1)
+OBJS += $(OBJS_PSPSND)
+LDFLAGS += -Llibpspsnd
+LIBS += -lpspsnd -lmikmod -lmmio -lpspaudiolib -lpspaudio
+CPPFLAGS += -DWITH_PSPSND
+endif
+
+ifeq ($(WITH_PSPNET),1)
+OBJS += $(OBJS_PSPNET)
+CPPFLAGS += -DWITH_PSPNET
+LIBS += -lpspwlan
+endif
+
+ifeq ($(WITH_OSLIB),1)
+OBJS += $(OBJS_OSLIB)
+LIBS += -losl -lpng -lz -lpspgu -lpspaudio
+CPPFLAGS += -DWITH_OSLIB
+endif
+
+ifeq ($(WITH_PSPOGG),1)
+OBJS += $(OBJS_PSPOGG)
+LIBS += -lvorbisidec -lpspaudiolib -lpspaudio
+CPPFLAGS += -DWITH_PSPOGG
+endif
+
+ifeq ($(WITH_PSPMP3),1)
+OBJS += $(OBJS_PSPMP3)
+LIBS += -lmad -lpspaudiolib -lpspaudio
+CPPFLAGS += -DWITH_PSPMP3
+endif
+
+ifeq ($(WITH_SSL),1)
+OBJS += $(OBJS_SSL)
+LIBS += -lssl -lcrypto
+CPPFLAGS += -DWITH_SSL -I$(PSPDEV)/psp/include/openssl
+endif
+
+LIBS += -lpsppower -lstdc++ -lbz2 -lssl -lcrypto
+
+CPPFLAGS += -DHAVE_CONFIG_H -DPSP -I../Include -I../Stackless
+CPPFLAGS += -I../Modules/expat -DHAVE_MEMMOVE
+
+LIBS += -lc -lm
+
+CFLAGS = -Os -G0 -Wall -Wno-strict-aliasing
+CXXFLAGS = $(CFLAGS) -fno-rtti -fno-strict-aliasing
+ASFLAGS = $(CFLAGS)
+
+LIBDIR =
+
+PSPSDK=$(shell psp-config --pspsdk-path)
+include $(PSPSDK)/lib/build.mak
+
+psperror.c:
+	python generr.py
+	
+release: $(RELEASE_DIRECTORY)/$(RELEASE_NAME)$(RELEASE_VERSION).zip
+	@echo "================== Package Done! =================="
+
+$(RELEASE_DIRECTORY)/$(RELEASE_NAME)$(RELEASE_VERSION).zip: $(PSP_EBOOT)
+	@echo "###### Create release package ######"
+	@echo "1. Creating release directory $(RELEASE_DIRECTORY)/"
+	@mkdir -p $(RELEASE_DIRECTORY)/
+	@echo "2. Copying EBOOT to release dir."
+	@cp -a EBOOT.PBP $(RELEASE_DIRECTORY)/
+	@echo "3. Copying Python libraries to release dir."
+	@cp -a ../Lib $(RELEASE_DIRECTORY)/python
+	@echo "4. Cleaning up files."
+	@find $(RELEASE_DIRECTORY)/ -name ".svn" | xargs rm -rf
+	@rm -rf $(RELEASE_DIRECTORY)/python/plat*
+	@echo "5. Release dir created on $(RELEASE_DIRECTORY)."
+	@echo "###### Done ######"
+
+distclean:
+	@echo "Cleaning $(RELEASE_DIRECTORY)"
+	@rm -rf $(RELEASE_DIRECTORY)
+	@echo "Done!"
+	@echo ""

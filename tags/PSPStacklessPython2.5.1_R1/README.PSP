@@ -1,0 +1,18 @@
+
+All  PSP-specific code  is  released  under the  same  license as  the
+interpreter itself,  the PSF license  version 2. See the  LICENSE file
+for details.
+
+==== How to use it ====
+
+You  place EBOOT.PBP  in <psp>/psp/game/<somename>  just as  any other
+homebrew.  Upon  launch,  the  Python  interpreter  will  look  for  a
+'script.py' file in the same directory as EBOOT.PBP and launch it.
+
+The module  search path is ['ms0:/python']  so if you want  to use any
+external module, you have to put it there (or in the same directory as
+script.py). For full functionnality, copy the whole Lib directory:
+
+mkdir /mnt/PSP/python
+cp -a Lib/* /mnt/PSP/python
+cp -a PSP/Lib/psp /mnt/PSP/python
