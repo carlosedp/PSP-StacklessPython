@@ -7,6 +7,9 @@
 #include "structmember.h"
 
 #include <time.h>
+#ifdef PSP
+#include <pspkernel.h>
+#endif
 
 #include "timefuncs.h"
 
@@ -3709,6 +3712,21 @@ datetime_from_timestamp(PyObject *cls, TM_FUNC f, double timestamp,
 static PyObject *
 datetime_best_possible(PyObject *cls, TM_FUNC f, PyObject *tzinfo)
 {
+#ifdef PSP
+	PyObject *time;
+	double dtime;
+
+	time = time_time();
+    	if (time == NULL)
+    		return NULL;
+	dtime = PyFloat_AsDouble(time);
+	Py_DECREF(time);
+	if (dtime == -1.0 && PyErr_Occurred())
+		return NULL;
+	return datetime_from_timestamp(cls, f, dtime, tzinfo);
+
+#else /* !PSP */
+
 #ifdef HAVE_GETTIMEOFDAY
 	struct timeval t;
 
@@ -3740,6 +3758,7 @@ datetime_best_possible(PyObject *cls, TM_FUNC f, PyObject *tzinfo)
 		return NULL;
 	return datetime_from_timestamp(cls, f, dtime, tzinfo);
 #endif	/* ! HAVE_GETTIMEOFDAY */
+#endif /* !PSP */
 }
 
 /* Return best possible local time -- this isn't constrained by the

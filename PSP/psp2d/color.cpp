@@ -23,6 +23,9 @@ static PyObject* color_new(PyTypeObject *type,
 {
     PyColor *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyColor*)type->tp_alloc(type, 0);
     if (self)
        self->color = 0;
@@ -36,7 +39,10 @@ static int color_init(PyColor *self,
 {
     int r, g, b, a = 0;
 
-    if (!PyArg_ParseTuple(args, "iii|i", &r, &g, &b, &a))
+    if (!PyArg_ParseTuple(args, "iii|i:__init__", &r, &g, &b, &a))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     self->color = ((u32)a << 24) | ((u32)b << 16) | ((u32)g << 8) | (u32)r;
@@ -55,6 +61,9 @@ static PyObject* color_getr(PyColor *self, void *closure)
 static int color_setr(PyColor *self, PyObject *value, void *closure)
 {
     int v;
+
+    if (PyErr_CheckSignals())
+       return -1;
 
     if (!value)
     {
@@ -76,9 +85,6 @@ static int color_setr(PyColor *self, PyObject *value, void *closure)
        return -1;
     }
 
-    if (PyErr_CheckSignals())
-       return -1;
-
     self->color = (self->color & 0xFFFFFF00U) | (u32)v;
 
     return 0;
@@ -95,6 +101,9 @@ static PyObject* color_getg(PyColor *self, void *closure)
 static int color_setg(PyColor *self, PyObject *value, void *closure)
 {
     int v;
+
+    if (PyErr_CheckSignals())
+       return -1;
 
     if (!value)
     {
@@ -116,9 +125,6 @@ static int color_setg(PyColor *self, PyObject *value, void *closure)
        return -1;
     }
 
-    if (PyErr_CheckSignals())
-       return -1;
-
     self->color = (self->color & 0xFFFF00FFU) | ((u32)v << 8);
 
     return 0;
@@ -135,6 +141,9 @@ static PyObject* color_getb(PyColor *self, void *closure)
 static int color_setb(PyColor *self, PyObject *value, void *closure)
 {
     int v;
+
+    if (PyErr_CheckSignals())
+       return -1;
 
     if (!value)
     {
@@ -156,9 +165,6 @@ static int color_setb(PyColor *self, PyObject *value, void *closure)
        return -1;
     }
 
-    if (PyErr_CheckSignals())
-       return -1;
-
     self->color = (self->color & 0xFF00FFFFU) | ((u32)v << 16);
 
     return 0;
@@ -175,6 +181,9 @@ static PyObject* color_geta(PyColor *self, void *closure)
 static int color_seta(PyColor *self, PyObject *value, void *closure)
 {
     int v;
+
+    if (PyErr_CheckSignals())
+       return -1;
 
     if (!value)
     {
@@ -195,9 +204,6 @@ static int color_seta(PyColor *self, PyObject *value, void *closure)
        PyErr_SetString(PyExc_ValueError, "Alpha component must be between 0 and 255");
        return -1;
     }
-
-    if (PyErr_CheckSignals())
-       return -1;
 
     self->color = (self->color & 0x00FFFFFFU) | ((u32)v << 24);
 

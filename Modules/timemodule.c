@@ -878,16 +878,16 @@ floattime(void)
     struct timeval t;
     double res;
 
-    time(&now);
+    sceKernelLibcTime(&now);
     res = (double)now;
 
-    if (gettimeofday(&t, NULL) == 0)
+    if (sceKernelLibcGettimeofday(&t, NULL) == 0)
     {
        res += t.tv_usec*0.000001;
     }
 
     return res;
-#else
+#else /* !PSP */
 
 #ifdef HAVE_GETTIMEOFDAY
 	{

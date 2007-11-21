@@ -29,6 +29,9 @@ static PyObject* sound_new(PyTypeObject *type,
 {
     PySound *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PySound*)type->tp_alloc(type, 0);
     if (self)
        self->sound = NULL;
@@ -42,7 +45,10 @@ static int sound_init(PySound *self,
 {
     char *filename;
 
-    if (!PyArg_ParseTuple(args, "s", &filename))
+    if (!PyArg_ParseTuple(args, "s:__init__", &filename))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     try
@@ -59,8 +65,7 @@ static int sound_init(PySound *self,
 }
 
 static PyObject* sound_start(PySound *self,
-                             PyObject *args,
-                             PyObject *kwargs)
+                             PyObject *args)
 {
     if (!PyArg_ParseTuple(args, ":start"))
        return NULL;

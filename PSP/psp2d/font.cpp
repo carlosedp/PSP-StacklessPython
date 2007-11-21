@@ -32,6 +32,9 @@ static PyObject* font_new(PyTypeObject *type,
 {
     PyFont *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyFont*)type->tp_alloc(type, 0);
 
     if (self)
@@ -46,7 +49,10 @@ static int font_init(PyFont *self,
 {
     char *filename;
 
-    if (!PyArg_ParseTuple(args, "s", &filename))
+    if (!PyArg_ParseTuple(args, "s:__init__", &filename))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     try
@@ -68,38 +74,44 @@ static int font_init(PyFont *self,
 }
 
 static PyObject* font_textWidth(PyFont *self,
-                                PyObject *args,
-                                PyObject *kwargs)
+                                PyObject *args)
 {
     char *text;
 
     if (!PyArg_ParseTuple(args, "s:textWidth", &text))
        return NULL;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     return Py_BuildValue("i", (int)self->fnt->getTextWidth(text));
 }
 
 static PyObject* font_textHeight(PyFont *self,
-                                 PyObject *args,
-                                 PyObject *kwargs)
+                                 PyObject *args)
 {
     char *text;
 
     if (!PyArg_ParseTuple(args, "s:textHeight", &text))
        return NULL;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     return Py_BuildValue("i", (int)self->fnt->getTextHeight(text));
 }
 
 static PyObject* font_drawText(PyFont *self,
-                               PyObject *args,
-                               PyObject *kwargs)
+                               PyObject *args)
 {
     PyObject *drw;
     int x, y;
     char *text;
 
-    if (!PyArg_ParseTuple(args, "Oiis", &drw, &x, &y, &text))
+    if (!PyArg_ParseTuple(args, "Oiis:drawText", &drw, &x, &y, &text))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (drw->ob_type == PPyImageType)

@@ -120,6 +120,9 @@ static PyObject* timer_new(PyTypeObject *type,
 {
     PyTimer *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyTimer*)type->tp_alloc(type, 0);
 
     if (self)
@@ -137,7 +140,10 @@ static int timer_init(PyTimer *self,
 {
     int tmo;
 
-    if (!PyArg_ParseTuple(args, "i", &tmo))
+    if (!PyArg_ParseTuple(args, "i:__init__", &tmo))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     self->lst = new PyListener(self);
@@ -147,10 +153,12 @@ static int timer_init(PyTimer *self,
 }
 
 static PyObject* timer_fire(PyTimer *self,
-                            PyObject *args,
-                            PyObject *kwargs)
+                            PyObject *args)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":fire"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     PyErr_SetString(PyExc_NotImplementedError, "Not implemented");
@@ -158,10 +166,12 @@ static PyObject* timer_fire(PyTimer *self,
 }
 
 static PyObject* timer_run(PyTimer *self,
-                           PyObject *args,
-                           PyObject *kwargs)
+                           PyObject *args)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":run"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     self->lst->saveState();

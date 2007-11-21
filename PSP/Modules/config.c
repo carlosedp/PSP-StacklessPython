@@ -82,12 +82,8 @@ extern void initosl(void);
 extern void initpspogg(void);
 #endif
 
-//#ifdef WITH_SQLITE
-//extern void init_sqlite(void);
-//#endif
-
 #ifdef WITH_SQLITE
-extern void init_sqlite3(void)
+extern void init_sqlite3(void);
 #endif
 
 #ifdef WITH_PSPMP3

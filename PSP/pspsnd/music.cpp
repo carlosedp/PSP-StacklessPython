@@ -29,6 +29,9 @@ static PyObject* music_new(PyTypeObject *type,
 {
     PyMusic *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyMusic*)type->tp_alloc(type, 0);
     if (self)
        self->music = NULL;
@@ -46,8 +49,11 @@ static int music_init(PyMusic *self,
 
     static char* kwids[] = { "filename", "maxchan", "loop", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|ii", kwids,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|ii:__init__", kwids,
                                      &filename, &maxchan, &loop))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     try
@@ -64,8 +70,7 @@ static int music_init(PyMusic *self,
 }
 
 static PyObject* music_start(PyMusic *self,
-                             PyObject *args,
-                             PyObject *kwargs)
+                             PyObject *args)
 {
     if (!PyArg_ParseTuple(args, ":start"))
        return NULL;
@@ -80,8 +85,7 @@ static PyObject* music_start(PyMusic *self,
 }
 
 static PyObject* music_stop(PyMusic *self,
-                            PyObject *args,
-                            PyObject *kwargs)
+                            PyObject *args)
 {
     if (!PyArg_ParseTuple(args, ":stop"))
        return NULL;

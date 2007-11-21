@@ -243,13 +243,13 @@ static PyObject* connect_to_apctl(PyObject *self, PyObject *args, PyObject *kwar
 
     static char* kwids[] = { "config", "callback", "timeout", NULL };
 
-    if (PyErr_CheckSignals())
-       return NULL;
-
     time(&started);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iOi", kwids,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iOi:connect_to_apctl", kwids,
                                      &config, &callback, &timeout))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (callback)
@@ -338,7 +338,10 @@ static PyObject* get_apctl_state(PyObject *self, PyObject *args)
 {
     int state, ret;
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":get_apctl_state"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     Py_BEGIN_ALLOW_THREADS
@@ -356,7 +359,10 @@ static PyObject* get_apctl_state(PyObject *self, PyObject *args)
 
 static PyObject* disconnect_apctl(PyObject *self, PyObject *args)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":disconnect_apctl"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     Py_BEGIN_ALLOW_THREADS
@@ -371,7 +377,10 @@ static PyObject* get_ip(PyObject *self, PyObject *args)
 {
     char ipaddr[32];
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":get_ip"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (sceNetApctlGetInfo(8, ipaddr) != 0)
@@ -389,12 +398,15 @@ static PyObject* enum_configs(PyObject *self, PyObject *args)
     PyObject *ret;
     netData name, ip;
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":enum_configs"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     ret = PyList_New(0);
 
-    while (1)
+    for (index = 1; index < 100; index++)
     {
        if (sceUtilityCheckNetParam(index))
           break;
@@ -415,14 +427,20 @@ static PyObject* wlanIsPowered(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, ":wlanIsPowered"))
        return NULL;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     return Py_BuildValue("i", sceWlanDevIsPowerOn());
 }
 
 static PyObject* wlanEtherAddr(PyObject *self, PyObject *args)
 {
-    char buffer[8];
+    unsigned char buffer[8];
 
     if (!PyArg_ParseTuple(args, ":wlanEtherAddr"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (sceWlanGetEtherAddr(buffer) < 0)
@@ -441,11 +459,14 @@ static PyObject* wlanSwitchState(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, ":wlanSwitchState"))
        return NULL;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     return Py_BuildValue("i", sceWlanGetSwitchState());
 }
 
 static PyMethodDef methods[] = {
-   { "connectToAPCTL", (PyCFunction)connect_to_apctl, METH_VARARGS, "" },
+   { "connectToAPCTL", (PyCFunction)connect_to_apctl, METH_VARARGS|METH_KEYWORDS, "" },
    { "disconnectAPCTL", (PyCFunction)disconnect_apctl, METH_VARARGS, "" },
    { "getAPCTLState", (PyCFunction)get_apctl_state, METH_VARARGS, "" },
    { "getIP", (PyCFunction)get_ip, METH_VARARGS, "" },

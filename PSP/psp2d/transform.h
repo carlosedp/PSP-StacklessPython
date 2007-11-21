@@ -19,6 +19,9 @@
 #define TR_USER                 0
 #define TR_PLUS                 1
 #define TR_MULT                 2
+#define TR_G2A                  3     // Gray level to alpha
+#define TR_GRAY                 4
+#define TR_BW                   5
 
 typedef struct
 {

@@ -1,4 +1,16 @@
-TARGET = python
+TARGET = StacklessPSP
+BUILD_PRX = 1
+PSP_FW_VERSION = 371
+RELEASE_NAME = StacklessPSP
+RELEASE_VERSION = 2.5.1
+RELEASE_DIRECTORY = ~/$(RELEASE_NAME)-$(RELEASE_VERSION)
+
+EXTRA_TARGETS = EBOOT.PBP
+PSP_EBOOT_TITLE = Stackless PyPSP 2.5.1
+PSP_EBOOT_ICON = icon_slp251.png
+#PSP_EBOOT_UNKPNG = pic0.png
+#PSP_EBOOT_PIC1 = pic1.png
+#PSP_EBOOT_SND0 = snd0.at3
 
 MODULES_STATIC = \
 	Modules/config.o \
@@ -52,7 +64,8 @@ MODULES_STATIC = \
 	../Modules/expat/xmltok.o \
 	../Modules/_elementtree.o \
 	../Modules/_functoolsmodule.o \
-	../Modules/_hashopenssl.o
+	../Modules/_hashopenssl.o \
+	../Modules/bz2module.o
 
 OBJECTS_PYTHON = \
     ../Python/ast.o \
@@ -149,15 +162,17 @@ OBJECTS_PARSER = \
 	../Parser/bitset.o \
 	../Parser/acceler.o
 
-#OBJS_SQLITE = pysqlite/src/cache.o \
-#	pysqlite/src/connection.o \
-#	pysqlite/src/cursor.o \
-#	pysqlite/src/microprotocols.o \
-#	pysqlite/src/module.o \
-#	pysqlite/src/prepare_protocol.o \
-#	pysqlite/src/row.o \
-#	pysqlite/src/statement.o \
-#	pysqlite/src/util.o
+OBJS_STACKLESS = ../Stackless/core/cframeobject.o \
+	../Stackless/core/slp_transfer.o \
+	../Stackless/core/stackless_util.o \
+	../Stackless/core/stacklesseval.o \
+	../Stackless/module/channelobject.o \
+	../Stackless/module/flextype.o \
+	../Stackless/module/scheduling.o \
+	../Stackless/module/stacklessmodule.o \
+	../Stackless/module/taskletobject.o \
+	../Stackless/pickling/prickelpit.o \
+	../Stackless/pickling/safe_pickle.o
 
 OBJS_SQLITE = ../Modules/_sqlite/cache.o \
               ../Modules/_sqlite/connection.o \
@@ -169,7 +184,8 @@ OBJS_SQLITE = ../Modules/_sqlite/cache.o \
               ../Modules/_sqlite/statement.o \
               ../Modules/_sqlite/util.o
 
-OBJS_PSP2D = psp2d/psp2d.o \
+OBJS_PSP2D = \
+	psp2d/psp2d.o \
 	psp2d/color.o \
 	psp2d/image.o \
 	psp2d/controller.o \
@@ -180,27 +196,14 @@ OBJS_PSP2D = psp2d/psp2d.o \
 	psp2d/blitbatch.o \
 	psp2d/timer.o
 
-OBJS_PSPSND = pspsnd/pspsnd.o \
+OBJS_PSPSND = \
+	pspsnd/pspsnd.o \
 	pspsnd/sound.o \
 	pspsnd/music.o
 
 OBJS_PSPNET = pspnet/pspnet.o
 
 OBJS_OSLIB = osl/osl.o osl/image.o osl/ctrl.o osl/sound.o osl/map.o osl/font.o
-
-
-OBJS_STACKLESS = ../Stackless/core/cframeobject.o \
-		 ../Stackless/core/slp_transfer.o \
-		 ../Stackless/core/stackless_util.o \
-		 ../Stackless/core/stacklesseval.o \
-		 ../Stackless/module/channelobject.o \
-		 ../Stackless/module/flextype.o \
-		 ../Stackless/module/scheduling.o \
-		 ../Stackless/module/stacklessmodule.o \
-		 ../Stackless/module/taskletobject.o \
-		 ../Stackless/pickling/prickelpit.o \
-		 ../Stackless/pickling/safe_pickle.o
-
 
 OBJS_PSPOGG = pspogg/oggplayer.o pspogg/pspogg.o
 
@@ -211,22 +214,15 @@ OBJS_SSL = ../Modules/_ssl.o
 OBJS = main.o psperror.o support.o \
 	$(MODULES_STATIC) $(OBJECTS_PYTHON) $(OBJECTS_OBJECTS) $(OBJECTS_PARSER) $(OBJS_STACKLESS)
 
-CPPFLAGS=
-LDFLAGS =
+CPPFLAGS=-I../../cpplibs
+LDFLAGS=-L../../cpplibs
 LIBS=
-
-#ifeq ($(WITH_SQLITE),1)
-#OBJS += $(OBJS_SQLITE)
-#CPPFLAGS += -DMODULE_NAME=\"pysqlite2.dbapi2\" -DWITH_SQLITE
-#LIBS += -lsqlite3
-#endif
 
 ifeq ($(WITH_SQLITE),1)
 OBJS += $(OBJS_SQLITE)
 CPPFLAGS += -I../Modules/_sqlite -DMODULE_NAME=\"sqlite3\" -DWITH_SQLITE
 LIBS += -lsqlite3
 endif
-
 
 ifeq ($(WITH_PSP2D),1)
 OBJS += $(OBJS_PSP2D)
@@ -269,10 +265,10 @@ endif
 ifeq ($(WITH_SSL),1)
 OBJS += $(OBJS_SSL)
 LIBS += -lssl -lcrypto
-CPPFLAGS += -DWITH_SSL
+CPPFLAGS += -DWITH_SSL -I$(PSPDEV)/psp/include/openssl
 endif
 
-LIBS += -lpsppower -lstdc++
+LIBS += -lpsppower -lstdc++ -lbz2 -lssl -lcrypto
 
 CPPFLAGS += -DHAVE_CONFIG_H -DPSP -I../Include -I../Stackless
 CPPFLAGS += -I../Modules/expat -DHAVE_MEMMOVE
@@ -280,17 +276,36 @@ CPPFLAGS += -I../Modules/expat -DHAVE_MEMMOVE
 LIBS += -lc -lm
 
 CFLAGS = -Os -G0 -Wall -Wno-strict-aliasing
-CXXFLAGS = $(CFLAGS) -fno-rtti
+CXXFLAGS = $(CFLAGS) -fno-rtti -fno-strict-aliasing
 ASFLAGS = $(CFLAGS)
 
 LIBDIR =
-
-EXTRA_TARGETS = EBOOT.PBP
-PSP_EBOOT_TITLE = Stackless PyPSP 2.5.1
-PSP_EBOOT_ICON = icon_slp251.png
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build.mak
 
 psperror.c:
 	python generr.py
+	
+release: $(RELEASE_DIRECTORY)/$(RELEASE_NAME)$(RELEASE_VERSION).zip
+	@echo "================== Package Done! =================="
+
+$(RELEASE_DIRECTORY)/$(RELEASE_NAME)$(RELEASE_VERSION).zip: $(PSP_EBOOT)
+	@echo "###### Create release package ######"
+	@echo "1. Creating release directory $(RELEASE_DIRECTORY)/"
+	@mkdir -p $(RELEASE_DIRECTORY)/
+	@echo "2. Copying EBOOT to release dir."
+	@cp -a EBOOT.PBP $(RELEASE_DIRECTORY)/
+	@echo "3. Copying Python libraries to release dir."
+	@cp -a ../Lib $(RELEASE_DIRECTORY)/python
+	@echo "4. Cleaning up files."
+	@find $(RELEASE_DIRECTORY)/ -name ".svn" | xargs rm -rf
+	@rm -rf $(RELEASE_DIRECTORY)/python/plat*
+	@echo "5. Release dir created on $(RELEASE_DIRECTORY)."
+	@echo "###### Done ######"
+
+distclean:
+	@echo "Cleaning $(RELEASE_DIRECTORY)"
+	@rm -rf $(RELEASE_DIRECTORY)
+	@echo "Done!"
+	@echo ""

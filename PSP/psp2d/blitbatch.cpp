@@ -90,6 +90,9 @@ static PyObject* blitbatch_new(PyTypeObject *type,
 {
     PyBlitBatch *self;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     self = (PyBlitBatch*)type->tp_alloc(type, 0);
 
     if (self)
@@ -102,7 +105,10 @@ static int blitbatch_init(PyBlitBatch *self,
                           PyObject *args,
                           PyObject *kwargs)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":__init__"))
+       return -1;
+
+    if (PyErr_CheckSignals())
        return -1;
 
     self->batch = new BlitBatch();
@@ -111,12 +117,14 @@ static int blitbatch_init(PyBlitBatch *self,
 }
 
 static PyObject* blitbatch_add(PyBlitBatch *self,
-                               PyObject *args,
-                               PyObject *kwargs)
+                               PyObject *args)
 {
     PyObject *other;
 
-    if (!PyArg_ParseTuple(args, "O", &other))
+    if (!PyArg_ParseTuple(args, "O:add", &other))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     self->batch->add(new PyBatched(other));
@@ -126,13 +134,15 @@ static PyObject* blitbatch_add(PyBlitBatch *self,
 }
 
 static PyObject* blitbatch_blit(PyBlitBatch *self,
-                                PyObject *args,
-                                PyObject *kwargs)
+                                PyObject *args)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":blit"))
        return NULL;
 
-    // TODO: release the GIL
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    // TODO: release the GIL ?
 
     self->batch->blit();
 
