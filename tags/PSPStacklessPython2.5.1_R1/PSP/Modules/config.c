@@ -59,6 +59,7 @@ extern void initpyexpat(void);
 extern void init_elementtree(void);
 extern void init_functools(void);
 extern void init_hashlib(void);
+extern void initbz2(void);
 
 extern void initpspos(void);
 
@@ -149,6 +150,7 @@ struct _inittab _PyImport_Inittab[] = {
         {"_elementtree", init_elementtree},
         {"_functools", init_functools},
         {"_hashlib", init_hashlib},
+        {"bz2", initbz2},
 
 #ifdef WITH_SSL
         {"_ssl", init_ssl},

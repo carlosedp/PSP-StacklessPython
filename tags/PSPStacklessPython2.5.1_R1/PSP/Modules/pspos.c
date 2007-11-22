@@ -30,24 +30,42 @@ extern char* formatPSPError(int); // in ../psperror.c
 static PyObject* PyPSP_open(PyObject *self,
                             PyObject *args)
 {
-    char *path;
-    int flags, mode;
+    char *path = NULL;
+    int flags;
+    int mode = 0777;
     int fd;
 
-    if (!PyArg_ParseTuple(args, "sii:open", &path, &flags, &mode))
+
+	if (!PyArg_ParseTuple(args, "eti|i",
+	                      Py_FileSystemDefaultEncoding, &path,
+	                      &flags, &mode))
+		return NULL;
+
+	Py_BEGIN_ALLOW_THREADS
+	fd = open(path, flags, mode);
+	Py_END_ALLOW_THREADS
+	if (fd < 0)
+        PyErr_SetString(PyExc_OSError, formatPSPError(fd));
+        return NULL;
+	PyMem_Free(path);
+	return PyInt_FromLong((long)fd);
+
+/*
+    if (!PyArg_ParseTuple(args, "si|i:open", &path, &flags, &mode))
        return NULL;
 
     if (PyErr_CheckSignals())
        return NULL;
-
+    Py_BEGIN_ALLOW_THREADS
     fd = open(path, flags,mode);
+    Py_END_ALLOW_THREADS
     if (fd < 0)
     {
        PyErr_SetString(PyExc_OSError, formatPSPError(fd));
        return NULL;
     }
-
-    return Py_BuildValue("i", fd);
+    return PyInt_FromLong((long)fd);
+*/
 }
 
 static int closefile(FILE *fp)
@@ -67,9 +85,40 @@ static PyObject* PyPSP_fdopen(PyObject *self,
 
     if (PyErr_CheckSignals())
        return NULL;
-
+    Py_BEGIN_ALLOW_THREADS
     fp = fdopen(fd, mode);
+    Py_END_ALLOW_THREADS
+    
     return PyFile_FromFile(fp, "", mode, closefile); // FIXME: name ?
+}
+
+static PyObject *PyPSP_close(PyObject *self, PyObject *args)
+{
+	int fd, res;
+	if (!PyArg_ParseTuple(args, "i:close", &fd))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = close(fd);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return PyErr_SetFromErrno(PyExc_OSError);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyObject *PyPSP_access(PyObject *self, PyObject *args)
+{
+	char *path;
+	int mode;
+	int res;
+	if (!PyArg_ParseTuple(args, "eti:access",
+			      Py_FileSystemDefaultEncoding, &path, &mode))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = access(path, mode);
+	Py_END_ALLOW_THREADS
+	PyMem_Free(path);
+	return PyBool_FromLong(res == 0);
 }
 
 static PyObject* PyPSP_unlink(PyObject *self,
@@ -177,6 +226,9 @@ static PyObject* PyPSP_getcwd(PyObject *self,
     int sz = 128;
     PyObject *ret;
 
+    if (!PyArg_ParseTuple(args, ":getcwd"))
+       return NULL;
+
     if (PyErr_CheckSignals())
        return NULL;
 
@@ -227,7 +279,8 @@ static PyObject* PyPSP_mkdir(PyObject *self,
     if (PyErr_CheckSignals())
        return NULL;
 
-    err = sceIoMkdir(path, mode);
+    //err = sceIoMkdir(path, mode);
+    err = mkdir(path, mode);
     if (err)
     {
        PyErr_SetString(PyExc_OSError, formatPSPError(err));
@@ -336,7 +389,6 @@ static PyObject* PyPSP_stat(PyObject *self,
 {
     char *path;
     PyObject *ret;
-    //SceIoStat st;
     struct stat st;
     int err;
 
@@ -346,7 +398,6 @@ static PyObject* PyPSP_stat(PyObject *self,
     if (PyErr_CheckSignals())
        return NULL;
 
-    //sceIoGetstat(path, &st);
     err = stat(path, &st);
     if (err)
     {
@@ -403,8 +454,8 @@ static PyObject* PyPSP_utime(PyObject *self,
     if (PyErr_CheckSignals())
        return NULL;
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    PyErr_SetString(PyExc_NotImplementedError, "Not implemented");
+    return NULL;
 }
 
 static PyObject* PyPSP_getenv(PyObject *self,
@@ -461,7 +512,7 @@ static PyObject* PyPSP_delenv(PyObject *self,
 static PyObject* PyPSP_getenvdict(PyObject *self,
                                   PyObject *args)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":getenvdict"))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -479,7 +530,7 @@ static PyObject* PyPSP_freemem(PyObject *self,
 {
     SceSize mem;
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":freemem"))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -499,7 +550,7 @@ static PyObject* PyPSP_battery(PyObject *self,
 {
     int plugged, present, charging, lifep, lifet, temp, volt;
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":battery"))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -521,12 +572,58 @@ static PyObject* PyPSP_battery(PyObject *self,
 //==========================================================================
 // CPU speed control
 
+void setClockBus(int cpufreq, int busfreq) {
+    scePowerSetClockFrequency(cpufreq < 19 ? 19 : cpufreq, cpufreq, busfreq);
+    return;
+}
+
+
+static PyObject* PyPSP_setclocks(PyObject *self,
+                                PyObject *args)
+{
+    int cpufreq, busfreq;
+
+    if (!PyArg_ParseTuple(args, "ii:setclocks", &cpufreq, &busfreq))
+       return NULL;
+
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    if ((cpufreq < 1) || (cpufreq > 333))
+    {
+       PyErr_Format(PyExc_OSError, "Bad CPU frequency: %d", cpufreq);
+       return NULL;
+    }
+    if ((busfreq < 1) || (busfreq > 167))
+    {
+       PyErr_Format(PyExc_OSError, "Bad BUS frequency: %d", busfreq);
+       return NULL;
+    }
+    setClockBus(cpufreq, busfreq);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject* PyPSP_getclocks(PyObject *self,
+                                PyObject *args)
+{
+
+    if (!PyArg_ParseTuple(args, ":getclocks"))
+       return NULL;
+
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    return Py_BuildValue("ii", scePowerGetCpuClockFrequency(),
+                               scePowerGetBusClockFrequency());
+}
+
 static PyObject* PyPSP_setclock(PyObject *self,
                                 PyObject *args)
 {
     int freq;
-
-    if (!PyArg_ParseTuple(args, "i", &freq))
+    if (!PyArg_ParseTuple(args, "i:setclock", &freq))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -537,7 +634,6 @@ static PyObject* PyPSP_setclock(PyObject *self,
        PyErr_Format(PyExc_OSError, "Bad CPU frequency: %d", freq);
        return NULL;
     }
-
     scePowerSetCpuClockFrequency(freq);
 
     Py_INCREF(Py_None);
@@ -548,7 +644,7 @@ static PyObject* PyPSP_getclock(PyObject *self,
                                 PyObject *args)
 {
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":getclock"))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -562,7 +658,7 @@ static PyObject* PyPSP_setbus(PyObject *self,
 {
     int freq;
 
-    if (!PyArg_ParseTuple(args, "i", &freq))
+    if (!PyArg_ParseTuple(args, "i:setbus", &freq))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -573,7 +669,7 @@ static PyObject* PyPSP_setbus(PyObject *self,
        PyErr_Format(PyExc_OSError, "Bad bus frequency: %d", freq);
        return NULL;
     }
-
+    
     scePowerSetBusClockFrequency(freq);
 
     Py_INCREF(Py_None);
@@ -584,7 +680,7 @@ static PyObject* PyPSP_getbus(PyObject *self,
                               PyObject *args)
 {
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":getbus"))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -596,7 +692,7 @@ static PyObject* PyPSP_getbus(PyObject *self,
 static PyObject* PyPSP_powertick(PyObject *self,
                                  PyObject *args)
 {
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, ":powertick"))
        return NULL;
 
     if (PyErr_CheckSignals())
@@ -618,6 +714,9 @@ static PyObject* PyPSP_getsystemparam(PyObject *self, PyObject *args)
     PyObject *ret;
 
     if (!PyArg_ParseTuple(args, "i:getsystemparam", &id))
+       return NULL;
+
+    if (PyErr_CheckSignals())
        return NULL;
 
     if (id == PSP_SYSTEMPARAM_ID_STRING_NICKNAME)
@@ -699,6 +798,9 @@ static PyObject* PyPSP_getnickname(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, ":getnickname"))
        return NULL;
 
+    if (PyErr_CheckSignals())
+       return NULL;
+
     if(sceUtilityGetSystemParamString(PSP_SYSTEMPARAM_ID_STRING_NICKNAME,
                                       nickname,
                                       256) == PSP_SYSTEMPARAM_RETVAL_FAIL)
@@ -745,10 +847,10 @@ static PyObject* PyPSP_realmem(PyObject *self, PyObject *args)
     int size = 4096, total = 0;
     _LINK *first = NULL, *current = NULL, *lnk;
 
-    if (PyErr_CheckSignals())
+    if (!PyArg_ParseTuple(args, "|i:realmem", &size))
        return NULL;
 
-    if (!PyArg_ParseTuple(args, "|i:realmem", &size))
+    if (PyErr_CheckSignals())
        return NULL;
 
     while (1)
@@ -798,6 +900,8 @@ static PyObject* PyPSP_realmem(PyObject *self, PyObject *args)
 
 static PyMethodDef pspos_functions[] = {
    { "open", PyPSP_open, METH_VARARGS, "" },
+   { "close", PyPSP_close, METH_VARARGS, "" },
+   { "access", PyPSP_access, METH_VARARGS, "" },
    { "fdopen", PyPSP_fdopen, METH_VARARGS, "" },
    { "unlink", PyPSP_unlink, METH_VARARGS, "" },
    { "remove", PyPSP_unlink, METH_VARARGS, "" },
@@ -819,6 +923,8 @@ static PyMethodDef pspos_functions[] = {
 
    { "freemem", PyPSP_freemem, METH_VARARGS, "" },
    { "battery", PyPSP_battery, METH_VARARGS, "" },
+   { "setclocks", PyPSP_setclocks, METH_VARARGS, "" },
+   { "getclocks", PyPSP_getclocks, METH_VARARGS, "" },
    { "setclock", PyPSP_setclock, METH_VARARGS, "" },
    { "getclock", PyPSP_getclock, METH_VARARGS, "" },
    { "setbus", PyPSP_setbus, METH_VARARGS, "" },
