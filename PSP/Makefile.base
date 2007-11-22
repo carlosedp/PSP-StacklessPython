@@ -298,6 +298,7 @@ $(RELEASE_DIRECTORY)/$(RELEASE_NAME)$(RELEASE_VERSION).zip: $(PSP_EBOOT)
 	@cp -a EBOOT.PBP $(RELEASE_DIRECTORY)/
 	@echo "3. Copying Python libraries to release dir."
 	@cp -a ../Lib $(RELEASE_DIRECTORY)/python
+	@cp -a elementtree/elementtree $(RELEASE_DIRECTORY)/python/site-packages/
 	@echo "4. Cleaning up files."
 	@find $(RELEASE_DIRECTORY)/ -name ".svn" | xargs rm -rf
 	@rm -rf $(RELEASE_DIRECTORY)/python/plat*

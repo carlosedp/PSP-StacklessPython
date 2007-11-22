@@ -59,6 +59,7 @@ extern void initpyexpat(void);
 extern void init_elementtree(void);
 extern void init_functools(void);
 extern void init_hashlib(void);
+extern void initbz2(void);
 
 extern void initpspos(void);
 
@@ -82,6 +83,10 @@ extern void initosl(void);
 extern void initpspogg(void);
 #endif
 
+//#ifdef WITH_SQLITE
+//extern void init_sqlite(void);
+//#endif
+
 #ifdef WITH_SQLITE
 extern void init_sqlite3(void);
 #endif
@@ -96,17 +101,14 @@ extern void init_ssl(void);
 
 
 struct _inittab _PyImport_Inittab[] = {
-	{"marshal", PyMarshal_Init},
-	{"imp", initimp},
-
-	{"__main__", NULL},
-	{"__builtin__", NULL},
-
-	{"sys", NULL},
-	{"exceptions", NULL},
-
-	{"gc", initgc},
-	{"_ast", init_ast},
+	    {"marshal", PyMarshal_Init},
+	    {"imp", initimp},
+	    {"__main__", NULL},
+	    {"__builtin__", NULL},
+	    {"sys", NULL},
+	    {"exceptions", NULL},
+	    {"gc", initgc},
+	    {"_ast", init_ast},
         {"_types", init_types},
         {"time", inittime},
         {"math", initmath},
@@ -118,7 +120,7 @@ struct _inittab _PyImport_Inittab[] = {
         {"errno", initerrno},
         {"thread", initthread},
         {"collections", initcollections},
-        {"md5", init_md5 },
+        {"_md5", init_md5 },
         {"_socket", init_socket},
         {"select", initselect},
         {"zipimport", initzipimport},
@@ -149,11 +151,11 @@ struct _inittab _PyImport_Inittab[] = {
         {"_elementtree", init_elementtree},
         {"_functools", init_functools},
         {"_hashlib", init_hashlib},
+        {"bz2", initbz2},
 
 #ifdef WITH_SSL
         {"_ssl", init_ssl},
 #endif
-        {"pspos", initpspos},
 
 #ifdef WITH_PSP2D
         {"psp2d", initpsp2d},
@@ -178,8 +180,6 @@ struct _inittab _PyImport_Inittab[] = {
 #ifdef WITH_SQLITE
         {"_sqlite3", init_sqlite3},
 #endif
-
-
 
 #ifdef WITH_PSPOGG
         {"pspogg", initpspogg},
