@@ -64,8 +64,7 @@ MODULES_STATIC = \
 	../Modules/expat/xmltok.o \
 	../Modules/_elementtree.o \
 	../Modules/_functoolsmodule.o \
-	../Modules/_hashopenssl.o \
-	../Modules/bz2module.o
+	../Modules/bz2module.o \
 
 OBJECTS_PYTHON = \
     ../Python/ast.o \
@@ -209,7 +208,8 @@ OBJS_PSPOGG = pspogg/oggplayer.o pspogg/pspogg.o
 
 OBJS_PSPMP3 = pspmp3/MusicEngine.o pspmp3/pspmp3.o
 
-OBJS_SSL = ../Modules/_ssl.o
+OBJS_SSL = ../Modules/_ssl.o \
+           ../Modules/_hashopenssl.o
 
 OBJS = main.o psperror.o support.o \
 	$(MODULES_STATIC) $(OBJECTS_PYTHON) $(OBJECTS_OBJECTS) $(OBJECTS_PARSER) $(OBJS_STACKLESS)
@@ -268,7 +268,7 @@ LIBS += -lssl -lcrypto
 CPPFLAGS += -DWITH_SSL -I$(PSPDEV)/psp/include/openssl
 endif
 
-LIBS += -lpsppower -lstdc++ -lbz2 -lssl -lcrypto
+LIBS += -lpsppower -lstdc++ -lbz2
 
 CPPFLAGS += -DHAVE_CONFIG_H -DPSP -I../Include -I../Stackless
 CPPFLAGS += -I../Modules/expat -DHAVE_MEMMOVE
