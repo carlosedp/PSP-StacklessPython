@@ -21,7 +21,7 @@ Download them via SVN. For each one, follow the steps in its README or README.ps
 
 Then, download cpplibs and have it in the same directory where you will place the PSP Stackless sources.
 
-  * cpplibs - svn://python-psp.net/python/trunk/cpplibs
+  * cpplibs - http://pspstacklesspython.googlecode.com/svn/cpplibs
 
 Build in its directory. No need to "make install".
 
