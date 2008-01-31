@@ -1,0 +1,17 @@
+
+A suite  of C++ libraries to  ease programming the  PSP. Original code
+from LuaPlayer (http://www.luaplayer.org/), ported to C++.
+
+* Installation
+
+make
+make install
+
+* Documentation
+
+make doc
+
+* Samples
+
+The  samples  directory  contains  the  C++  version  of  the  program
+developped in the Python-PSP tutorial.
