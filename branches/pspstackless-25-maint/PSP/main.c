@@ -35,7 +35,8 @@
 #define REVS    51
 PSP_MODULE_INFO("StacklessPython", 0, VERS, REVS);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER|PSP_THREAD_ATTR_VFPU);
-PSP_HEAP_SIZE_KB(18*1024); /* Use 18Mb */
+//PSP_HEAP_SIZE_KB(18*1024); /* Use 18Mb */
+PSP_HEAP_SIZE_KB(-1024);    /* Leave 1024k to OS, rest to app */
 PSP_MAIN_THREAD_STACK_SIZE_KB(64);
 
 volatile int pspInterruptOccurred = 0;
@@ -105,8 +106,9 @@ void initTimezone() {
 
 int main(int argc, char *argv[]) {
     SetupCallbacks();
-    stdout = fopen("ms0:/pytrace.txt", "a+");
+    stdout = fopen("pytrace.txt", "a+");
     stderr = stdout;
+    setenv("PYTHONPATH", "python.zip", 1);
 
     initTimezone();
     time_t now;

@@ -15,7 +15,7 @@
 #include "color.h"
 #include "font.h"
 
-using namespace PSP2D;
+using namespace Imaging;
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
@@ -55,6 +55,39 @@ static int screen_init(PyScreen *self,
 
     return 0;
 }
+
+static PyObject* screen_getwidth(PyImage *self, void *closure)
+{
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    return Py_BuildValue("i", 480);
+}
+
+static PyObject* screen_getheight(PyImage *self, void *closure)
+{
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    return Py_BuildValue("i", 272);
+}
+
+static PyObject* screen_getsize(PyImage *self, void *closure)
+{
+    if (PyErr_CheckSignals())
+       return NULL;
+
+    return Py_BuildValue("ii", 480, 272);
+}
+
+static PyGetSetDef screen_getset[] = {
+   { "width", (getter)screen_getwidth, NULL, "Width of the image", NULL },
+   { "height", (getter)screen_getheight, NULL, "Height of the image", NULL },
+   { "size", (getter)screen_getsize, NULL, "Size as a 2-tuple", NULL },
+
+   { NULL }
+};
+
 
 static PyObject* screen_blit(PyScreen *self,
                              PyObject *args,
@@ -357,7 +390,7 @@ static PyMethodDef screen_methods[] = {
 static PyTypeObject PyScreenType = {
    PyObject_HEAD_INIT(NULL)
    0,
-   "psp2d.Screen",
+   "pymaging.Screen",
    sizeof(PyScreen),
    0,
    (destructor)screen_dealloc,
@@ -385,7 +418,7 @@ static PyTypeObject PyScreenType = {
    0,
    screen_methods,
    0,
-   0,
+   screen_getset,
    0,
    0,
    0,

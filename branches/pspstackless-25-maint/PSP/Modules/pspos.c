@@ -725,7 +725,7 @@ static PyObject* PyPSP_getsystemparam(PyObject *self, PyObject *args)
 
        if (sceUtilityGetSystemParamString(id, sValue, sizeof(sValue)) == PSP_SYSTEMPARAM_RETVAL_FAIL)
        {
-          PyErr_SetString(PyExc_OSError, "Could not set system parameter");
+          PyErr_SetString(PyExc_OSError, "Could not get system parameter");
           return NULL;
        }
 
@@ -737,7 +737,7 @@ static PyObject* PyPSP_getsystemparam(PyObject *self, PyObject *args)
 
        if (sceUtilityGetSystemParamInt(id, &iValue) == PSP_SYSTEMPARAM_RETVAL_FAIL)
        {
-          PyErr_SetString(PyExc_OSError, "Could not set system parameter");
+          PyErr_SetString(PyExc_OSError, "Could not get system parameter");
           return NULL;
        }
 

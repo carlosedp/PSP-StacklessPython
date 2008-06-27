@@ -14,13 +14,13 @@
 #define _PYSCREEN_H
 
 #include <Python.h>
-#include <libpsp2d/Screen.h>
+#include <imaging/Screen.h>
 
 typedef struct
 {
       PyObject_HEAD
 
-      PSP2D::Screen *scr;
+      Imaging::Screen *scr;
 } PyScreen;
 
 extern PyTypeObject* PPyScreenType;
