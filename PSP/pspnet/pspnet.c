@@ -409,14 +409,13 @@ static PyObject* enum_configs(PyObject *self, PyObject *args)
     for (index = 1; index < 100; index++)
     {
        if (sceUtilityCheckNetParam(index))
-          break;
+          continue;
 
        sceUtilityGetNetParam(index, PSP_NETPARAM_NAME, &name);
        sceUtilityGetNetParam(index, PSP_NETPARAM_IP, &ip);
 
        PyList_Append(ret, Py_BuildValue("iss", index, name.asString, ip.asString));
 
-       index++;
     }
 
     return ret;

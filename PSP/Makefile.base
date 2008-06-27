@@ -1,9 +1,10 @@
 TARGET = StacklessPSP
 BUILD_PRX = 1
-PSP_FW_VERSION = 371
+PSP_LARGE_MEMORY = 1
+PSP_FW_VERSION = 380
 RELEASE_NAME = StacklessPSP
 RELEASE_VERSION = 2.5.1
-RELEASE_DIRECTORY = ~/$(RELEASE_NAME)-$(RELEASE_VERSION)
+RELEASE_DIRECTORY = ../../$(RELEASE_NAME)-$(RELEASE_VERSION)
 
 EXTRA_TARGETS = EBOOT.PBP
 PSP_EBOOT_TITLE = Stackless PyPSP 2.5.1
@@ -183,18 +184,18 @@ OBJS_SQLITE = ../Modules/_sqlite/cache.o \
               ../Modules/_sqlite/statement.o \
               ../Modules/_sqlite/util.o
 
-OBJS_PSP2D = \
-	psp2d/psp2d.o \
-	psp2d/color.o \
-	psp2d/image.o \
+OBJS_PSP2D = psp2d/psp2d.o \
 	psp2d/controller.o \
 	psp2d/screen.o \
-	psp2d/mask.o \
-	psp2d/font.o \
-	psp2d/transform.o \
-	psp2d/blitbatch.o \
-	psp2d/timer.o
-
+	psp2d/timer.o \
+	../../pymaging/color.o \
+	../../pymaging/filters.o \
+	../../pymaging/font.o \
+	../../pymaging/image.o \
+	../../pymaging/main.o \
+	../../pymaging/mask.o \
+	../../pymaging/transform.o
+	
 OBJS_PSPSND = \
 	pspsnd/pspsnd.o \
 	pspsnd/sound.o \
@@ -214,8 +215,8 @@ OBJS_SSL = ../Modules/_ssl.o \
 OBJS = main.o psperror.o support.o \
 	$(MODULES_STATIC) $(OBJECTS_PYTHON) $(OBJECTS_OBJECTS) $(OBJECTS_PARSER) $(OBJS_STACKLESS)
 
-CPPFLAGS=-I../../cpplibs
-LDFLAGS=-L../../cpplibs
+CPPFLAGS=-Ipsp2d -I../../cpplibs -I../../imaging -I../../pymaging
+LDFLAGS=-L../../cpplibs -L../../imaging/build-psp
 LIBS=
 
 ifeq ($(WITH_SQLITE),1)
@@ -227,8 +228,8 @@ endif
 ifeq ($(WITH_PSP2D),1)
 OBJS += $(OBJS_PSP2D)
 LDFAGS += -Llibpsp2d
-LIBS += -lpsp2d -ljpeg -lpng -lz -lpspgu
-CPPFLAGS += -DWITH_PSP2D
+LIBS += -lpsp2d -limaging -ljpeg -lpng -lz -lpspgu
+CPPFLAGS += -DWITH_PSP2D -DIMAGING_MODULE_NAME=\"psp2d\"
 endif
 
 ifeq ($(WITH_PSPSND),1)
@@ -275,7 +276,7 @@ CPPFLAGS += -I../Modules/expat -DHAVE_MEMMOVE
 
 LIBS += -lc -lm
 
-CFLAGS = -Os -G0 -Wall -Wno-strict-aliasing
+CFLAGS = -Os -G0 -Wall -Wno-strict-aliasing -fPIC
 CXXFLAGS = $(CFLAGS) -fno-rtti -fno-strict-aliasing
 ASFLAGS = $(CFLAGS)
 
@@ -287,22 +288,20 @@ include $(PSPSDK)/lib/build.mak
 psperror.c:
 	python generr.py
 	
-release: $(RELEASE_DIRECTORY)/$(RELEASE_NAME)$(RELEASE_VERSION).zip
-	@echo "================== Package Done! =================="
-
-$(RELEASE_DIRECTORY)/$(RELEASE_NAME)$(RELEASE_VERSION).zip: $(PSP_EBOOT)
+release: $(PSP_EBOOT)
 	@echo "###### Create release package ######"
 	@echo "1. Creating release directory $(RELEASE_DIRECTORY)/"
 	@mkdir -p $(RELEASE_DIRECTORY)/
 	@echo "2. Copying EBOOT to release dir."
-	@cp -a EBOOT.PBP $(RELEASE_DIRECTORY)/
+	@cp -pR EBOOT.PBP $(RELEASE_DIRECTORY)/
 	@echo "3. Copying Python libraries to release dir."
-	@cp -a ../Lib $(RELEASE_DIRECTORY)/python
-	@cp -a elementtree/elementtree $(RELEASE_DIRECTORY)/python/site-packages/
-	@echo "4. Cleaning up files."
-	@find $(RELEASE_DIRECTORY)/ -name ".svn" | xargs rm -rf
-	@rm -rf $(RELEASE_DIRECTORY)/python/plat*
-	@echo "5. Release dir created on $(RELEASE_DIRECTORY)."
+	@cd ../Lib && find . \! -wholename '*/.svn*' \! -wholename '*/plat*' \! -wholename '*/test/*' | zip $(RELEASE_DIRECTORY)/python.zip -q@
+	@mkdir -p site-packages
+	@cp -pR elementtree/elementtree site-packages/
+	@find site-packages/ -name ".svn" | xargs rm -rf
+	@zip -qr $(RELEASE_DIRECTORY)/python.zip site-packages/elementtree
+	@rm -rf site-packages
+	@echo "4. Release dir created on $(RELEASE_DIRECTORY)."
 	@echo "###### Done ######"
 
 distclean:
