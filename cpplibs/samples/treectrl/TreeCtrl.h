@@ -1,13 +1,13 @@
 
 /**
- * @file Mask.h
+ * @file TreeCtrl.h
  */
 
 /**********************************************************************
 
-  Created: 13 Nov 2005
+  Created: 13 May 2008
 
-    Copyright (C) 2005 Jérôme Laheurte
+    Copyright (C) 2008 Frank Buss, Jérôme Laheurte
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -32,76 +32,41 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 **********************************************************************/
-// $Id: Mask.h 1481 2005-11-26 11:33:45Z fraca7 $
+// $Id$
 
-#ifndef _MASK_H
-#define _MASK_H
+#ifndef _TREECTRL_H
+#define _TREECTRL_H
 
-#include <psptypes.h>
-#include <libpsp2d/Image.h>
+#include <imaging/Image.h>
 
-namespace PSP2D
+class TreeItem;
+
+class TreeCtrl
 {
-    /**
-     * 2-dimensional bit mask, intended for collision detection
-     */
+  public:
+    TreeCtrl();
+    ~TreeCtrl();
 
-    class Mask
-    {
-      public:
-       /**
-        * Constructor
-        */
+    void freeze();
+    void thaw();
 
-       Mask(Image *img, u16 x, u16 y, u16 w, u16 h, unsigned char threshold = 127,
-            u16 xcoord = 0, u16 ycoord = 0);
+    TreeItem* append(TreeItem *parent, TreeItem *item);
 
-       ~Mask();
+    void selectNext();
+    void selectPrev();
 
-       /**
-        * Changes this mask position
-        */
+    void redraw();
 
-       void move(u16 x, u16 y);
+    void collapse(bool);
 
-       /**
-        * Sets a bit to 1
-        */
-
-       void set(u16 x, u16 y);
-
-       /**
-        * Sets all the bits that are set in another mask
-        */
-
-       void set(Mask *msk);
-
-       /**
-        * Clears a bit
-        */
-
-       void clear(u16 x, u16 y);
-
-       /**
-        * Returns true if the bit is set
-        */
-
-       bool isSet(u16 x, u16 y);
-
-       /**
-        * Returns the number of common bits
-        */
-
-       u32 collide(Mask *msk);
-
-      protected:
-       u32 *_data;
-       u16 _width, _height, _wcap;
-       u16 _x, _y;
-    };
+  protected:
+    TreeItem *m_pRoot;
+    bool m_bFrozen;
+    int m_iFirst;
+    Imaging::Image *m_pArrow1;
+    Imaging::Image *m_pArrow2;
+    TreeItem *m_pSelected;
+    Imaging::Image *m_pSelect;
 };
 
-// Inline methods
-#include <libpsp2d/Mask.il>
-
-#endif /* _MASK_H */
+#endif /* _TREECTRL_H */

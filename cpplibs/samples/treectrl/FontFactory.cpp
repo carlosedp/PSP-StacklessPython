@@ -1,13 +1,14 @@
 
 /**
- * @file Exception.h
+ * @file FontFactory.cpp
+ * @brief Implementation of class FontFactory
  */
 
 /**********************************************************************
 
-  Created: 11 Nov 2005
+  Created: 13 May 2008
 
-    Copyright (C) 2005 Frank Buss, Jérôme Laheurte
+    Copyright (C) 2008 Frank Buss, Jérôme Laheurte
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -32,41 +33,37 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 **********************************************************************/
-// $Id: Exception.h 1481 2005-11-26 11:33:45Z fraca7 $
+// $Id$
 
-#ifndef _EXCEPTION_H
-#define _EXCEPTION_H
+#include "FontFactory.h"
 
-#include <string>
+using namespace std;
+using namespace Imaging;
 
-namespace PSP2D
+FontFactory* FontFactory::m_pInstance = 0;
+
+FontFactory::FontFactory()
 {
-    /**
-     * Base class  for exceptions  that may be  throwed by  classes in
-     * this library.
-     */
+}
 
-    class Exception
+FontFactory* FontFactory::getInstance()
+{
+    if (!m_pInstance)
+       m_pInstance = new FontFactory();
+
+    return m_pInstance;
+}
+
+Font* FontFactory::getFont(const string& name)
+{
+    if (m_Map.find(name) == m_Map.end())
     {
-      public:
-       /**
-        * Constructor.
-        *
-        * @param msg: A description of the error.
-        */
-       Exception(const std::string& msg);
+       string filename(name + ".png");
 
-       virtual ~Exception();
+       m_Map.insert(pair<string, Font*>(name, new Font(filename)));
+    }
 
-       /**
-        * Accessor for the message.
-        */
+    return m_Map[name];
+}
 
-       std::string getMessage();
-
-      protected:
-       std::string _msg;
-    };
-};
-
-#endif /* _EXCEPTION_H */
+static const char* _rcsid_FontFactory __attribute__((unused)) = "$Id$";

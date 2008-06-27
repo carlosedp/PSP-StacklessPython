@@ -1,13 +1,13 @@
 
 /**
- * @file BlitBatch.h
+ * @file FontFactory.h
  */
 
 /**********************************************************************
 
-  Created: 20 Nov 2005
+  Created: 13 May 2008
 
-    Copyright (C) 2005 Frank Buss, Jérôme Laheurte
+    Copyright (C) 2008 Frank Buss, Jérôme Laheurte
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -32,51 +32,29 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 **********************************************************************/
-// $Id: BlitBatch.h 1481 2005-11-26 11:33:45Z fraca7 $
+// $Id$
 
-#ifndef _BLITBATCH_H
-#define _BLITBATCH_H
+#ifndef _FONTFACTORY_H
+#define _FONTFACTORY_H
 
-#include <libpsp2d/Image.h>
-#include <list>
+#include <map>
+#include <string>
 
-namespace PSP2D
+#include <imaging/Font.h>
+
+class FontFactory
 {
-    class BatchedDrawable
-    {
-      public:
-       virtual ~BatchedDrawable() {};
+  public:
+    static FontFactory* getInstance();
 
-       virtual bool getData(Image*& drw, u16& sx, u16& sy, u16& w, u16& h,
-                            u16& dx, u16& dy) = 0;
-    };
+    Imaging::Font* getFont(const std::string&);
 
-    class BlitBatch
-    {
-      public:
-       /**
-        * Constructor.
-        */
+  private:
+    FontFactory();
 
-       BlitBatch();
+    static FontFactory* m_pInstance;
 
-       virtual ~BlitBatch();
-
-       /**
-        * Add a job. Takes ownership of the object.
-        */
-
-       void add(BatchedDrawable*);
-
-       /**
-        * Blit.
-        */
-
-       void blit(void);
-
-      protected:
-       std::list<BatchedDrawable*> _drws;
-    };
+    std::map<std::string, Imaging::Font*> m_Map;
 };
 
-#endif /* _BLITBATCH_H */
+#endif /* _FONTFACTORY_H */

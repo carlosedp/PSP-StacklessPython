@@ -1,13 +1,13 @@
 
 /**
- * @file Callback.h
+ * @file TreeItem.h
  */
 
 /**********************************************************************
 
-  Created: 02 Sep 2007
+  Created: 13 May 2008
 
-    Copyright (C) 2007 Frank Buss, Jérôme Laheurte
+    Copyright (C) 2008 Frank Buss, Jérôme Laheurte
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -34,21 +34,65 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 // $Id$
 
-#ifndef _CALLBACK_H
-#define _CALLBACK_H
+#ifndef _TREEITEM_H
+#define _TREEITEM_H
 
-namespace PSP2D
+#include <vector>
+#include <string>
+
+#include <imaging/Drawable.h>
+#include <imaging/Font.h>
+
+class TreeItem
 {
-    class Callback
-    {
-      public:
-       /**
-        * Called on activity progress. Should return false to stop the task.
-        */
-       virtual bool update(int, int) = 0;
+  public:
+    TreeItem();
+    virtual ~TreeItem();
 
-       virtual ~Callback() {};
-    };
+    virtual void draw(Imaging::Drawable*) = 0;
+
+    void visibleChildren(int, std::vector<std::pair<int, TreeItem*> >&);
+
+    bool collapsed();
+    void collapsed(bool);
+
+    void appendChild(TreeItem*);
+    TreeItem* childAt(int);
+
+    bool hasChildren()
+    {
+       return !m_Children.empty();
+    }
+
+  protected:
+    bool m_bCollapsed;
+    std::vector<TreeItem*> m_Children;
 };
 
-#endif /* _CALLBACK_H */
+class TextTreeItem : public TreeItem
+{
+  public:
+    TextTreeItem(const std::string& fontName = "font_small");
+    virtual ~TextTreeItem();
+
+    void draw(Imaging::Drawable*);
+
+    virtual std::string getText() = 0;
+
+  protected:
+    Imaging::Font* m_pFont;
+};
+
+class StaticTextTreeItem : public TextTreeItem
+{
+  public:
+    StaticTextTreeItem(const std::string& text, const std::string& fontName = "font_small");
+    virtual ~StaticTextTreeItem();
+
+    std::string getText();
+
+  protected:
+    std::string m_Text;
+};
+
+#endif /* _TREEITEM_H */

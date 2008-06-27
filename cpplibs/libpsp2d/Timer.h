@@ -37,7 +37,11 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _TIMER_H
 #define _TIMER_H
 
+#ifdef LINUX
+#include "ltypes.h"
+#else
 #include <psptypes.h>
+#endif
 
 namespace PSP2D
 {

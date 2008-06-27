@@ -33,11 +33,16 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 **********************************************************************/
-// $Id: Timer.cpp 3 2006-03-12 15:13:39Z fraca7 $
+// $Id: Timer.cpp 108 2007-12-02 10:52:55Z fraca7 $
 
 #include "Timer.h"
 
+#ifdef LINUX
+#include <unistd.h>
+#else
 #include <pspkernel.h>
+#endif
+
 #include <time.h>
 
 using namespace PSP2D;
@@ -73,7 +78,11 @@ void Timer::run()
        else
        {
           // Wait
+#ifdef LINUX
+          usleep((fired + _tmo - now) * 1000);
+#else
           sceKernelDelayThreadCB((fired + _tmo - now) * 1000);
+#endif
           fired = (u32)clock() * 1000 / CLOCKS_PER_SEC;
           if (!_listener->fire())
              break;
@@ -81,4 +90,4 @@ void Timer::run()
     }
 }
 
-static const char* _rcsid_Timer __attribute__((unused)) = "$Id: Timer.cpp 3 2006-03-12 15:13:39Z fraca7 $";
+static const char* _rcsid_Timer __attribute__((unused)) = "$Id: Timer.cpp 108 2007-12-02 10:52:55Z fraca7 $";

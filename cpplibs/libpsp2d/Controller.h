@@ -37,7 +37,9 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _CONTROLLER_H
 #define _CONTROLLER_H
 
+#ifndef LINUX
 #include <pspctrl.h>
+#endif
 
 namespace PSP2D
 {
