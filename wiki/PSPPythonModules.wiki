@@ -1,4 +1,4 @@
-#python-psp modules usage
+#summary python-psp modules usage
 
 ==Introduction==
 
@@ -13,4 +13,3 @@ For tutorials on PSP modules usage (psp2d, pspsnd, pspos, pspnet) check python-p
           o pspnet -- network
           o os -- extra os functions
           o OSLib -- experimental binding for OSLib - Not yet supported on PSP Stackless.
-
