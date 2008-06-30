@@ -1,4 +1,4 @@
-#Changelog information for PSP Stackless Python releases
+#summary Changelog information for PSP Stackless Python releases
 
 The release information will be put in this page with the newest release on top.
 
@@ -26,4 +26,3 @@ The release information will be put in this page with the newest release on top.
     * MP3 and OGG support
     * time and datetime modules now displays the correct date and time
     * WPA support for pspnet module
-
