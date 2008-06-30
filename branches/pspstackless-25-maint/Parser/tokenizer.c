@@ -585,6 +585,7 @@ decode_str(const char *str, struct tok_state *tok)
 {
 	PyObject* utf8 = NULL;
 	const char *s;
+	const char *newl[2] = {NULL, NULL};
 	int lineno = 0;
 	tok->enc = NULL;
 	tok->str = str;
@@ -603,13 +604,23 @@ decode_str(const char *str, struct tok_state *tok)
 	for (s = str;; s++) {
 		if (*s == '\0') break;
 		else if (*s == '\n') {
+			newl[lineno] = s;
 			lineno++;
 			if (lineno == 2) break;
 		}
 	}
 	tok->enc = NULL;
-	if (!check_coding_spec(str, s - str, tok, buf_setreadl))
-		return error_ret(tok);
+	/* need to check line 1 and 2 separately since check_coding_spec
+	   assumes a single line as input */
+	if (newl[0]) {
+		if (!check_coding_spec(str, newl[0] - str, tok, buf_setreadl))
+			return error_ret(tok);
+		if (tok->enc == NULL && newl[1]) {
+			if (!check_coding_spec(newl[0]+1, newl[1] - newl[0],
+					       tok, buf_setreadl))
+				return error_ret(tok);
+		}
+	}
 #ifdef Py_USING_UNICODE
 	if (tok->enc != NULL) {
 		assert(utf8 == NULL);
@@ -1521,6 +1532,67 @@ PyTokenizer_Get(struct tok_state *tok, char **p_start, char **p_end)
 	}
 	return result;
 }
+
+/* This function is only called from parsetok. However, it cannot live
+   there, as it must be empty for PGEN, and we can check for PGEN only
+   in this file. */
+
+#if defined(PGEN) || !defined(Py_USING_UNICODE)
+char*
+PyTokenizer_RestoreEncoding(struct tok_state* tok, int len, int* offset)
+{
+	return NULL;
+}
+#else
+static PyObject *
+dec_utf8(const char *enc, const char *text, size_t len) {
+	PyObject *ret = NULL;	
+	PyObject *unicode_text = PyUnicode_DecodeUTF8(text, len, "replace");
+	if (unicode_text) {
+		ret = PyUnicode_AsEncodedString(unicode_text, enc, "replace");
+		Py_DECREF(unicode_text);
+	}
+	if (!ret) {
+		PyErr_Clear();
+	}
+	return ret;
+}
+char *
+PyTokenizer_RestoreEncoding(struct tok_state* tok, int len, int *offset)
+{
+	char *text = NULL;
+	if (tok->encoding) {
+		/* convert source to original encondig */
+		PyObject *lineobj = dec_utf8(tok->encoding, tok->buf, len);
+		if (lineobj != NULL) {
+			int linelen = PyString_Size(lineobj);
+			const char *line = PyString_AsString(lineobj);
+			text = PyObject_MALLOC(linelen + 1);
+			if (text != NULL && line != NULL) {
+				if (linelen)
+					strncpy(text, line, linelen);
+				text[linelen] = '\0';
+			}
+			Py_DECREF(lineobj);
+					
+			/* adjust error offset */
+			if (*offset > 1) {
+				PyObject *offsetobj = dec_utf8(tok->encoding, 
+							       tok->buf, *offset-1);
+				if (offsetobj) {
+					*offset = PyString_Size(offsetobj) + 1;
+					Py_DECREF(offsetobj);
+				}
+			}
+			
+		}
+	}
+	return text;
+
+}
+#endif
+
+			   
 
 #ifdef Py_DEBUG
 

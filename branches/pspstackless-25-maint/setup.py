@@ -267,7 +267,8 @@ class PyBuildExt(build_ext):
                 # strip out double-dashes first so that we don't end up with
                 # substituting "--Long" to "-Long" and thus lead to "ong" being
                 # used for a library directory.
-                env_val = re.sub(r'(^|\s+)-(-|(?!%s))' % arg_name[1], '', env_val)
+                env_val = re.sub(r'(^|\s+)-(-|(?!%s))' % arg_name[1],
+                                 ' ', env_val)
                 parser = optparse.OptionParser()
                 # Make sure that allowing args interspersed with options is
                 # allowed
@@ -276,7 +277,7 @@ class PyBuildExt(build_ext):
                 parser.add_option(arg_name, dest="dirs", action="append")
                 options = parser.parse_args(env_val.split())[0]
                 if options.dirs:
-                    for directory in options.dirs:
+                    for directory in reversed(options.dirs):
                         add_dir_to_list(dir_list, directory)
 
         if os.path.normpath(sys.prefix) != '/usr':
@@ -599,14 +600,18 @@ class PyBuildExt(build_ext):
         # implementation independent wrapper for these; dumbdbm.py provides
         # similar functionality (but slower of course) implemented in Python.
 
-        # Sleepycat Berkeley DB interface.  http://www.sleepycat.com
+        # Sleepycat^WOracle Berkeley DB interface.
+        #  http://www.oracle.com/database/berkeley-db/db/index.html
         #
-        # This requires the Sleepycat DB code. The supported versions
-        # are set below.  Visit http://www.sleepycat.com/ to download
+        # This requires the Sleepycat^WOracle DB code. The supported versions
+        # are set below.  Visit the URL above to download
         # a release.  Most open source OSes come with one or more
         # versions of BerkeleyDB already installed.
 
         max_db_ver = (4, 5)
+        # NOTE: while the _bsddb.c code links against BerkeleyDB 4.6.x
+        # we leave that version disabled by default as it has proven to be
+        # quite a buggy library release on many platforms.
         min_db_ver = (3, 3)
         db_setup_debug = False   # verbose debug prints from this script?
 
@@ -623,7 +628,7 @@ class PyBuildExt(build_ext):
             '/sw/include/db3',
         ]
         # 4.x minor number specific paths
-        for x in (0,1,2,3,4,5):
+        for x in range(max_db_ver[1]+1):
             db_inc_paths.append('/usr/include/db4%d' % x)
             db_inc_paths.append('/usr/include/db4.%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
@@ -646,7 +651,7 @@ class PyBuildExt(build_ext):
         for dn in inc_dirs:
             std_variants.append(os.path.join(dn, 'db3'))
             std_variants.append(os.path.join(dn, 'db4'))
-            for x in (0,1,2,3,4):
+            for x in range(max_db_ver[1]+1):
                 std_variants.append(os.path.join(dn, "db4%d"%x))
                 std_variants.append(os.path.join(dn, "db4.%d"%x))
             for x in (2,3):
@@ -673,6 +678,15 @@ class PyBuildExt(build_ext):
                         m = re.search(r"#define\WDB_VERSION_MINOR\W(\d+)", f)
                         db_minor = int(m.group(1))
                         db_ver = (db_major, db_minor)
+
+                        # Avoid 4.6 prior to 4.6.21 due to a BerkeleyDB bug
+                        if db_ver == (4, 6):
+                            m = re.search(r"#define\WDB_VERSION_PATCH\W(\d+)", f)
+                            db_patch = int(m.group(1))
+                            if db_patch < 21:
+                                print "db.h:", db_ver, "patch", db_patch,
+                                print "being ignored (4.6.x must be >= 4.6.21)"
+                                continue
 
                         if ( (not db_ver_inc_map.has_key(db_ver)) and
                            (db_ver <= max_db_ver and db_ver >= min_db_ver) ):
@@ -741,7 +755,7 @@ class PyBuildExt(build_ext):
             dblib_dir = None
 
         # The sqlite interface
-        sqlite_setup_debug = True   # verbose debug prints from this script?
+        sqlite_setup_debug = False # verbose debug prints from this script?
 
         # We hunt for #define SQLITE_VERSION "n.n.n"
         # We need to find >= sqlite version 3.0.8
@@ -837,8 +851,13 @@ class PyBuildExt(build_ext):
         # accidentally building this module with a later version of the
         # underlying db library.  May BSD-ish Unixes incorporate db 1.85
         # symbols into libc and place the include file in /usr/include.
+        #
+        # If the better bsddb library can be built (db_incs is defined)
+        # we do not build this one.  Otherwise this build will pick up
+        # the more recent berkeleydb's db.h file first in the include path
+        # when attempting to compile and it will fail.
         f = "/usr/include/db.h"
-        if os.path.exists(f):
+        if os.path.exists(f) and not db_incs:
             data = open(f).read()
             m = re.search(r"#s*define\s+HASHVERSION\s+2\s*", data)
             if m is not None:

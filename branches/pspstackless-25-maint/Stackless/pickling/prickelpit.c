@@ -450,18 +450,18 @@ err_exit:
  */
 
 PyObject *
-slp_into_tuple_with_nulls(PyObject **start, int length)
+slp_into_tuple_with_nulls(PyObject **start, Py_ssize_t length)
 {
 	PyObject *res = PyTuple_New(length+1);
 	PyObject *nulls = PyTuple_New(0);
-	int i, nullcount = 0;
+	Py_ssize_t i, nullcount = 0;
 	if (res == NULL)
 		return NULL;
 	for (i=0; i<length; ++i) {
 		PyObject *ob = start[i];
 		if (ob == NULL) {
 			/* store None, and add the position to nulls */
-			PyObject *pos = PyInt_FromLong(i);
+			PyObject *pos = PyInt_FromSsize_t(i);
 			if (pos == NULL)
 				return NULL;
 			ob = Py_None;
@@ -477,10 +477,10 @@ slp_into_tuple_with_nulls(PyObject **start, int length)
 	return res;
 }
 
-int
+Py_ssize_t
 slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 {
-	int i, length = PyTuple_GET_SIZE(tup)-1;
+	Py_ssize_t i, length = PyTuple_GET_SIZE(tup)-1;
 	PyObject *nulls;
 	if (length < 0) return 0;
 
@@ -633,7 +633,7 @@ static int init_celltype(void)
 
  ******************************************************/
 
-#define functuplefmt "OOOOO"
+#define functuplefmt "OOOOOO"
 
 static PyTypeObject wrap_PyFunction_Type;
 
@@ -643,11 +643,14 @@ func_reduce(PyFunctionObject * func)
 	PyObject *tup = Py_BuildValue(
 	    "(O()(" functuplefmt "))",
 	    &wrap_PyFunction_Type,
+		/* Standard function constructor arguments. */
 	    func->func_code != NULL ? func->func_code : Py_None,
 	    func->func_globals != NULL ? func->func_globals : Py_None,
 	    func->func_name != NULL ? func->func_name : Py_None,
 	    func->func_defaults != NULL ? func->func_defaults : Py_None,
-	    func->func_closure != NULL ? func->func_closure : Py_None
+	    func->func_closure != NULL ? func->func_closure : Py_None,
+		/* Additional data we need to preserve. */
+		func->func_module != NULL ? func->func_module : Py_None
 	);
         return tup;
 }
@@ -679,7 +682,7 @@ func_setstate(PyObject *self, PyObject *args)
 	if (is_wrong_type(self->ob_type)) return NULL;
 	self->ob_type = self->ob_type->tp_base;
 	fu = (PyFunctionObject *)
-	     self->ob_type->tp_new(self->ob_type, args, NULL);
+	     self->ob_type->tp_new(self->ob_type, PyTuple_GetSlice(args, 0, 5), NULL);
 	if (fu != NULL) {
 		PyFunctionObject *target = (PyFunctionObject *) self;
 		COPY(fu, target, func_code);
@@ -687,6 +690,10 @@ func_setstate(PyObject *self, PyObject *args)
 		COPY(fu, target, func_name);
 		COPY(fu, target, func_defaults);
 		COPY(fu, target, func_closure);
+
+		Py_XINCREF(PyTuple_GetItem(args, 5));
+        target->func_module = PyTuple_GetItem(args, 5);
+
 		Py_DECREF(fu);
 		Py_INCREF(self);
 		return self;
@@ -856,6 +863,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	PyObject *exec_name = NULL;
 	PyFrame_ExecFunc *good_func, *bad_func;
 	int valid, have_locals;
+	Py_ssize_t tmp;
 
 	if (is_wrong_type(f->ob_type)) return NULL;
 
@@ -923,7 +931,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	}
 
 	if (PyTuple_Check(localsplus_as_tuple)) {
-		int space =  f->f_code->co_stacksize + (f->f_valuestack - f->f_localsplus);
+		Py_ssize_t space =  f->f_code->co_stacksize + (f->f_valuestack - f->f_localsplus);
 
 		if (PyTuple_GET_SIZE(localsplus_as_tuple)-1 > space) {
 			PyErr_SetString(PyExc_ValueError, "invalid localsplus for frame");
@@ -949,7 +957,8 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 
 	f->f_lasti = f_lasti;
 	f->f_lineno = f_lineno;
-	f->f_iblock = PyTuple_GET_SIZE(blockstack_as_tuple);
+	tmp = PyTuple_GET_SIZE(blockstack_as_tuple);
+	f->f_iblock = Py_SAFE_DOWNCAST(tmp, Py_ssize_t, int);
 	if (f->f_iblock < 0 || f->f_iblock > CO_MAXBLOCKS) {
 		PyErr_SetString(PyExc_ValueError, "invalid blockstack for frame");
 		goto err_exit;
@@ -1181,7 +1190,7 @@ module_reduce(PyObject * m)
 		if (import == NULL)
 			return NULL;
 	}
-	return Py_BuildValue("(O(s))", import, name);
+	return Py_BuildValue("(O(s()()(s)))", import, name, "");
 	/* would be shorter, but the search result is quite arbitrary:
 		tup = PyObject_GetAttrString(m, "__name__");
 	 */

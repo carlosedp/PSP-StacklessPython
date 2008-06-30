@@ -39,8 +39,6 @@ __rcsid__ = '$Id$'
 import os, re
 
 def main():
-    psphome = os.getenv('PSPDEV')
-    path = os.path.join('usr', 'local', 'pspdev', 'psp', 'sdk', 'include', 'pspkerror.h')
     path = 'pspkerror.h'
     s = 0
     fp = file(path, 'r')

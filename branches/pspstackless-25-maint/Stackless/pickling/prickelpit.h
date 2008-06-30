@@ -37,10 +37,10 @@ cannot_##procname(PyFrameObject *f, int exc, PyObject *retval) \
 
 /* pickling of arrays with nulls */
 
-PyAPI_FUNC(PyObject *) slp_into_tuple_with_nulls(PyObject **start, int length);
+PyAPI_FUNC(PyObject *) slp_into_tuple_with_nulls(PyObject **start, Py_ssize_t length);
 /* creates a tuple of length+1 with the first element holding null markers */
 
-PyAPI_FUNC(int) slp_from_tuple_with_nulls(PyObject **start, PyObject *tup);
+PyAPI_FUNC(Py_ssize_t) slp_from_tuple_with_nulls(PyObject **start, PyObject *tup);
 /* loads data from a tuple where the first element holds null markers.
    return value is the number of elements (length-1)
  */

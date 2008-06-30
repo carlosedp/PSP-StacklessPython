@@ -1535,8 +1535,11 @@ finish:
 		/* File does not exist, or cannot read attributes */
 		return PyBool_FromLong(0);
 	/* Access is possible if either write access wasn't requested, or
-	   the file isn't read-only. */
-	return PyBool_FromLong(!(mode & 2) || !(attr & FILE_ATTRIBUTE_READONLY));
+	   the file isn't read-only, or if it's a directory, as there are
+	   no read-only directories on Windows. */
+	return PyBool_FromLong(!(mode & 2) 
+	                       || !(attr & FILE_ATTRIBUTE_READONLY)
+			       || (attr & FILE_ATTRIBUTE_DIRECTORY));
 #else
 	int res;
 	if (!PyArg_ParseTuple(args, "eti:access", 
@@ -3409,9 +3412,9 @@ posix_spawnvpe(PyObject *self, PyObject *args)
 
 	Py_BEGIN_ALLOW_THREADS
 #if defined(PYCC_GCC)
-	spawnval = spawnve(mode, path, argvlist, envlist);
+	spawnval = spawnvpe(mode, path, argvlist, envlist);
 #else
-	spawnval = _spawnve(mode, path, argvlist, envlist);
+	spawnval = _spawnvpe(mode, path, argvlist, envlist);
 #endif
 	Py_END_ALLOW_THREADS
 
@@ -4788,18 +4791,19 @@ _PyPopenCreateProcess(char *cmdstring,
 			        (sizeof(modulepath)/sizeof(modulepath[0]))
 			               -strlen(modulepath));
 			if (stat(modulepath, &statinfo) != 0) {
+				size_t mplen = sizeof(modulepath)/sizeof(modulepath[0]);
 				/* Eeek - file-not-found - possibly an embedding
 				   situation - see if we can locate it in sys.prefix
 				*/
 				strncpy(modulepath,
 				        Py_GetExecPrefix(),
-				        sizeof(modulepath)/sizeof(modulepath[0]));
+				        mplen);
+				modulepath[mplen-1] = '\0';
 				if (modulepath[strlen(modulepath)-1] != '\\')
 					strcat(modulepath, "\\");
 				strncat(modulepath,
 				        szConsoleSpawn,
-				        (sizeof(modulepath)/sizeof(modulepath[0]))
-				               -strlen(modulepath));
+				        mplen-strlen(modulepath));
 				/* No where else to look - raise an easily identifiable
 				   error, rather than leaving Windows to report
 				   "file not found" - as the user is probably blissfully
@@ -6169,16 +6173,23 @@ static PyObject *
 posix_fdopen(PyObject *self, PyObject *args)
 {
 	int fd;
-	char *mode = "r";
+	char *orgmode = "r";
 	int bufsize = -1;
 	FILE *fp;
 	PyObject *f;
-	if (!PyArg_ParseTuple(args, "i|si", &fd, &mode, &bufsize))
+	char *mode;
+	if (!PyArg_ParseTuple(args, "i|si", &fd, &orgmode, &bufsize))
 		return NULL;
 
-	if (mode[0] != 'r' && mode[0] != 'w' && mode[0] != 'a') {
-		PyErr_Format(PyExc_ValueError,
-			     "invalid file mode '%s'", mode);
+	/* Sanitize mode.  See fileobject.c */
+	mode = PyMem_MALLOC(strlen(orgmode)+3);
+	if (!mode) {
+		PyErr_NoMemory();
+		return NULL;
+	}
+	strcpy(mode, orgmode);
+	if (_PyFile_SanitizeMode(mode)) {
+		PyMem_FREE(mode);
 		return NULL;
 	}
 	Py_BEGIN_ALLOW_THREADS
@@ -6200,9 +6211,10 @@ posix_fdopen(PyObject *self, PyObject *args)
 	fp = fdopen(fd, mode);
 #endif
 	Py_END_ALLOW_THREADS
+	PyMem_FREE(mode);
 	if (fp == NULL)
 		return posix_error();
-	f = PyFile_FromFile(fp, "<fdopen>", mode, fclose);
+	f = PyFile_FromFile(fp, "<fdopen>", orgmode, fclose);
 	if (f != NULL)
 		PyFile_SetBufSize(f, bufsize);
 	return f;

@@ -225,6 +225,10 @@ _Py_Mangle(PyObject *privateobj, PyObject *ident)
 		return ident; /* Don't mangle if class is just underscores */
 	}
 	plen = strlen(p);
+
+	assert(1 <= PY_SSIZE_T_MAX - nlen);
+	assert(1 + nlen <= PY_SSIZE_T_MAX - plen);
+
 	ident = PyString_FromStringAndSize(NULL, 1 + nlen + plen);
 	if (!ident)
 		return 0;
@@ -619,6 +623,8 @@ markblocks(unsigned char *code, int len)
 {
 	unsigned int *blocks = (unsigned int *)PyMem_Malloc(len*sizeof(int));
 	int i,j, opcode, blockcnt = 0;
+
+	assert(len <= PY_SIZE_MAX / sizeof(int));
 
 	if (blocks == NULL) {
 		PyErr_NoMemory();
@@ -1281,6 +1287,12 @@ compiler_next_instr(struct compiler *c, basicblock *b)
 		size_t oldsize, newsize;
 		oldsize = b->b_ialloc * sizeof(struct instr);
 		newsize = oldsize << 1;
+
+		if (oldsize > (PY_SIZE_MAX >> 1)) {
+			PyErr_NoMemory();
+			return -1;
+		}
+
 		if (newsize == 0) {
 			PyErr_NoMemory();
 			return -1;
@@ -1298,11 +1310,16 @@ compiler_next_instr(struct compiler *c, basicblock *b)
 	return b->b_iused++;
 }
 
-/* Set the i_lineno member of the instruction at offse off if the
-   line number for the current expression/statement (?) has not
+/* Set the i_lineno member of the instruction at offset off if the
+   line number for the current expression/statement has not
    already been set.  If it has been set, the call has no effect.
 
-   Every time a new node is b
+   The line number is reset in the following cases:
+   - when entering a new scope
+   - on each statement
+   - on each expression that start a new line
+   - before the "except" clause
+   - before the "for" and "while" expressions
    */
 
 static void
@@ -1567,7 +1584,20 @@ compiler_add_o(struct compiler *c, PyObject *dict, PyObject *o)
 	Py_ssize_t arg;
 
 	/* necessary to make sure types aren't coerced (e.g., int and long) */
-	t = PyTuple_Pack(2, o, o->ob_type);
+        /* _and_ to distinguish 0.0 from -0.0 e.g. on IEEE platforms */
+        if (PyFloat_Check(o)) {
+            double d = PyFloat_AS_DOUBLE(o);
+            unsigned char* p = (unsigned char*) &d;
+            /* all we need is to make the tuple different in either the 0.0
+             * or -0.0 case from all others, just to avoid the "coercion".
+             */
+            if (*p==0 && p[sizeof(double)-1]==0)
+                t = PyTuple_Pack(3, o, o->ob_type, Py_None);
+            else
+	        t = PyTuple_Pack(2, o, o->ob_type);
+        } else {
+	    t = PyTuple_Pack(2, o, o->ob_type);
+        }
 	if (t == NULL)
 	    return -1;
 
@@ -1779,7 +1809,8 @@ compiler_body(struct compiler *c, asdl_seq *stmts)
 	if (!asdl_seq_LEN(stmts))
 		return 1;
 	st = (stmt_ty)asdl_seq_GET(stmts, 0);
-	if (compiler_isdocstring(st)) {
+	if (compiler_isdocstring(st) && Py_OptimizeFlag < 2) {
+		/* don't generate docstrings if -OO */
 		i = 1;
 		VISIT(c, expr, st->v.Expr.value);
 		if (!compiler_nameop(c, __doc__, Store))
@@ -1982,7 +2013,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 
 	st = (stmt_ty)asdl_seq_GET(s->v.FunctionDef.body, 0);
 	docstring = compiler_isdocstring(st);
-	if (docstring)
+	if (docstring && Py_OptimizeFlag < 2)
 	    first_const = st->v.Expr.value->v.Str.s;
 	if (compiler_add_o(c, c->u->u_consts, first_const) < 0)	 {
 	    compiler_exit_scope(c);
@@ -2220,9 +2251,8 @@ compiler_for(struct compiler *c, stmt_ty s)
 	VISIT(c, expr, s->v.For.iter);
 	ADDOP(c, GET_ITER);
 	compiler_use_next_block(c, start);
-	/* XXX(nnorwitz): is there a better way to handle this?
-	   for loops are special, we want to be able to trace them
-	   each time around, so we need to set an extra line number. */
+	/* for expressions must be traced on each iteration,
+	   so we need to set an extra line number. */
 	c->u->u_lineno_set = false;
 	ADDOP_JREL(c, FOR_ITER, cleanup);
 	VISIT(c, expr, s->v.For.target);
@@ -2242,8 +2272,11 @@ compiler_while(struct compiler *c, stmt_ty s)
 	basicblock *loop, *orelse, *end, *anchor = NULL;
 	int constant = expr_constant(s->v.While.test);
 
-	if (constant == 0)
+	if (constant == 0) {
+		if (s->v.While.orelse)
+			VISIT_SEQ(c, stmt, s->v.While.orelse);
 		return 1;
+	}
 	loop = compiler_new_block(c);
 	end = compiler_new_block(c);
 	if (constant == -1) {
@@ -2266,6 +2299,9 @@ compiler_while(struct compiler *c, stmt_ty s)
 	if (!compiler_push_fblock(c, LOOP, loop))
 		return 0;
 	if (constant == -1) {
+		/* while expressions must be traced on each iteration,
+		   so we need to set an extra line number. */
+		c->u->u_lineno_set = false;
 		VISIT(c, expr, s->v.While.test);
 		ADDOP_JREL(c, JUMP_IF_FALSE, anchor);
 		ADDOP(c, POP_TOP);
@@ -2447,8 +2483,8 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 						s->v.TryExcept.handlers, i);
 		if (!handler->type && i < n-1)
 		    return compiler_error(c, "default 'except:' must be last");
-        c->u->u_lineno_set = false;
-        c->u->u_lineno = handler->lineno;
+		c->u->u_lineno_set = false;
+		c->u->u_lineno = handler->lineno;
 		except = compiler_new_block(c);
 		if (except == NULL)
 			return 0;
@@ -4067,6 +4103,10 @@ assemble_init(struct assembler *a, int nblocks, int firstlineno)
 	a->a_lnotab = PyString_FromStringAndSize(NULL, DEFAULT_LNOTAB_SIZE);
 	if (!a->a_lnotab)
 		return 0;
+	if (nblocks > PY_SIZE_MAX / sizeof(basicblock *)) {
+		PyErr_NoMemory();
+		return 0;
+	}
 	a->a_postorder = (basicblock **)PyObject_Malloc(
 					    sizeof(basicblock *) * nblocks);
 	if (!a->a_postorder) {
@@ -4167,10 +4207,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	assert(d_bytecode >= 0);
 	assert(d_lineno >= 0);
 
-	/* XXX(nnorwitz): is there a better way to handle this?
-	   for loops are special, we want to be able to trace them
-	   each time around, so we need to set an extra line number. */
-	if (d_lineno == 0 && i->i_opcode != FOR_ITER)
+	if(d_bytecode == 0 && d_lineno == 0)
 		return 1;
 
 	if (d_bytecode > 255) {
@@ -4178,10 +4215,14 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 		nbytes = a->a_lnotab_off + 2 * ncodes;
 		len = PyString_GET_SIZE(a->a_lnotab);
 		if (nbytes >= len) {
-			if (len * 2 < nbytes)
+			if ((len <= INT_MAX / 2) && (len * 2 < nbytes))
 				len = nbytes;
-			else
+			else if (len <= INT_MAX / 2)
 				len *= 2;
+			else {
+				PyErr_NoMemory();
+				return 0;
+			}
 			if (_PyString_Resize(&a->a_lnotab, len) < 0)
 				return 0;
 		}
@@ -4200,10 +4241,14 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 		nbytes = a->a_lnotab_off + 2 * ncodes;
 		len = PyString_GET_SIZE(a->a_lnotab);
 		if (nbytes >= len) {
-			if (len * 2 < nbytes)
+			if ((len <= INT_MAX / 2) && len * 2 < nbytes)
 				len = nbytes;
-			else
+			else if (len <= INT_MAX / 2)
 				len *= 2;
+			else {
+				PyErr_NoMemory();
+				return 0;
+			}
 			if (_PyString_Resize(&a->a_lnotab, len) < 0)
 				return 0;
 		}
@@ -4262,6 +4307,8 @@ assemble_emit(struct assembler *a, struct instr *i)
 	if (i->i_lineno && !assemble_lnotab(a, i))
 		return 0;
 	if (a->a_offset + size >= len) {
+		if (len > PY_SSIZE_T_MAX / 2)
+			return 0;
 		if (_PyString_Resize(&a->a_bytecode, len * 2) < 0)
 		    return 0;
 	}

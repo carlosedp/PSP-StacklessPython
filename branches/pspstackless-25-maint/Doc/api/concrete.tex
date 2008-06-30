@@ -99,6 +99,7 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
 
 \begin{csimplemacrodesc}{Py_RETURN_NONE}
   Properly handle returning \cdata{Py_None} from within a C function.
+  \versionadded{2.4}
 \end{csimplemacrodesc}
 
 
@@ -1173,10 +1174,10 @@ These are the UTF-16 codec APIs:
    *byteorder == 1:  big endian
 \end{verbatim}
 
-  and then switches according to all byte order marks (BOM) it finds
-  in the input data.  BOMs are not copied into the resulting Unicode
-  string.  After completion, \var{*byteorder} is set to the current
-  byte order at the end of input data.
+  and then switches if the first two bytes of the input data are a byte order
+  mark (BOM) and the specified byte order is native order.  This BOM is not
+  copied into the resulting Unicode string.  After completion, \var{*byteorder}
+  is set to the current byte order at the.
 
   If \var{byteorder} is \NULL{}, the codec starts in native order mode.
 
@@ -1752,12 +1753,12 @@ format.
   \versionadded{2.4}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PyTuple_Size}{PyObject *p}
+\begin{cfuncdesc}{Py_ssize_t}{PyTuple_Size}{PyObject *p}
   Take a pointer to a tuple object, and return the size of that
   tuple.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PyTuple_GET_SIZE}{PyObject *p}
+\begin{cfuncdesc}{Py_ssize_t}{PyTuple_GET_SIZE}{PyObject *p}
   Return the size of the tuple \var{p}, which must be non-\NULL{} and
   point to a tuple; no error checking is performed.
 \end{cfuncdesc}
@@ -2232,7 +2233,7 @@ implementation detail and may change in future releases of Python.
   creation.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PyFile_Encoding}{PyFileObject *p, char *enc}
+\begin{cfuncdesc}{int}{PyFile_SetEncoding}{PyFileObject *p, const char *enc}
   Set the file's encoding for Unicode output to \var{enc}. Return
   1 on success and 0 on failure.
   \versionadded{2.3}
@@ -3147,7 +3148,7 @@ Likewise, the constructor functions work with any iterable Python object.
 The following functions and macros are available for instances of
 \class{set} or \class{frozenset} or instances of their subtypes.
 
-\begin{cfuncdesc}{int}{PySet_Size}{PyObject *anyset}
+\begin{cfuncdesc}{Py_ssize_t}{PySet_Size}{PyObject *anyset}
   Return the length of a \class{set} or \class{frozenset} object.
   Equivalent to \samp{len(\var{anyset})}.  Raises a
   \exception{PyExc_SystemError} if \var{anyset} is not a \class{set},
@@ -3155,7 +3156,7 @@ The following functions and macros are available for instances of
   \bifuncindex{len}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySet_GET_SIZE}{PyObject *anyset}
+\begin{cfuncdesc}{Py_ssize_t}{PySet_GET_SIZE}{PyObject *anyset}
   Macro form of \cfunction{PySet_Size()} without error checking.
 \end{cfuncdesc}
 

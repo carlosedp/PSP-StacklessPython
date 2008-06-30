@@ -20,7 +20,11 @@
 #endif
 #endif
 
-#ifdef SUBWCREV
+/* on unix, SVNVERSION is passed on the command line.
+ * on Windows, the string is interpolated using
+ * subwcrev.exe
+ */
+#ifndef SVNVERSION
 #define SVNVERSION "$WCRANGE$$WCMODS?M:$"
 #endif
 
@@ -40,9 +44,9 @@ Py_GetBuildInfo(void)
 const char *
 _Py_svnversion(void)
 {
-#ifdef SVNVERSION
-	return SVNVERSION;
-#else
+	/* the following string can be modified by subwcrev.exe */
+	static const char svnversion[] = SVNVERSION;
+	if (svnversion[0] != '$')
+		return svnversion; /* it was interpolated, or passed on command line */
 	return "exported";
-#endif
 }

@@ -22,8 +22,8 @@ typedef struct _sts {
 	int runcount;
 
 	/* scheduling */
-	int ticker;
-	int interval;
+	long ticker;
+	long interval;
 	PyObject * (*interrupt) (void);    /* the fast scheduler */
 	/* trap recursive scheduling via callbacks */
 	int schedlock;

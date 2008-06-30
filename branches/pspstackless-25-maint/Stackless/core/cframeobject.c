@@ -170,7 +170,7 @@ cframe_setstate(PyObject *self, PyObject *args)
 	PyObject *exec_name = NULL;
 	PyFrame_ExecFunc *good_func, *bad_func;
 	PyObject *params;
-	int i, n;
+	long i, n;
 
         if (!PyArg_ParseTuple (args, cframetuplenewfmt,
 			       &valid,

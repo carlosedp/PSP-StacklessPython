@@ -791,6 +791,12 @@ CharArray_set_value(CDataObject *self, PyObject *value)
 	char *ptr;
 	int size;
 
+	if (value == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't delete attribute");
+		return -1;
+	}
+
 	if (PyUnicode_Check(value)) {
 		value = PyUnicode_AsEncodedString(value,
 						  conversion_mode_encoding,
@@ -846,6 +852,11 @@ WCharArray_set_value(CDataObject *self, PyObject *value)
 {
 	int result = 0;
 
+	if (value == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't delete attribute");
+		return -1;
+	}
 	if (PyString_Check(value)) {
 		value = PyUnicode_FromEncodedObject(value,
 						    conversion_mode_encoding,
@@ -2885,7 +2896,7 @@ CFuncPtr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		|| PyLong_Check(PyTuple_GET_ITEM(args, 0)))) {
 		CDataObject *ob;
 		void *ptr = PyLong_AsVoidPtr(PyTuple_GET_ITEM(args, 0));
-		if (ptr == NULL)
+		if (ptr == NULL && PyErr_Occurred())
 			return NULL;
 		ob = (CDataObject *)GenericCData_new(type, args, kwds);
 		if (ob == NULL)
@@ -3969,6 +3980,11 @@ Simple_set_value(CDataObject *self, PyObject *value)
 	PyObject *result;
 	StgDictObject *dict = PyObject_stgdict((PyObject *)self);
 
+	if (value == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't delete attribute");
+		return -1;
+	}
 	assert(dict); /* Cannot be NULL for CDataObject instances */
 	assert(dict->setfunc);
 	result = dict->setfunc(self->b_ptr, value, dict->size);
@@ -4504,32 +4520,42 @@ create_comerror(void)
 	PyObject *s;
 	int status;
 
-	ComError = PyErr_NewException("_ctypes.COMError",
-				      NULL,
-				      dict);
-	if (ComError == NULL)
+	if (dict == NULL)
 		return -1;
+
 	while (methods->ml_name) {
 		/* get a wrapper for the built-in function */
 		PyObject *func = PyCFunction_New(methods, NULL);
 		PyObject *meth;
 		if (func == NULL)
-			return -1;
+			goto error;
 		meth = PyMethod_New(func, NULL, ComError);
 		Py_DECREF(func);
 		if (meth == NULL)
-			return -1;
+			goto error;
 		PyDict_SetItemString(dict, methods->ml_name, meth);
 		Py_DECREF(meth);
 		++methods;
 	}
-	Py_INCREF(ComError);
+
 	s = PyString_FromString(comerror_doc);
 	if (s == NULL)
-		return -1;
+		goto error;
 	status = PyDict_SetItemString(dict, "__doc__", s);
 	Py_DECREF(s);
-	return status;
+	if (status == -1)
+		goto error;
+
+	ComError = PyErr_NewException("_ctypes.COMError",
+				      NULL,
+				      dict);
+	if (ComError == NULL)
+		goto error;
+
+	return 0;
+  error:
+	Py_DECREF(dict);
+	return -1;
 }
 
 #endif
@@ -4749,7 +4775,7 @@ init_ctypes(void)
 #endif
 	PyModule_AddObject(m, "FUNCFLAG_CDECL", PyInt_FromLong(FUNCFLAG_CDECL));
 	PyModule_AddObject(m, "FUNCFLAG_PYTHONAPI", PyInt_FromLong(FUNCFLAG_PYTHONAPI));
-	PyModule_AddStringConstant(m, "__version__", "1.0.2");
+	PyModule_AddStringConstant(m, "__version__", "1.0.3");
 
 	PyModule_AddObject(m, "_memmove_addr", PyLong_FromVoidPtr(memmove));
 	PyModule_AddObject(m, "_memset_addr", PyLong_FromVoidPtr(memset));

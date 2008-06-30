@@ -538,11 +538,12 @@ read_file(Unpicklerobject *self, char **s, Py_ssize_t n)
 		self->buf_size = size;
 	}
 	else if (n > self->buf_size) {
-		self->buf = (char *)realloc(self->buf, n);
-		if (!self->buf)  {
+		char *newbuf = (char *)realloc(self->buf, n);
+		if (!newbuf)  {
 			PyErr_NoMemory();
 			return -1;
 		}
+		self->buf = newbuf;
 		self->buf_size = n;
 	}
 
@@ -581,6 +582,7 @@ readline_file(Unpicklerobject *self, char **s)
 	i = 0;
 	while (1) {
 		int bigger;
+		char *newbuf;
 		for (; i < (self->buf_size - 1); i++) {
 			if (feof(self->fp) ||
 			    (self->buf[i] = getc(self->fp)) == '\n') {
@@ -594,11 +596,12 @@ readline_file(Unpicklerobject *self, char **s)
 			PyErr_NoMemory();
 			return -1;
 		}
-		self->buf = (char *)realloc(self->buf, bigger);
-		if (!self->buf)  {
+		newbuf = (char *)realloc(self->buf, bigger);
+		if (!newbuf)  {
 			PyErr_NoMemory();
 			return -1;
 		}
+		self->buf = newbuf;
 		self->buf_size = bigger;
 	}
 }
@@ -2251,7 +2254,7 @@ save_reduce(Picklerobject *self, PyObject *args, PyObject *ob)
 			Py_INCREF(temp);
 			PyTuple_SET_ITEM(newargtup, i-1, temp);
 		}
-		i = save(self, newargtup, 0) < 0;
+		i = save(self, newargtup, 0);
 		Py_DECREF(newargtup);
 		if (i < 0)
 			return -1;
@@ -3501,6 +3504,14 @@ load_binstring(Unpicklerobject *self)
 	if (self->read_func(self, &s, 4) < 0) return -1;
 
 	l = calc_binint(s, 4);
+	if (l < 0) {
+		/* Corrupt or hostile pickle -- we never write one like
+		 * this.
+		 */
+		PyErr_SetString(UnpicklingError,
+				"BINSTRING pickle has negative byte count");
+		return -1;
+	}
 
 	if (self->read_func(self, &s, l) < 0)
 		return -1;
@@ -3568,6 +3579,14 @@ load_binunicode(Unpicklerobject *self)
 	if (self->read_func(self, &s, 4) < 0) return -1;
 
 	l = calc_binint(s, 4);
+	if (l < 0) {
+		/* Corrupt or hostile pickle -- we never write one like
+		 * this.
+		 */
+		PyErr_SetString(UnpicklingError,
+				"BINUNICODE pickle has negative byte count");
+		return -1;
+	}
 
 	if (self->read_func(self, &s, l) < 0)
 		return -1;
@@ -4437,17 +4456,19 @@ load_mark(Unpicklerobject *self)
 	*/
 
 	if ((self->num_marks + 1) >= self->marks_size) {
+		int *marks;
 		s=self->marks_size+20;
 		if (s <= self->num_marks) s=self->num_marks + 1;
 		if (self->marks == NULL)
-			self->marks=(int *)malloc(s * sizeof(int));
+			marks=(int *)malloc(s * sizeof(int));
 		else
-			self->marks=(int *)realloc(self->marks,
+			marks=(int *)realloc(self->marks,
 						   s * sizeof(int));
-		if (! self->marks) {
+		if (!marks) {
 			PyErr_NoMemory();
 			return -1;
 		}
+		self->marks = marks;
 		self->marks_size = s;
 	}
 

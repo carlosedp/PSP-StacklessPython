@@ -264,6 +264,47 @@ class TestConcretePickledTasklets(TestPickledTasklets):
         # Force the collection of the unpickled tasklet.
         gc.collect()
 
+    def testSendSequence(self):
+        # Send sequence when pickled was not handled.  It uses
+        # a custom cframe execute function which was not recognised
+        # by the pickling.
+        #
+        # Traceback (most recent call last):
+        #   File ".\test_pickle.py", line 283, in testSendSequence
+        #     pickle.dumps(t1)
+        # ValueError: frame exec function at 1e00bf40 is not registered!
+
+        def sender(chan):
+            l = [ 1, 2, 3, 4 ]
+            chan.send_sequence(l)
+            
+        def receiver(chan):
+            length = 4
+            while length:
+                v = chan.receive()
+                length -= 1
+                
+        c = stackless.channel()
+        t1 = stackless.tasklet(sender)(c)
+        t2 = stackless.tasklet(receiver)(c)
+        t1.run()
+
+        pickle.dumps(t1)
+
+    def testSubmoduleImporting(self):
+        # When a submodule was pickled, it would unpickle as the
+        # module instead.
+        import xml.sax
+        m1 = xml.sax
+        m2 = pickle.loads(pickle.dumps(m1))
+        self.assertEquals(m1, m2)
+
+    def testFunctionModulePreservation(self):
+        # The 'module' name on the function was not being preserved.
+        f1 = lambda: None
+        f2 = pickle.loads(pickle.dumps(f1))
+        self.assertEquals(f1.__module__, f2.__module__)
+
 
 if __name__ == '__main__':
     if not sys.argv[1:]:

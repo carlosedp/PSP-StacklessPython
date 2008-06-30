@@ -1227,11 +1227,14 @@ min_max(PyObject *args, PyObject *kwds, int op)
 				"%s() got an unexpected keyword argument", name);
 			return NULL;
 		}
+		Py_INCREF(keyfunc);
 	}
 
 	it = PyObject_GetIter(v);
-	if (it == NULL)
+	if (it == NULL) {
+		Py_XDECREF(keyfunc);
 		return NULL;
+	}
 
 	maxitem = NULL; /* the result */
 	maxval = NULL;  /* the value associated with the result */
@@ -1280,6 +1283,7 @@ min_max(PyObject *args, PyObject *kwds, int op)
 	else
 		Py_DECREF(maxval);
 	Py_DECREF(it);
+	Py_XDECREF(keyfunc);
 	return maxitem;
 
 Fail_it_item_and_val:
@@ -1290,6 +1294,7 @@ Fail_it:
 	Py_XDECREF(maxval);
 	Py_XDECREF(maxitem);
 	Py_DECREF(it);
+	Py_XDECREF(keyfunc);
 	return NULL;
 }
 
@@ -2507,11 +2512,43 @@ filterstring(PyObject *func, PyObject *strobj)
 					PyString_AS_STRING(item)[0];
 			} else {
 				/* do we need more space? */
-				Py_ssize_t need = j + reslen + len-i-1;
+				Py_ssize_t need = j;
+
+				/* calculate space requirements while checking for overflow */
+				if (need > PY_SSIZE_T_MAX - reslen) {
+					Py_DECREF(item);
+					goto Fail_1;
+				}
+
+				need += reslen;
+
+				if (need > PY_SSIZE_T_MAX - len) {
+					Py_DECREF(item);
+					goto Fail_1;
+				}
+
+				need += len;
+
+				if (need <= i) {
+					Py_DECREF(item);
+					goto Fail_1;
+				}
+
+				need = need - i - 1;
+
+				assert(need >= 0);
+				assert(outlen >= 0);
+
 				if (need > outlen) {
 					/* overallocate, to avoid reallocations */
-					if (need<2*outlen)
+					if (outlen > PY_SSIZE_T_MAX / 2) {
+						Py_DECREF(item);
+						return NULL;
+					}
+
+					if (need<2*outlen) {
 						need = 2*outlen;
+          }
 					if (_PyString_Resize(&result, need)) {
 						Py_DECREF(item);
 						return NULL;
@@ -2603,11 +2640,31 @@ filterunicode(PyObject *func, PyObject *strobj)
 			else {
 				/* do we need more space? */
 				Py_ssize_t need = j + reslen + len - i - 1;
+        
+				/* check that didnt overflow */
+				if ((j > PY_SSIZE_T_MAX - reslen) ||
+					((j + reslen) > PY_SSIZE_T_MAX - len) ||
+						((j + reslen + len) < i) ||
+							((j + reslen + len - i) <= 0)) {
+					Py_DECREF(item);
+					return NULL;
+				}
+
+				assert(need >= 0);
+				assert(outlen >= 0);
+				
 				if (need > outlen) {
 					/* overallocate,
 					   to avoid reallocations */
-					if (need < 2 * outlen)
-						need = 2 * outlen;
+					if (need < 2 * outlen) {
+            if (outlen > PY_SSIZE_T_MAX / 2) {
+              Py_DECREF(item);
+              return NULL;
+						} else {
+							need = 2 * outlen;
+				    }
+          }
+
 					if (PyUnicode_Resize(
 						&result, need) < 0) {
 						Py_DECREF(item);

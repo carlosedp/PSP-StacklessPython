@@ -64,12 +64,25 @@ current_version = "%s.%d" % (short_version, FIELD3)
 # package replace this one. See "UpgradeCode Property".
 upgrade_code_snapshot='{92A24481-3ECB-40FC-8836-04B7966EC0D5}'
 upgrade_code='{65E6DE48-A358-434D-AA4F-4AF72DB4718F}'
+# This was added in 2.5.2, to support parallel installation of
+# both 32-bit and 64-bit versions of Python on a single system.
+upgrade_code_64='{6A965A0C-6EE6-4E3A-9983-3263F56311EC}'
+
+# Determine the target architechture
+dll_file = "python%s%s.dll" % (major, minor)
+dll_path = os.path.join(srcdir, "PCBuild", dll_file)
+msilib.set_arch_from_file(dll_path)
 
 if snapshot:
     current_version = "%s.%s.%s" % (major, minor, int(time.time()/3600/24))
     product_code = msilib.gen_uuid()
 else:
     product_code = product_codes[current_version]
+    if msilib.Win64:
+        # Bump the last digit of the code by one, so that 32-bit and 64-bit
+        # releases get separate product codes
+        digit = hex((int(product_code[-2],16)+1)%16)[-1]
+        product_code = product_code[:-2] + digit + '}'
 
 if full_current_version is None:
     full_current_version = current_version
@@ -147,14 +160,10 @@ def build_mingw_lib(lib_file, def_file, dll_file, mingw_lib):
 # Target files (.def and .a) go in PCBuild directory
 lib_file = os.path.join(srcdir, "PCBuild", "python%s%s.lib" % (major, minor))
 def_file = os.path.join(srcdir, "PCBuild", "python%s%s.def" % (major, minor))
-dll_file = "python%s%s.dll" % (major, minor)
 mingw_lib = os.path.join(srcdir, "PCBuild", "libpython%s%s.a" % (major, minor))
 
 have_mingw = build_mingw_lib(lib_file, def_file, dll_file, mingw_lib)
 
-# Determine the target architechture
-dll_path = os.path.join(srcdir, "PCBuild", dll_file)
-msilib.set_arch_from_file(dll_path)
 if msilib.pe_type(dll_path) != msilib.pe_type("msisupport.dll"):
     raise SystemError, "msisupport.dll for incorrect architecture"
 
@@ -166,9 +175,11 @@ else:
     testprefix = ''
 
 if msilib.Win64:
-    SystemFolderName = "[SystemFolder64]"
+    SystemFolderName = "[System64Folder]"
+    registry_component = 4|256
 else:
     SystemFolderName = "[SystemFolder]"
+    registry_component = 4
 
 msilib.reset()
 
@@ -182,16 +193,22 @@ def build_database():
     Summary information stream."""
     if snapshot:
         uc = upgrade_code_snapshot
+    elif msilib.Win64:
+        uc = upgrade_code_64
     else:
         uc = upgrade_code
+    if msilib.Win64:
+        productsuffix = " (64 bit)"
+    else:
+        productsuffix = ""
     # schema represents the installer 2.0 database schema.
     # sequence is the set of standard sequences
     # (ui/execute, admin/advt/install)
     db = msilib.init_database("python-%s%s.msi" % (full_current_version, msilib.arch_ext),
-                  schema, ProductName="Python "+full_current_version,
+                  schema, ProductName="Python "+full_current_version+productsuffix,
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer=u"Martin v. L\xf6wis")
+                  Manufacturer=u"Python Software Foundation")
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
     # InstallInitialize, so we first uninstall everything, but still roll
@@ -232,11 +249,22 @@ def remove_old_versions(db):
               "REMOVEOLDSNAPSHOT")])
         props = "REMOVEOLDSNAPSHOT"
     else:
+        if msilib.Win64:
+            uc = upgrade_code_64
+            # For 2.5, also upgrade installation with upgrade_code
+            # of 2.5.0 and 2.5.1, since they used the same code for
+            # 64-bit versions
+            assert major=='2' and minor=='5'
+            extra = [(upgrade_code, start, "2.5.2000",
+                    None, migrate_features, None, "REMOVEOLDVERSION")]
+        else:
+            uc = upgrade_code
+            extra = []
         add_data(db, "Upgrade",
-            [(upgrade_code, start, current_version,
+            [(uc, start, current_version,
               None, migrate_features, None, "REMOVEOLDVERSION"),
              (upgrade_code_snapshot, start, "%s.%d.0" % (major, int(minor)+1),
-              None, migrate_features, None, "REMOVEOLDSNAPSHOT")])
+              None, migrate_features, None, "REMOVEOLDSNAPSHOT")]+extra)
         props = "REMOVEOLDSNAPSHOT;REMOVEOLDVERSION"
     # Installer collects the product codes of the earlier releases in
     # these properties. In order to allow modification of the properties,
@@ -877,7 +905,7 @@ def add_files(db):
     if not have_ctypes:
         print "WARNING: _ctypes.pyd not found, ctypes will not be included"
         extensions.remove("_ctypes.pyd")
-    
+
     # Add all .py files in Lib, except lib-tk, test
     dirs={}
     pydirs = [(root,"Lib")]
@@ -1061,15 +1089,15 @@ def add_registry(db):
     tcldata = []
     if have_tcl:
         tcldata = [
-            ("REGISTRY.tcl", msilib.gen_uuid(), "TARGETDIR", 4, None,
+            ("REGISTRY.tcl", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
              "py.IDLE")]
     add_data(db, "Component",
              # msidbComponentAttributesRegistryKeyPath = 4
-             [("REGISTRY", msilib.gen_uuid(), "TARGETDIR", 4, None,
+             [("REGISTRY", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
                "InstallPath"),
-              ("REGISTRY.doc", msilib.gen_uuid(), "TARGETDIR", 4, None,
+              ("REGISTRY.doc", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
                "Documentation"),
-              ("REGISTRY.def", msilib.gen_uuid(), "TARGETDIR", 4,
+              ("REGISTRY.def", msilib.gen_uuid(), "TARGETDIR", registry_component,
                None, None)] + tcldata)
     # See "FeatureComponents Table".
     # The association between TclTk and pythonw.exe is necessary to make ICE59

@@ -204,7 +204,7 @@ interrupt_timeout_return(void)
 static PyObject *
 PyStackless_RunWatchdog_M(long timeout)
 {
-	return PyStackless_CallMethod_Main(slp_module, "run", "(i)", timeout);
+	return PyStackless_CallMethod_Main(slp_module, "run", "(l)", timeout);
 }
 
 PyObject *
@@ -265,7 +265,7 @@ run_watchdog(PyObject *self, PyObject *args, PyObject *kwds)
 	static char *argnames[] = {"timeout", NULL};
 	long timeout = 0;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|i:run_watchdog",
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|l:run_watchdog",
 					 argnames, &timeout))
 		return NULL;
 	return PyStackless_RunWatchdog(timeout);
@@ -285,7 +285,7 @@ get_thread_info(PyObject *self, PyObject *args)
 	PyInterpreterState *interp = ts->interp;
 	long id = 0;
 
-	if (!PyArg_ParseTuple(args, "|i:get_thread_info", &id))
+	if (!PyArg_ParseTuple(args, "|l:get_thread_info", &id))
 		return NULL;
 	for (ts = interp->tstate_head; id && ts != NULL; ts = ts->next) {
 		if (ts->thread_id == id)
@@ -343,7 +343,7 @@ test_cframe(PyObject *self, PyObject *args, PyObject *kwds)
 	PyObject *ret = Py_None;
 
 	Py_INCREF(ret);
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|i:test_cframe",
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "l|l:test_cframe",
 					 argnames, &switches, &extra))
 		return NULL;
 		if (extra < 0 || extra > STACK_MAX_USEFUL)
@@ -675,8 +675,8 @@ _get_refinfo(PyObject *self)
 {
 	PyObject *op, *max = Py_None;
 	PyObject *refchain;
-	int ref_total = _Py_RefTotal;
-	int computed_total = 0;
+	Py_ssize_t ref_total = _Py_RefTotal;
+	Py_ssize_t computed_total = 0;
 
 	refchain = PyTuple_New(0)->_ob_next; /* None doesn't work in 2.2 */
 	Py_DECREF(refchain->_ob_prev);
@@ -689,7 +689,7 @@ _get_refinfo(PyObject *self)
 		max = op;
 		computed_total += op->ob_refcnt;
 	}
-	return Py_BuildValue("(Oiii)", max, max->ob_refcnt, ref_total,
+	return Py_BuildValue("(Onnn)", max, max->ob_refcnt, ref_total,
 			     computed_total);
 }
 
@@ -1010,8 +1010,8 @@ static int init_stackless_methods()
 
 	for (; p->type != NULL; p++) {
 		PyTypeObject *t = p->type;
-		int ind = p->offset & MFLAG_IND;
-		int ofs = p->offset - ind;
+		size_t ind = p->offset & MFLAG_IND;
+		size_t ofs = p->offset - ind;
 
 		if (ind)
 			t = *((PyTypeObject **)t);
