@@ -25,16 +25,16 @@ static PyTaskletObject *_prev;
 #define __return(x) return (x)
 
 #define SLP_SAVE_STATE(stackref, stsizediff) \
-    intptr_t stsizeb; \
+	intptr_t stsizeb; \
 	stackref += STACK_MAGIC; \
 	if (_cstprev != NULL) { \
-        if (slp_cstack_new(_cstprev, (intptr_t *)stackref, _prev) == NULL) __return(-1); \
+		if (slp_cstack_new(_cstprev, (intptr_t *)stackref, _prev) == NULL) __return(-1); \
 		stsizeb = slp_cstack_save(*_cstprev); \
 	} \
 	else \
-        stsizeb = (_cst->startaddr - (intptr_t *)stackref) * sizeof(intptr_t); \
-    if (_cst == NULL) __return(0); \
-    stsizediff = stsizeb - (_cst->ob_size * sizeof(intptr_t));
+		stsizeb = (_cst->startaddr - (intptr_t *)stackref) * sizeof(intptr_t); \
+	if (_cst == NULL) __return(0); \
+	stsizediff = stsizeb - (_cst->ob_size * sizeof(intptr_t));
 
 #define SLP_RESTORE_STATE() \
 	if (_cst != NULL) { \
@@ -62,15 +62,9 @@ static PyTaskletObject *_prev;
 #undef __return
 #define __return(x) { exitcode = x; goto exit; }
 
-int slp_save_state(intptr_t *stack){
-	int exitcode;
-#ifdef SSIZE_T
-	/* Only on Windows apparently. */
-	SSIZE_T diff;
-#else
-	/* Py_ssize_t when we port to 2.5? */
-	int diff;
-#endif
+intptr_t slp_save_state(intptr_t *stack){
+	intptr_t exitcode;
+	intptr_t diff;
 	SLP_SAVE_STATE(stack, diff);
 	return diff;
 exit:
@@ -97,12 +91,12 @@ climb_stack_and_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 	 * needed stack size becomes *negative* :-))
 	 */
 	PyThreadState *ts = PyThreadState_GET();
-    intptr_t probe;
-    ptrdiff_t needed = &probe - ts->st.cstack_base;
+	intptr_t probe;
+	ptrdiff_t needed = &probe - ts->st.cstack_base;
 	/* in rare cases, the need might have vanished due to the recursion */
-    intptr_t *goobledigoobs;
+	intptr_t *goobledigoobs;
 	if (needed > 0) {
-        goobledigoobs = alloca(needed * sizeof(intptr_t));
+		goobledigoobs = alloca(needed * sizeof(intptr_t));
 		if (goobledigoobs == NULL)
 			return -1;
 	}
@@ -118,7 +112,7 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 	/* since we change the stack we must assure that the protocol was met */
 	STACKLESS_ASSERT();
 
-    if ((intptr_t *) &ts > ts->st.cstack_base)
+	if ((intptr_t *) &ts > ts->st.cstack_base)
 		return climb_stack_and_transfer(cstprev, cst, prev);
 	if (cst == NULL || cst->ob_size == 0)
 		cst = ts->st.initial_stub;

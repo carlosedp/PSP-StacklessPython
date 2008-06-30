@@ -629,6 +629,7 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 	PyEval_SaveThread();
 	PR("locker waiting for my lock");
 	acquire_lock(ts->st.thread.self_lock, 1);
+	Py_INCREF(ts->st.thread.self_lock);
 	PR("HAVE my lock");
 	PyEval_RestoreThread(ts);
 
@@ -662,6 +663,7 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 		Py_DECREF(unlocker_lock);
 	}
 
+	Py_DECREF(ts->st.thread.self_lock);
 	ts->st.thread.is_locked = 0;
 #else
 	(void)unlocker_lock;

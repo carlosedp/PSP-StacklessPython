@@ -26,14 +26,14 @@ reset_gc(PyTypeObject *type)
 	}
 }
 
-static int
-find_size(PyObject * bases, int size)
+static Py_ssize_t
+find_size(PyObject * bases, Py_ssize_t size)
 {
-	int i, n = PyTuple_GET_SIZE(bases);
+	Py_ssize_t i, n = PyTuple_GET_SIZE(bases);
 
 	for (i=0; i<n; ++i) {
 		PyObject *op = PyTuple_GET_ITEM(bases, i);
-		int sz = op->ob_type->tp_basicsize;
+		Py_ssize_t sz = op->ob_type->tp_basicsize;
 		if (sz > size)
 			size = sz;
 	}
@@ -117,8 +117,8 @@ flextype_new(PyTypeObject *meta, PyObject *args, PyObject *kwds)
         PyObject *name, *bases, *dict;
 	static char *kwlist[] = {"name", "bases", "dict", 0};
 	PyFlexTypeObject *type;
-	int basicsize = meta->tp_basicsize;
-	int type_size = basicsize;
+	Py_ssize_t basicsize = meta->tp_basicsize;
+	Py_ssize_t type_size = basicsize;
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SO!O!:type", kwlist,
 					 &name,
@@ -149,7 +149,7 @@ type_clone(PyTypeObject *meta, PyTypeObject *base, const char *typename, PyObjec
 	   size_t type_size, PyCMethodDef *ml)
 {
         PyObject *args = Py_BuildValue("(s(O)O)", typename, base, dict);
-	int basicsize = meta->tp_basicsize;
+	Py_ssize_t basicsize = meta->tp_basicsize;
 	PyFlexTypeObject *type;
 
         assert(type_size >= (size_t) meta->tp_basicsize);

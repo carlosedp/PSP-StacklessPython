@@ -15,14 +15,14 @@ typedef struct NRMUTEX {
 	HANDLE hevent ;
 } NRMUTEX, *PNRMUTEX ;
 
-typedef PVOID WINAPI interlocked_cmp_xchg_t(PVOID *dest, PVOID exc, PVOID comperand) ;
+typedef LONG WINAPI interlocked_cmp_xchg_t(LONG volatile *dest, LONG exc, LONG comperand) ;
 
 /* Sorry mate, but we haven't got InterlockedCompareExchange in Win95! */
-static PVOID WINAPI
-interlocked_cmp_xchg(PVOID *dest, PVOID exc, PVOID comperand)
+static LONG WINAPI
+interlocked_cmp_xchg(LONG volatile *dest, LONG exc, LONG comperand)
 {
 	static LONG spinlock = 0 ;
-	PVOID result ;
+	LONG result ;
 	DWORD dwSleep = 0;
 
 	/* Acqire spinlock (yielding control to other threads if cant aquire for the moment) */
@@ -76,10 +76,12 @@ InitializeNonRecursiveMutex(PNRMUTEX mutex)
 	return mutex->hevent != NULL ;	/* TRUE if the mutex is created */
 }
 
+#ifndef MS_WIN64
 #ifdef InterlockedCompareExchange
 #undef InterlockedCompareExchange
 #endif
 #define InterlockedCompareExchange(dest,exchange,comperand) (ixchg((dest), (exchange), (comperand)))
+#endif
 
 VOID
 DeleteNonRecursiveMutex(PNRMUTEX mutex)
@@ -98,7 +100,7 @@ EnterNonRecursiveMutex(PNRMUTEX mutex, BOOL wait)
 	/* InterlockedIncrement(&mutex->owned) == 0 means that no thread currently owns the mutex */
 	if (!wait)
 	{
-		if (InterlockedCompareExchange((PVOID *)&mutex->owned, (PVOID)0, (PVOID)-1) != (PVOID)-1)
+		if (InterlockedCompareExchange(&mutex->owned, 0, -1) != -1)
 			return WAIT_TIMEOUT ;
 		ret = WAIT_OBJECT_0 ;
 	}
@@ -202,12 +204,12 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 		 * too many threads".
 		 */
 		dprintf(("%ld: PyThread_start_new_thread failed: %p errno %d\n",
-		         PyThread_get_thread_ident(), rv, errno));
+		         PyThread_get_thread_ident(), (void*)rv, errno));
 		obj.id = -1;
 	}
 	else {
 		dprintf(("%ld: PyThread_start_new_thread succeeded: %p\n",
-		         PyThread_get_thread_ident(), rv));
+		         PyThread_get_thread_ident(), (void*)rv));
 		/* wait for thread to initialize, so we can get its id */
 		WaitForSingleObject(obj.done, INFINITE);
 		assert(obj.id != -1);
@@ -333,7 +335,7 @@ PyThread_release_lock(PyThread_type_lock aLock)
 	dprintf(("%ld: PyThread_release_lock(%p) called\n", PyThread_get_thread_ident(),aLock));
 
 	if (!(aLock && LeaveNonRecursiveMutex((PNRMUTEX) aLock)))
-		dprintf(("%ld: Could not PyThread_release_lock(%p) error: %l\n", PyThread_get_thread_ident(), aLock, GetLastError()));
+		dprintf(("%ld: Could not PyThread_release_lock(%p) error: %ld\n", PyThread_get_thread_ident(), aLock, GetLastError()));
 }
 
 /* minimum/maximum thread stack sizes supported */

@@ -533,7 +533,7 @@ class C:
   string, it must contain a possibly signed decimal number
   representable as a Python integer, possibly embedded in whitespace.
   The \var{radix} parameter gives the base for the
-  conversion and may be any integer in the range [2, 36], or zero.  If
+  conversion (which is 10 by default) and may be any integer in the range [2, 36], or zero.  If
   \var{radix} is zero, the proper radix is guessed based on the
   contents of string; the interpretation is the same as for integer
   literals.  If \var{radix} is specified and \var{x} is not a string,
@@ -972,7 +972,7 @@ except NameError:
 
 \begin{funcdesc}{reversed}{seq}
   Return a reverse iterator.  \var{seq} must be an object which
-  supports the sequence protocol (the __len__() method and the
+  supports the sequence protocol (the \method{__len__()} method and the
   \method{__getitem__()} method with integer arguments starting at
   \code{0}).
   \versionadded{2.4}
@@ -1280,13 +1280,11 @@ bypass these functions without concerns about missing something important.
   to be added to the end of the argument list.
   Calling \function{apply()} is different from just calling
   \code{\var{function}(\var{args})}, since in that case there is always
-  exactly one argument.  The use of \function{apply()} is equivalent
-  to \code{\var{function}(*\var{args}, **\var{keywords})}.
-  Use of \function{apply()} is not necessary since the ``extended call
-  syntax,'' as used in the last example, is completely equivalent.
+  exactly one argument.  The use of \function{apply()} is exactly
+  equivalent to \code{\var{function}(*\var{args}, **\var{keywords})}.
 
-  \deprecated{2.3}{Use the extended call syntax instead, as described
-                   above.}
+  \deprecated{2.3}{Use the extended call syntax with \code{*args}
+  and \code{**keywords} instead.}
 \end{funcdesc}
 
 \begin{funcdesc}{buffer}{object\optional{, offset\optional{, size}}}

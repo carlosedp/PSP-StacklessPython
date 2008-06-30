@@ -45,7 +45,16 @@ list_resize(PyListObject *self, Py_ssize_t newsize)
 	 * system realloc().
 	 * The growth pattern is:  0, 4, 8, 16, 25, 35, 46, 58, 72, 88, ...
 	 */
-	new_allocated = (newsize >> 3) + (newsize < 9 ? 3 : 6) + newsize;
+	new_allocated = (newsize >> 3) + (newsize < 9 ? 3 : 6);
+
+	/* check for integer overflow */
+	if (new_allocated > PY_SIZE_MAX - newsize) {
+		PyErr_NoMemory();
+		return -1;
+	} else {
+		new_allocated += newsize;
+	}
+
 	if (newsize == 0)
 		new_allocated = 0;
 	items = self->ob_item;
@@ -92,8 +101,9 @@ PyList_New(Py_ssize_t size)
 		return NULL;
 	}
 	nbytes = size * sizeof(PyObject *);
-	/* Check for overflow */
-	if (nbytes / sizeof(PyObject *) != (size_t)size)
+	/* Check for overflow without an actual overflow,
+	 *  which can cause compiler to optimise out */
+	if (size > PY_SIZE_MAX / sizeof(PyObject *))
 		return PyErr_NoMemory();
 	if (num_free_lists) {
 		num_free_lists--;
@@ -487,10 +497,10 @@ list_repeat(PyListObject *a, Py_ssize_t n)
 	if (n < 0)
 		n = 0;
 	size = a->ob_size * n;
-	if (size == 0)
-              return PyList_New(0);
 	if (n && size/n != a->ob_size)
 		return PyErr_NoMemory();
+	if (size == 0)
+		return PyList_New(0);
 	np = (PyListObject *) PyList_New(size);
 	if (np == NULL)
 		return NULL;
@@ -661,7 +671,7 @@ list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 
 
 	size = PyList_GET_SIZE(self);
-	if (size == 0) {
+	if (size == 0 || n == 1) {
 		Py_INCREF(self);
 		return (PyObject *)self;
 	}
@@ -670,6 +680,10 @@ list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 		(void)list_clear(self);
 		Py_INCREF(self);
 		return (PyObject *)self;
+	}
+
+	if (size > PY_SSIZE_T_MAX / n) {
+		return PyErr_NoMemory();
 	}
 
 	if (list_resize(self, size*n) == -1)
@@ -781,8 +795,9 @@ listextend(PyListObject *self, PyObject *b)
 	/* Guess a result list size. */
 	n = _PyObject_LengthHint(b);
 	if (n < 0) {
-		if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
-		    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+		if (PyErr_Occurred()
+		    && !PyErr_ExceptionMatches(PyExc_TypeError)
+		    && !PyErr_ExceptionMatches(PyExc_AttributeError)) {
 			Py_DECREF(it);
 			return NULL;
 		}
@@ -1367,6 +1382,10 @@ merge_getmem(MergeState *ms, Py_ssize_t need)
 	 * we don't care what's in the block.
 	 */
 	merge_freemem(ms);
+	if (need > PY_SSIZE_T_MAX / sizeof(PyObject*)) {
+		PyErr_NoMemory();
+		return -1;
+	}
 	ms->a = (PyObject **)PyMem_Malloc(need * sizeof(PyObject*));
 	if (ms->a) {
 		ms->alloced = need;
@@ -2532,6 +2551,8 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 				step = -step;
 			}
 
+			assert(slicelength <= PY_SIZE_MAX / sizeof(PyObject*));
+
 			garbage = (PyObject**)
 				PyMem_MALLOC(slicelength*sizeof(PyObject*));
 			if (!garbage) {
@@ -2927,4 +2948,3 @@ listreviter_len(listreviterobject *it)
 		return 0;
 	return len;
 }
-

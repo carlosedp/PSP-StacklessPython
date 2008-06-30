@@ -38,8 +38,8 @@ subclasses.
 
 \begin{methoddesc}{iterweekdays}{weekday}
 Return an iterator for the week day numbers that will be used
-for one week. The first number from the iterator will be the
-same as the number returned by \method{firstweekday()}.
+for one week. The first value from the iterator will be the same
+as the value of the \member{firstweekday} property.
 \end{methoddesc}
 
 \begin{methoddesc}{itermonthdates}{year, month}
@@ -81,20 +81,20 @@ the \var{year} as full weeks. Weeks are lists of seven
 day numbers.
 \end{methoddesc}
 
-\begin{methoddesc}{yeardatescalendar}{year, month\optional{, width}}
+\begin{methoddesc}{yeardatescalendar}{year\optional{, width}}
 Return the data for the specified year ready for formatting. The return
 value is a list of month rows. Each month row contains up to \var{width}
 months (defaulting to 3). Each month contains between 4 and 6 weeks and
 each week contains 1--7 days. Days are \class{datetime.date} objects.
 \end{methoddesc}
 
-\begin{methoddesc}{yeardays2calendar}{year, month\optional{, width}}
+\begin{methoddesc}{yeardays2calendar}{year\optional{, width}}
 Return the data for the specified year ready for formatting (similar to
 \method{yeardatescalendar()}). Entries in the week lists are tuples of
 day numbers and weekday numbers. Day numbers outside this month are zero.
 \end{methoddesc}
 
-\begin{methoddesc}{yeardayscalendar}{year, month\optional{, width}}
+\begin{methoddesc}{yeardayscalendar}{year\optional{, width}}
 Return the data for the specified year ready for formatting (similar to
 \method{yeardatescalendar()}). Entries in the week lists are day numbers.
 Day numbers outside this month are zero.
@@ -113,8 +113,8 @@ This class can be used to generate plain text calendars.
 Return a month's calendar in a multi-line string. If \var{w} is
 provided, it specifies the width of the date columns, which are
 centered. If \var{l} is given, it specifies the number of lines that
-each week will use. Depends on the first weekday as set by
-\function{setfirstweekday()}.
+each week will use. Depends on the first weekday as specified in the constructor
+or set by the \method{setfirstweekday()} method.
 \end{methoddesc}
 
 \begin{methoddesc}{prmonth}{theyear, themonth\optional{, w\optional{, l}}}
@@ -126,9 +126,9 @@ Print a month's calendar as returned by \method{formatmonth()}.
 Return a \var{m}-column calendar for an entire year as a multi-line string.
 Optional parameters \var{w}, \var{l}, and \var{c} are for date column
 width, lines per week, and number of spaces between month columns,
-respectively. Depends on the first weekday as set by
-\method{setfirstweekday()}.  The earliest year for which a calendar can
-be generated is platform-dependent.
+respectively. Depends on the first weekday as specified in the constructor or
+set by the \method{setfirstweekday()} method.  The earliest year for which a
+calendar can be generated is platform-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}{pryear}{theyear\optional{, w\optional{, l\optional{,

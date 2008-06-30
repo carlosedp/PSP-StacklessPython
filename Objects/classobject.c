@@ -647,6 +647,16 @@ instance_dealloc(register PyInstanceObject *inst)
 	 */
 	assert(inst->ob_refcnt > 0);
 	if (--inst->ob_refcnt == 0) {
+
+		/* New weakrefs could be created during the finalizer call.
+		    If this occurs, clear them out without calling their
+		    finalizers since they might rely on part of the object
+		    being finalized that has already been destroyed. */
+		while (inst->in_weakreflist != NULL) {
+			_PyWeakref_ClearRef((PyWeakReference *)
+                                            (inst->in_weakreflist));
+		}
+
 		Py_DECREF(inst->in_class);
 		Py_XDECREF(inst->in_dict);
 		PyObject_GC_Del(inst);
@@ -1540,6 +1550,18 @@ static PyObject *funcname(PyInstanceObject *self) { \
 	return generic_unary_op(self, o); \
 }
 
+/* unary function with a fallback */
+#define UNARY_FB(funcname, methodname, funcname_fb) \
+static PyObject *funcname(PyInstanceObject *self) { \
+	static PyObject *o; \
+	if (o == NULL) { o = PyString_InternFromString(methodname); \
+			 if (o == NULL) return NULL; } \
+	if (PyObject_HasAttr((PyObject*)self, o)) \
+		return generic_unary_op(self, o); \
+	else \
+		return funcname_fb(self); \
+}
+
 #define BINARY(f, m, n) \
 static PyObject *f(PyObject *v, PyObject *w) { \
 	return do_binop(v, w, "__" m "__", "__r" m "__", n); \
@@ -1778,7 +1800,7 @@ instance_index(PyInstanceObject *self)
 
 UNARY(instance_invert, "__invert__")
 UNARY(instance_int, "__int__")
-UNARY(instance_long, "__long__")
+UNARY_FB(instance_long, "__long__", instance_int)
 UNARY(instance_float, "__float__")
 UNARY(instance_oct, "__oct__")
 UNARY(instance_hex, "__hex__")

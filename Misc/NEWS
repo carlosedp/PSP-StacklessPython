@@ -4,6 +4,343 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5.2?
+=============================
+
+*Release date: 21-Feb-2008*
+
+Extension Modules
+-----------------
+
+- Fix deallocation of array objects when allocation ran out of memory.
+  Remove array test case that was incorrect on 64-bit systems.
+
+- Bug #2137: Remove test_struct.test_crasher, which was meaningful
+  only on 32-bit systems.
+
+
+What's New in Python 2.5.2c1?
+=============================
+
+*Release date: 14-Feb-2008*
+
+Core and builtins
+-----------------
+
+- Added checks for integer overflows, contributed by Google. Some are
+  only available if asserts are left in the code, in cases where they
+  can't be triggered from Python code.
+
+- Issue #2045: Fix an infinite recursion triggered when printing a subclass of
+  collections.defaultdict, if its default_factory is set to a bound method.
+
+- Issue #1920: "while 0" statements were completely removed by the compiler,
+  even in the presence of an "else" clause, which is supposed to be run when 
+  the condition is false. Now the compiler correctly emits bytecode for the
+  "else" suite.
+
+- A few crashers fixed: weakref_in_del.py (issue #1377858);
+  loosing_dict_ref.py (issue #1303614, test67.py);
+  borrowed_ref_[34].py (not in tracker).
+
+- Fix for #1303614 and #1174712 backported from the trunk:
+  __dict__ descriptor abuse for subclasses of built-in types;
+  subclassing from both ModuleType and another built-in types.
+
+- Bug #1915: Python compiles with --enable-unicode=no again. However
+  several extension methods and modules do not work without unicode
+  support.
+
+- Issue #1678380: distinction between 0.0 and -0.0 was lost during constant
+  folding optimization.  This was a regression from Python 2.4.
+
+- Issue #1882: when compiling code from a string, encoding cookies in the
+  second line of code were not always recognized correctly.
+
+- Bug #1517: Possible segfault in lookup().
+
+- Issue #1638: %zd configure test fails on Linux.
+
+- Issue #1553: An erroneous __length_hint__ can make list() raise a
+  SystemError.
+
+- Issue #1521: On 64bit platforms, using PyArgs_ParseTuple with the t# of w#
+  format code incorrectly truncated the length to an int, even when
+  PY_SSIZE_T_CLEAN is set.  The str.decode method used to return incorrect
+  results with huge strings.
+
+- Issue #1445: Fix a SystemError when accessing the ``cell_contents`` 
+  attribute of an empty cell object.
+
+- Issue #1265: Fix a problem with sys.settrace, if the tracing function uses a
+  generator expression when at the same time the executed code is closing a
+  paused generator.
+
+- Issue 1704621: Fix segfaults in list_repeat() and list_inplace_repeat().
+
+- Issue #1147: Generators were not raising a DeprecationWarning when a string
+  was passed into throw().
+
+- Patch #1031213: Decode source line in SyntaxErrors back to its original source
+  encoding.
+
+- Patch #1673759: add a missing overflow check when formatting floats
+  with %G.
+
+- Patch #1733960: Allow T_LONGLONG to accept ints.
+
+- Prevent expandtabs() on string and unicode objects from causing a segfault
+  when a large width is passed on 32-bit platforms.
+
+- Bug #1733488: Fix compilation of bufferobject.c on AIX.
+
+- Fix Issue #1703448: A joined thread could show up in the
+  threading.enumerate() list after the join() for a brief period until
+  it actually exited.
+
+
+Library
+-------
+
+- Patch #1966: Break infinite loop in httplib when the servers
+  implements the chunked encoding incorrectly.
+
+- tarfile.py: Fix reading of xstar archives.
+
+- #2021: Allow tempfile.NamedTemporaryFile to be used in with statements
+  by correctly supporting the context management protocol.
+
+- Fixed _ctypes.COMError so that it must be called with exactly three
+  arguments, instances now have the hresult, text, and details
+  instance variables.
+
+- #1507247, #2004: tarfile.py: Use mode 0700 for temporary directories and
+  default permissions for missing directories.
+
+- #175006: The debugger used to skip the condition of a "while" statement
+  after the first iteration. Now it correctly steps on the expression, and
+  breakpoints on the "while" statement are honored on each loop.
+
+- The ctypes int types did not accept objects implementing
+  __int__() in the constructor.
+
+- #1189216: Fix the zipfile module to work on archives with headers
+  past the 2**31 byte boundary.
+
+- Issue #1336: fix a race condition in subprocess.Popen if the garbage
+  collector kicked in at the wrong time that would cause the process
+  to hang when the child wrote to stderr.
+
+- Bug #1687: Fixed plistlib.py restricts <integer> to Python int when writing.
+
+- Issue #1182: many arithmetic bugs in the decimal module have been
+  fixed, and the decimal module has been updated to comply with the
+  latest IBM Decimal Arithmetic specification (version 1.66) and
+  testsuite (version 2.57).  (Backported from Python 2.6a0.)
+
+- Patch #1637: fix urlparse for URLs like 'http://x.com?arg=/foo'.
+
+- Issue #1735: TarFile.extractall() now correctly sets directory permissions
+  and times.
+
+- Bug #1713: posixpath.ismount() claims symlink to a mountpoint is a mountpoint.
+
+- Issue #1700: Regular expression inline flags incorrectly handle certain
+  unicode characters.
+
+- Change ctypes version number to 1.0.3 (when Python 2.5.2 is released,
+  ctypes 1.0.3 will be also be released).
+
+- Issue #1695: Fixed typo in the docstrings for time.localtime() and gmtime().
+
+- Issue #1642: Fix segfault in ctypes when trying to delete attributes.
+
+- os.access now returns True on Windows for any existing directory.
+
+- Issue #1531: tarfile.py: Read fileobj from the current offset, do not
+  seek to the start.
+
+- Issue 1429818: patch for trace and doctest modules so they play nicely
+  together.
+
+- doctest mis-used __loader__.get_data(), assuming universal newlines was used.
+
+- Issue #1705170: contextlib.contextmanager was still swallowing
+  StopIteration in some cases. This should no longer happen.
+
+- Bug #1307: Fix smtpd so it doesn't raise an exception when there is no arg.
+
+- ctypes will now work correctly on 32-bit systems when Python is
+  configured with --with-system-ffi.
+
+- Bug #1777530: ctypes.util.find_library uses dump(1) instead of
+  objdump(1) on Solaris.
+
+- Bug #1153: repr.repr() now doesn't require set and dictionary items
+  to be orderable to properly represent them.
+
+- Bug #1709599: Run test_1565150 only if the file system is NTFS.
+
+- When encountering a password-protected robots.txt file the RobotFileParser
+  no longer prompts interactively for a username and password (bug 813986).
+
+- TarFile.__init__() no longer fails if no name argument is passed and
+  the fileobj argument has no usable name attribute (e.g. StringIO).
+
+- Reverted the fix for bug #1548891 because it broke compatibility with
+  arbitrary read buffers. Added a note in the documentation.
+
+- GB18030 codec now can encode additional two-byte characters that
+  are missing in GBK.
+
+- Bug #1704793: Raise KeyError if unicodedata.lookup cannot
+  represent the result in a single character.
+
+- Change location of the package index to pypi.python.org/pypi
+
+- Bug #1701409: Fix a segfault in printing ctypes.c_char_p and
+  ctypes.c_wchar_p when they point to an invalid location.  As a
+  sideeffect the representation of these instances has changed.
+
+- Bug #1734723: Fix repr.Repr() so it doesn't ignore the maxtuple attribute.
+
+- Bug #1728403: Fix a bug that CJKCodecs StreamReader hangs when it
+  reads a file that ends with incomplete sequence and sizehint argument
+  for .read() is specified.
+
+- Bug #1730389: Have time.strptime() match spaces in a format argument with
+  ``\s+`` instead of ``\s*``.
+
+- SF 1668596/1720897: distutils now copies data files
+  even if package_dir is empty.
+
+- Fix bug in marshal where bad data would cause a segfault due to
+  lack of an infinite recursion check.
+
+- mailbox.py: Ignore stray directories found in Maildir's cur/new/tmp
+  subdirectories.
+
+- HTML-escape the plain traceback in cgitb's HTML output, to prevent
+  the traceback inadvertently or maliciously closing the comment and
+  injecting HTML into the error page.
+
+- Bug #1290505: Properly clear time.strptime's locale cache when the locale
+  changes between calls.  Backport of r54646 and r54647.
+
+- Bug #1706381: Specifying the SWIG option "-c++" in the setup.py file
+  (as opposed to the command line) will now write file names ending in
+  ".cpp" too.
+
+- Patch #1695229: Fix a regression with tarfile.open() and a missing name
+  argument.
+
+- tarfile.py: Fix directory names to have only one trailing slash.
+
+- Fix test_pty.py to not hang on OS X (and theoretically other *nixes) when
+  run in verbose mode.
+
+- Bug #1693258: IDLE would show two "Preferences" menu's with some versions
+  of Tcl/Tk
+
+- Issue1385: The hmac module now computes the correct hmac when using hashes
+  with a block size other than 64 bytes (such as sha384 and sha512).
+
+- Issue829951: In the smtplib module, SMTP.starttls() now complies with 
+  RFC 3207 and forgets any knowledge obtained from the server not obtained
+  from the TLS negotiation itself.  Patch contributed by Bill Fenner.
+
+
+Extension Modules
+-----------------
+
+- Patch #1736: Fix file name handling of _msi.FCICreate.
+
+- Backport r59862 (issue #712900): make long regexp matches interruptable.
+
+- #1940: make it possible to use curses.filter() before curses.initscr()
+  as the documentation says.
+
+- Fix a potential 'SystemError: NULL result without error' in _ctypes.
+
+- Bug #1301: Bad assert in _tkinter fixed.
+
+- Patch #1114: fix curses module compilation on 64-bit AIX, & possibly
+  other 64-bit LP64 platforms where attr_t is not the same size as a long.  
+  (Contributed by Luke Mewburn.)
+
+- Bug #1649098: Avoid declaration of zero-sized array declaration in
+  structure.
+
+- Bug #1703286: ctypes no longer truncates 64-bit pointers.
+
+- Bug #1721309: prevent bsddb module from freeing random memory.
+
+- Bug #1233: fix bsddb.dbshelve.DBShelf append method to work as
+  intended for RECNO databases.
+
+- Bug #1726026: Correct the field names of WIN32_FIND_DATAA and
+  WIN32_FIND_DATAW structures in the ctypes.wintypes module.
+
+- Added support for linking the bsddb module against BerkeleyDB 4.6.x.
+
+- Fix libffi configure for hppa*-*-linux* | parisc*-*-linux*.
+
+- Build using system ffi library on arm*-linux*.
+
+- Bug #1372: zlibmodule.c: int overflow in PyZlib_decompress
+
+- bsddb module: Fix memory leak when using database cursors on
+  databases without a DBEnv.
+
+
+Documentation
+-------------
+
+- Bug #1637365: add subsection about "__name__ == __main__" to the
+  Python tutorial.
+
+- Bug #1569057: Document that calling file.next() on a file open for writing
+  has undefined behaviour.  Backport of r54712.
+
+Build
+-----
+
+- Have the search path for building extensions follow the declared order in
+  $CPPFLAGS and $LDFLAGS.
+
+- Bug #1234: Fixed semaphore errors on AIX 5.2
+
+- Bug #1699: Define _BSD_SOURCE only on OpenBSD.
+
+- Bug #1608: use -fwrapv when GCC supports it.  This is important,
+  newer GCC versions may optimize away overflow buffer overflow checks
+  without this option!
+
+- Allow simultaneous installation of 32-bit and 64-bit versions
+  on 64-bit Windows systems.
+
+- Patch #786737: Allow building in a tree of symlinks pointing to
+  a readonly source.
+
+- Bug #1737210: Change Manufacturer of Windows installer to PSF.
+
+- Bug #1746880: Correctly install DLLs into system32 folder on Win64.
+
+- Define _BSD_SOURCE, to get access to POSIX extensions on OpenBSD 4.1+.
+
+- Patch #1673122: Use an explicit path to libtool when building a framework. 
+  This avoids picking up GNU libtool from a users PATH.
+
+- Allow Emacs 22 for building the documentation in info format.
+
+- Makefile.pre.in(buildbottest): Run an optional script pybuildbot.identify
+  to include some information about the build environment.
+
+Windows
+-------
+
+- Bug #1216: Restore support for Visual Studio 2002.
+
 What's New in Python 2.5.1?
 =============================
 
@@ -11,6 +348,8 @@ What's New in Python 2.5.1?
 
 Core and builtins
 -----------------
+
+- Bug #1722485: remove docstrings again when running with -OO.
 
 - Revert SF #1615701: dict.update() does *not* call __getitem__() or keys()
   if subclassed.  This is to remain consistent with 2.5.
@@ -147,7 +486,9 @@ Core and builtins
 Extension Modules
 -----------------
 
-- Bug #1563759: struct.unpack doens't support buffer protocol objects
+- Patch #1643738: Problem with signals in a single-threaded application.
+
+- Bug #1563759: struct.unpack doens't support buffer protocol objects.
 
 - Bug #1686475: Support stat'ing open files on Windows again.
 
@@ -171,6 +512,9 @@ Extension Modules
 - Patch #1657276: Make NETLINK_DNRTMSG conditional.
 
 - Bug #1653736: Fix signature of time_isoformat.
+
+- Issue #1698398 Zipfile.printdir() crashed because the format string
+  expected a tuple type of length six instead of time.struct_time object.
 
 - operator.count() now raises an OverflowError when the count reaches sys.maxint.
 
@@ -483,6 +827,8 @@ Windows
 Documentation
 -------------
 
+- Patch #1698768: updated the "using Python on the Mac" intro.
+
 - Patch #1489771: the syntax rules in Python Reference Manual were
   updated to reflect the current Python syntax.
 
@@ -588,6 +934,8 @@ Tests
 - Fix bsddb test_basics.test06_Transactions to check the version
   number properly.
 
+- Fix utf-8-sig incremental decoder, which didn't recognise a BOM when the
+  first chunk fed to the decoder started with a BOM, but was longer than 3 bytes.
 
 Documentation
 -------------

@@ -199,6 +199,11 @@ CField_set(CFieldObject *self, PyObject *inst, PyObject *value)
 	assert(CDataObject_Check(inst));
 	dst = (CDataObject *)inst;
 	ptr = dst->b_ptr + self->offset;
+	if (value == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't delete attribute");
+		return -1;
+	}
 	return CData_set(inst, self->proto, self->setfunc, value,
 			 self->index, self->size, ptr);
 }
@@ -350,10 +355,9 @@ static int
 get_long(PyObject *v, long *p)
 {
 	long x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
 		return -1;
 	}
 	x = PyInt_AsUnsignedLongMask(v);
@@ -369,10 +373,9 @@ static int
 get_ulong(PyObject *v, unsigned long *p)
 {
 	unsigned long x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
 		return -1;
 	}
 	x = PyInt_AsUnsignedLongMask(v);
@@ -390,11 +393,10 @@ static int
 get_longlong(PyObject *v, PY_LONG_LONG *p)
 {
 	PY_LONG_LONG x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
-		return -1;
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
+ 		return -1;
 	}
 	x = PyInt_AsUnsignedLongLongMask(v);
 	if (x == -1 && PyErr_Occurred())
@@ -409,12 +411,11 @@ static int
 get_ulonglong(PyObject *v, unsigned PY_LONG_LONG *p)
 {
 	unsigned PY_LONG_LONG x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
-		return -1;
-	}
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
+ 		return -1;
+ 	}
 	x = PyInt_AsUnsignedLongLongMask(v);
 	if (x == -1 && PyErr_Occurred())
 		return -1;
@@ -1333,7 +1334,7 @@ z_get(void *ptr, unsigned size)
 		if (IsBadStringPtrA(*(char **)ptr, -1)) {
 			PyErr_Format(PyExc_ValueError,
 				     "invalid string pointer %p",
-				     ptr);
+				     *(char **)ptr);
 			return NULL;
 		}
 #endif
@@ -1389,7 +1390,7 @@ Z_set(void *ptr, PyObject *value, unsigned size)
 		size *= sizeof(wchar_t);
 		buffer = (wchar_t *)PyMem_Malloc(size);
 		if (!buffer)
-			return NULL;
+			return PyErr_NoMemory();
 		memset(buffer, 0, size);
 		keep = PyCObject_FromVoidPtr(buffer, PyMem_Free);
 		if (!keep) {
@@ -1414,9 +1415,17 @@ Z_get(void *ptr, unsigned size)
 {
 	wchar_t *p;
 	p = *(wchar_t **)ptr;
-	if (p)
+	if (p) {
+#if defined(MS_WIN32) && !defined(_WIN32_WCE)
+		if (IsBadStringPtrW(*(wchar_t **)ptr, -1)) {
+			PyErr_Format(PyExc_ValueError,
+				     "invalid string pointer %p",
+				     *(wchar_t **)ptr);
+			return NULL;
+		}
+#endif
 		return PyUnicode_FromWideChar(p, wcslen(p));
-	else {
+	} else {
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
@@ -1541,17 +1550,21 @@ static struct fielddesc formattable[] = {
 /* XXX Hm, sizeof(int) == sizeof(long) doesn't hold on every platform */
 /* As soon as we can get rid of the type codes, this is no longer a problem */
 #if SIZEOF_LONG == 4
-	{ 'l', l_set, l_get, &ffi_type_sint, l_set_sw, l_get_sw},
-	{ 'L', L_set, L_get, &ffi_type_uint, L_set_sw, L_get_sw},
+	{ 'l', l_set, l_get, &ffi_type_sint32, l_set_sw, l_get_sw},
+	{ 'L', L_set, L_get, &ffi_type_uint32, L_set_sw, L_get_sw},
 #elif SIZEOF_LONG == 8
-	{ 'l', l_set, l_get, &ffi_type_slong, l_set_sw, l_get_sw},
-	{ 'L', L_set, L_get, &ffi_type_ulong, L_set_sw, L_get_sw},
+	{ 'l', l_set, l_get, &ffi_type_sint64, l_set_sw, l_get_sw},
+	{ 'L', L_set, L_get, &ffi_type_uint64, L_set_sw, L_get_sw},
 #else
 # error
 #endif
 #ifdef HAVE_LONG_LONG
-	{ 'q', q_set, q_get, &ffi_type_slong, q_set_sw, q_get_sw},
-	{ 'Q', Q_set, Q_get, &ffi_type_ulong, Q_set_sw, Q_get_sw},
+#if SIZEOF_LONG_LONG == 8
+	{ 'q', q_set, q_get, &ffi_type_sint64, q_set_sw, q_get_sw},
+	{ 'Q', Q_set, Q_get, &ffi_type_uint64, Q_set_sw, Q_get_sw},
+#else
+# error
+#endif
 #endif
 	{ 'P', P_set, P_get, &ffi_type_pointer},
 	{ 'z', z_set, z_get, &ffi_type_pointer},

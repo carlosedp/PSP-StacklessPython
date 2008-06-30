@@ -119,6 +119,7 @@ PyDoc_STRVAR(IO_getval__doc__,
 static PyObject *
 IO_cgetval(PyObject *self) {
         if (!IO__opencheck(IOOOBJECT(self))) return NULL;
+        assert(IOOOBJECT(self)->pos >= 0);
         return PyString_FromStringAndSize(((IOobject*)self)->buf,
                                           ((IOobject*)self)->pos);
 }
@@ -137,6 +138,7 @@ IO_getval(IOobject *self, PyObject *args) {
         }
         else
                   s=self->string_size;
+        assert(self->pos >= 0);
         return PyString_FromStringAndSize(self->buf, s);
 }
 
@@ -157,6 +159,8 @@ IO_cread(PyObject *self, char **output, Py_ssize_t  n) {
         Py_ssize_t l;
 
         if (!IO__opencheck(IOOOBJECT(self))) return -1;
+        assert(IOOOBJECT(self)->pos >= 0);
+        assert(IOOOBJECT(self)->string_size >= 0);
         l = ((IOobject*)self)->string_size - ((IOobject*)self)->pos;  
         if (n < 0 || n > l) {
                 n = l;
@@ -192,12 +196,17 @@ IO_creadline(PyObject *self, char **output) {
         for (n = ((IOobject*)self)->buf + ((IOobject*)self)->pos,
                s = ((IOobject*)self)->buf + ((IOobject*)self)->string_size; 
              n < s && *n != '\n'; n++);
+
         if (n < s) n++;
 
         *output=((IOobject*)self)->buf + ((IOobject*)self)->pos;
         l = n - ((IOobject*)self)->buf - ((IOobject*)self)->pos;
-	assert(((IOobject*)self)->pos + l < INT_MAX);
-        ((IOobject*)self)->pos += (int)l;
+
+        assert(IOOOBJECT(self)->pos <= PY_SSIZE_T_MAX - l);
+        assert(IOOOBJECT(self)->pos >= 0);
+        assert(IOOOBJECT(self)->string_size >= 0);
+
+        ((IOobject*)self)->pos += l;
         return (int)l;
 }
 
@@ -215,6 +224,7 @@ IO_readline(IOobject *self, PyObject *args) {
                 n -= m;
                 self->pos -= m;
         }
+        assert(IOOOBJECT(self)->pos >= 0);
         return PyString_FromStringAndSize(output, n);
 }
 
@@ -277,6 +287,7 @@ IO_tell(IOobject *self, PyObject *unused) {
 
         if (!IO__opencheck(self)) return NULL;
 
+        assert(self->pos >= 0);
         return PyInt_FromSsize_t(self->pos);
 }
 
@@ -339,13 +350,17 @@ O_seek(Oobject *self, PyObject *args) {
         }
 
         if (position > self->buf_size) {
+                  char *newbuf;
                   self->buf_size*=2;
                   if (self->buf_size <= position) self->buf_size=position+1;
-		  self->buf = (char*) realloc(self->buf,self->buf_size);
-                  if (!self->buf) {
+		  newbuf = (char*) realloc(self->buf,self->buf_size);
+                  if (!newbuf) {
+                      free(self->buf);
+                      self->buf = 0;
                       self->buf_size=self->pos=0;
                       return PyErr_NoMemory();
                     }
+                  self->buf = newbuf;
           }
         else if (position < 0) position=0;
 
@@ -366,6 +381,7 @@ static int
 O_cwrite(PyObject *self, const char *c, Py_ssize_t  l) {
         Py_ssize_t newl;
         Oobject *oself;
+        char *newbuf;
 
         if (!IO__opencheck(IOOOBJECT(self))) return -1;
         oself = (Oobject *)self;
@@ -377,12 +393,15 @@ O_cwrite(PyObject *self, const char *c, Py_ssize_t  l) {
 		    assert(newl + 1 < INT_MAX);
                     oself->buf_size = (int)(newl+1);
 	    }
-            oself->buf = (char*)realloc(oself->buf, oself->buf_size);
-	    if (!oself->buf) {
+            newbuf = (char*)realloc(oself->buf, oself->buf_size);
+	    if (!newbuf) {
                     PyErr_SetString(PyExc_MemoryError,"out of memory");
+                    free(oself->buf);
+                    oself->buf = 0;
                     oself->buf_size = oself->pos = 0;
                     return -1;
               }
+            oself->buf = newbuf;
           }
 
         memcpy(oself->buf+oself->pos,c,l);
@@ -657,8 +676,11 @@ newIobject(PyObject *s) {
   char *buf;
   Py_ssize_t size;
 
-  if (PyObject_AsCharBuffer(s, (const char **)&buf, &size) != 0)
-      return NULL;
+  if (PyObject_AsReadBuffer(s, (const void **)&buf, &size)) {
+    PyErr_Format(PyExc_TypeError, "expected read buffer, %.200s found",
+                 s->ob_type->tp_name);
+    return NULL;
+  }
 
   self = PyObject_New(Iobject, &Itype);
   if (!self) return NULL;

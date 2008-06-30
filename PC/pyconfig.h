@@ -234,6 +234,9 @@ typedef int pid_t;
 #define COMPILER "[gcc]"
 #define hypot _hypot
 #define PY_LONG_LONG long long
+#define PY_LLONG_MIN LLONG_MIN
+#define PY_LLONG_MAX LLONG_MAX
+#define PY_ULLONG_MAX ULLONG_MAX
 #endif /* GNUC */
 
 /* ------------------------------------------------------------------------*/
@@ -259,6 +262,9 @@ typedef int pid_t;
 #define HAVE_LONG_LONG 1
 #ifndef PY_LONG_LONG
 #	define PY_LONG_LONG __int64
+#	define PY_LLONG_MAX _I64_MAX
+#	define PY_LLONG_MIN _I64_MIN
+#	define PY_ULLONG_MAX _UI64_MAX
 #endif
 
 /* For Windows the Python core is in a DLL by default.  Test
@@ -344,11 +350,11 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
    define these.
    If some compiler does not provide them, modify the #if appropriately. */
 #if defined(_MSC_VER)
-#if _MSC_VER > 1201
+#if _MSC_VER > 1300
 #define HAVE_UINTPTR_T 1
 #define HAVE_INTPTR_T 1
 #else
-/* VC6 & eVC4 don't support the C99 LL suffix for 64-bit integer literals */
+/* VC6, VS 2002 and eVC4 don't support the C99 LL suffix for 64-bit integer literals */
 #define Py_LL(x) x##I64
 #endif  /* _MSC_VER > 1200  */
 #endif  /* _MSC_VER */

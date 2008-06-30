@@ -340,8 +340,10 @@ void slp_kill_tasks_with_stacks(PyThreadState *ts)
 		 * leaving it to run next.
 		 */
 		if (!t->flags.blocked && t != cs->tstate->st.main) {
-			chain = &t;
-			SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev)
+			if (t->next && t->prev) { /* it may have been removed() */
+				chain = &t;
+				SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev)
+			}
 			chain = &cs->tstate->st.main;
 			task = cs->task;
 			SLP_CHAIN_INSERT(PyTaskletObject, chain, task, next, prev);
@@ -349,6 +351,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *ts)
 			t = cs->task;
 		}
 
+		Py_INCREF(t); /* because the following steals a reference */
 		PyTasklet_Kill(t);
 		PyErr_Clear();
 
@@ -364,8 +367,14 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 {
 	PyThreadState *ts = PyThreadState_Get();
 
-	if (ts->st.main == NULL)
-		initialize_main_and_current();
+	if (ts->st.main == NULL) {
+		if (initialize_main_and_current()) {
+			PyObject *s = PyString_FromString("tasklet cleanup");
+			PyErr_WriteUnraisable(s);
+			Py_XDECREF(s);
+			return;
+		}
+	}
 	slp_kill_tasks_with_stacks(allthreads ? NULL : ts);
 }
 

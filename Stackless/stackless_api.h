@@ -261,6 +261,12 @@ PyAPI_FUNC(void) PyChannel_SetPreference(PyChannelObject *self, int val);
 PyAPI_FUNC(int) PyChannel_GetScheduleAll(PyChannelObject *self);
 PyAPI_FUNC(void) PyChannel_SetScheduleAll(PyChannelObject *self, int val);
 
+/*
+ *Get the current channel balance. Negative numbers are readers, positive
+ * are writers
+ */
+PyAPI_FUNC(int) PyChannel_GetBalance(PyChannelObject *self);
+
 /******************************************************
 
   stacklessmodule functions

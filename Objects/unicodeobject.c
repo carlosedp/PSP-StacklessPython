@@ -1813,7 +1813,10 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
         startinpos = s-starts;
         /* \ - Escapes */
         s++;
-        switch (*s++) {
+        c = *s++;
+        if (s > end)
+            c = '\0'; /* Invalid after \ */
+        switch (c) {
 
         /* \x escapes */
         case '\n': break;
@@ -1832,9 +1835,9 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
         case '0': case '1': case '2': case '3':
         case '4': case '5': case '6': case '7':
             x = s[-1] - '0';
-            if ('0' <= *s && *s <= '7') {
+            if (s < end && '0' <= *s && *s <= '7') {
                 x = (x<<3) + *s++ - '0';
-                if ('0' <= *s && *s <= '7')
+                if (s < end && '0' <= *s && *s <= '7')
                     x = (x<<3) + *s++ - '0';
             }
             *p++ = x;
@@ -5686,7 +5689,7 @@ unicode_expandtabs(PyUnicodeObject *self, PyObject *args)
     Py_UNICODE *e;
     Py_UNICODE *p;
     Py_UNICODE *q;
-    Py_ssize_t i, j;
+    Py_ssize_t i, j, old_j;
     PyUnicodeObject *u;
     int tabsize = 8;
 
@@ -5694,20 +5697,37 @@ unicode_expandtabs(PyUnicodeObject *self, PyObject *args)
 	return NULL;
 
     /* First pass: determine size of output string */
-    i = j = 0;
+    i = j = old_j = 0;
     e = self->str + self->length;
     for (p = self->str; p < e; p++)
         if (*p == '\t') {
-	    if (tabsize > 0)
+	    if (tabsize > 0) {
 		j += tabsize - (j % tabsize);
+		if (old_j > j) {
+		    PyErr_SetString(PyExc_OverflowError,
+				    "new string is too long");
+		    return NULL;
+		}
+		old_j = j;
+	    }
 	}
         else {
             j++;
             if (*p == '\n' || *p == '\r') {
                 i += j;
-                j = 0;
+                old_j = j = 0;
+                if (i < 0) {
+                    PyErr_SetString(PyExc_OverflowError,
+                                    "new string is too long");
+                    return NULL;
+                }
             }
         }
+
+    if ((i + j) < 0) {
+        PyErr_SetString(PyExc_OverflowError, "new string is too long");
+        return NULL;
+    }
 
     /* Second pass: create output string and fill it */
     u = _PyUnicode_New(i + j);
@@ -5740,7 +5760,7 @@ PyDoc_STRVAR(find__doc__,
 "S.find(sub [,start [,end]]) -> int\n\
 \n\
 Return the lowest index in S where substring sub is found,\n\
-such that sub is contained within s[start,end].  Optional\n\
+such that sub is contained within s[start:end].  Optional\n\
 arguments start and end are interpreted as in slice notation.\n\
 \n\
 Return -1 on failure.");
@@ -6481,7 +6501,7 @@ PyDoc_STRVAR(rfind__doc__,
 "S.rfind(sub [,start [,end]]) -> int\n\
 \n\
 Return the highest index in S where substring sub is found,\n\
-such that sub is contained within s[start,end].  Optional\n\
+such that sub is contained within s[start:end].  Optional\n\
 arguments start and end are interpreted as in slice notation.\n\
 \n\
 Return -1 on failure.");
@@ -7273,7 +7293,8 @@ formatfloat(Py_UNICODE *buf,
        always given), therefore increase the length by one.
 
     */
-    if ((type == 'g' && buflen <= (size_t)10 + (size_t)prec) ||
+    if (((type == 'g' || type == 'G') && 
+          buflen <= (size_t)10 + (size_t)prec) ||
 	(type == 'f' && buflen <= (size_t)53 + (size_t)prec)) {
 	PyErr_SetString(PyExc_OverflowError,
 			"formatted float is too long (precision too large?)");

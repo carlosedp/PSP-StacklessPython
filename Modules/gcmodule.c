@@ -732,8 +732,16 @@ collect(int generation)
 	Py_ssize_t n = 0; /* # unreachable objects that couldn't be collected */
 	PyGC_Head *young; /* the generation we are examining */
 	PyGC_Head *old; /* next older generation */
+#ifdef STACKLESS
+	/* unlinking may occur in a different tasklet during collection
+	 * so these must not be on the stack
+	 */
+	static PyGC_Head unreachable; /* non-problematic unreachable trash */
+	static PyGC_Head finalizers;  /* objects with, & reachable from, __del__ */
+#else
 	PyGC_Head unreachable; /* non-problematic unreachable trash */
 	PyGC_Head finalizers;  /* objects with, & reachable from, __del__ */
+#endif
 	PyGC_Head *gc;
 	double t1 = 0.0;
 
