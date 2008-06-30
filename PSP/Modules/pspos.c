@@ -20,6 +20,7 @@
 #include <pspkernel.h>
 #include <psppower.h>
 #include <psputility.h>
+#include <pspsircs.h>
 
 #include "structseq.h"
 
@@ -894,6 +895,105 @@ static PyObject* PyPSP_realmem(PyObject *self, PyObject *args)
     return Py_BuildValue("i", total);
 }
 
+static PyObject* PyPSP_sendIR(PyObject *self, PyObject *args)
+{
+    struct sircs_data *data;
+    PyObject *params;
+    int count, i;
+
+    if (!PyArg_ParseTuple(args, "O:sendIR", &params))
+       return NULL;
+
+    if (!PyList_Check(params))
+    {
+       PyErr_SetString(PyExc_TypeError, "Argument must be a list.");
+       return NULL;
+    }
+
+    count = PyList_Size(params);
+    data = malloc(sizeof(struct sircs_data) * count);
+
+    for (i = 0; i < count; ++i)
+    {
+       PyObject *tpl = PyList_GetItem(params, i);
+       PyObject *pytype, *pycmd, *pydev;
+       int type, cmd, dev;
+
+       if (!PyTuple_Check(tpl))
+       {
+          PyErr_SetString(PyExc_TypeError, "List elements must be tuples.");
+          free(data);
+
+          return NULL;
+       }
+
+       if (PyTuple_Size(tpl) != 3)
+       {
+          PyErr_SetString(PyExc_TypeError, "List elements must be 3-tuples.");
+          free(data);
+
+          return NULL;
+       }
+
+       pytype = PyTuple_GetItem(tpl, 0);
+       pycmd = PyTuple_GetItem(tpl, 1);
+       pydev = PyTuple_GetItem(tpl, 2);
+
+       if (!PyInt_Check(pytype) || !PyInt_Check(pycmd) || !PyInt_Check(pydev))
+       {
+          PyErr_SetString(PyExc_TypeError, "Integers are required");
+          free(data);
+
+          return NULL;
+       }
+
+       type = PyInt_AsLong(pytype);
+       cmd = PyInt_AsLong(pycmd);
+       dev = PyInt_AsLong(pydev);
+
+       if ((type < 0) || (type > 255))
+       {
+          PyErr_SetString(PyExc_ValueError, "type must be in the range 0..255");
+          free(data);
+
+          return NULL;
+       }
+
+       if ((cmd < 0) || (cmd > 255))
+       {
+          PyErr_SetString(PyExc_ValueError, "cmd must be in the range 0..255");
+          free(data);
+
+          return NULL;
+       }
+
+       if ((dev < 0) || (dev > 65535))
+       {
+          PyErr_SetString(PyExc_ValueError, "dev must be in the range 0..65535");
+          free(data);
+
+          return NULL;
+       }
+
+       data[i].type = (u8)type;
+       data[i].cmd = (u8)cmd;
+       data[i].dev = (u16)dev;
+    }
+
+    if (sceSircsSend(data, count))
+    {
+       free(data);
+
+       PyErr_SetString(PyExc_OSError, "sceSircsSend() failed");
+       return NULL;
+    }
+
+    free(data);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 
 //==========================================================================
 //
@@ -938,6 +1038,7 @@ static PyMethodDef pspos_functions[] = {
    //{ "setnickname", PyPSP_setnickname, METH_VARARGS, "" },
 
    { "realmem", PyPSP_realmem, METH_VARARGS, "" },
+   { "sendIR",   PyPSP_sendIR, METH_VARARGS, "" },
 
    { NULL }
 };

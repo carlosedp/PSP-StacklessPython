@@ -32,7 +32,7 @@
 #include "Python.h"
 
 #define VERS    2
-#define REVS    51
+#define REVS    52
 PSP_MODULE_INFO("StacklessPython", 0, VERS, REVS);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER|PSP_THREAD_ATTR_VFPU);
 //PSP_HEAP_SIZE_KB(18*1024); /* Use 18Mb */
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     printf("Search path: %s\n", Py_GetPath());
     printf("\n");
 
-    scePowerSetClockFrequency(333, 333, 166);
+    //scePowerSetClockFrequency(333, 333, 166);
     FILE *fp;
     PySys_ResetWarnOptions();
     Py_SetProgramName("python");
