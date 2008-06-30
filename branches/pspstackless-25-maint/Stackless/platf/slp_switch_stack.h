@@ -20,6 +20,7 @@ slp_switch_stack(void)
 	    SLP_STACK_END();
 	    return 0;
 	}
+#pragma warning(default:4731)
 }
 
 #elif defined(MS_WIN64) && defined(_M_X64)
@@ -31,10 +32,14 @@ static int
 slp_switch_stack(void)
 {
 	register int *stackref, stsizediff;
+#if STACKLESS_FRHACK
+	__asm__ volatile ("" : : : "esi", "edi");
+#else
 	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+#endif
 	__asm__ ("movl %%esp, %0" : "=g" (stackref));
 	{
-		SLP_STACK_BEGIN(stackref, stsizediff);
+ 		SLP_STACK_BEGIN(stackref, stsizediff);
 		__asm__ volatile (
 		    "addl %0, %%esp\n"
 		    "addl %0, %%ebp\n"
@@ -44,7 +49,11 @@ slp_switch_stack(void)
 		SLP_STACK_END();
 		return 0;
 	}
+#if STACKLESS_FRHACK
+	__asm__ volatile ("" : : : "esi", "edi");
+#else
 	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+#endif
 }
 
 #elif defined(__GNUC__) && defined(__amd64__)

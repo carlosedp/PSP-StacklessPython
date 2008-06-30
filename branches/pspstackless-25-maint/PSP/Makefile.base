@@ -1,7 +1,7 @@
 TARGET = StacklessPSP
 BUILD_PRX = 1
 PSP_LARGE_MEMORY = 1
-PSP_FW_VERSION = 380
+PSP_FW_VERSION = 371
 RELEASE_NAME = StacklessPSP
 RELEASE_VERSION = 2.5.2
 RELEASE_DIRECTORY = ../../$(RELEASE_NAME)-$(RELEASE_VERSION)
@@ -269,7 +269,7 @@ LIBS += -lssl -lcrypto
 CPPFLAGS += -DWITH_SSL -I$(PSPDEV)/psp/include/openssl
 endif
 
-LIBS += -lpsppower -lstdc++ -lbz2
+LIBS += -lpsppower -lpspsircs -lstdc++ -lbz2
 
 CPPFLAGS += -DHAVE_CONFIG_H -DPSP -I../Include -I../Stackless
 CPPFLAGS += -I../Modules/expat -DHAVE_MEMMOVE
@@ -290,17 +290,17 @@ psperror.c:
 	python generr.py
 	@rm pspkerror.h
 	
-release: $(PSP_EBOOT)
+release: distclean $(PSP_EBOOT)
 	@echo "###### Create release package ######"
 	@echo "1. Creating release directory $(RELEASE_DIRECTORY)/"
 	@mkdir -p $(RELEASE_DIRECTORY)/
 	@echo "2. Copying EBOOT to release dir."
 	@cp -pR EBOOT.PBP $(RELEASE_DIRECTORY)/
 	@echo "3. Copying Python libraries to release dir."
-	@cd ../Lib && find . \! -wholename '*/.svn*' \! -wholename '*/plat*' \! -wholename '*/test/*' | zip $(RELEASE_DIRECTORY)/python.zip -q@
+	@cd ../Lib && find . -path '*/.svn*' -prune -o -path '*/plat-*' -prune -o -path './test/*' -prune -o -path '*/msilib/*' -prune -o -path '*/curses/*' -prune -o -path '*/idlelib/*' -prune -o -path '*/lib-tk/*' -prune -o -print | zip $(RELEASE_DIRECTORY)/python.zip -q@
 	@mkdir -p site-packages
 	@cp -pR elementtree/elementtree site-packages/
-	@find site-packages/ -name ".svn" | xargs rm -rf
+	@find site-packages/ -path "*/.svn*" -print0 | xargs -0 rm -rf
 	@zip -qr $(RELEASE_DIRECTORY)/python.zip site-packages/elementtree
 	@rm -rf site-packages
 	@echo "4. Release dir created on $(RELEASE_DIRECTORY)."
