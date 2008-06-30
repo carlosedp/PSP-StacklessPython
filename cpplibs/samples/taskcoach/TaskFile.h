@@ -1,11 +1,11 @@
 
 /**
- * @file TreeCtrl.h
+ * @file TaskFile.h
  */
 
 /**********************************************************************
 
-  Created: 13 May 2008
+  Created: 17 May 2008
 
     Copyright (C) 2008 Frank Buss, Jérôme Laheurte
 
@@ -34,41 +34,26 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 // $Id$
 
-#ifndef _TREECTRL_H
-#define _TREECTRL_H
+#ifndef _TASKFILE_H
+#define _TASKFILE_H
 
-#include <imaging/Image.h>
+#include <string>
+#include <vector>
 
-class TreeItem;
+class Task;
 
-class TreeCtrl
+class TaskFile
 {
   public:
-    TreeCtrl();
-    ~TreeCtrl();
+    TaskFile(const std::string&);
+    ~TaskFile();
 
-    void freeze();
-    void thaw();
-
-    TreeItem* append(TreeItem *parent, TreeItem *item);
-
-    void selectNext();
-    void selectPrev();
-
-    void redraw();
-
-    void collapse(bool);
-
-    TreeItem* selection();
+    std::vector<Task*> read();
 
   protected:
-    TreeItem *m_pRoot;
-    bool m_bFrozen;
-    int m_iFirst;
-    Imaging::Image *m_pArrow1;
-    Imaging::Image *m_pArrow2;
-    TreeItem *m_pSelected;
-    Imaging::Image *m_pSelect;
+    std::string m_Filename;
+
+    Task* _parseLine(char*);
 };
 
-#endif /* _TREECTRL_H */
+#endif /* _TASKFILE_H */

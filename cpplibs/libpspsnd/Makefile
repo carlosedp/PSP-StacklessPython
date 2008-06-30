@@ -15,7 +15,7 @@ install: $(TARGET_LIB)
 	@echo "Installing libpspsnd into $(PSPDIR)"
 	@mkdir -p $(PSPDIR)/include/libpspsnd $(PSPDIR)/lib
 	@cp *.h $(PSPDIR)/include/libpspsnd
-	@cp libpspsnd.a  $(PSPDIR)/lib
+	@cp ../libpspsnd.a  $(PSPDIR)/lib
 	@echo "Done"
 
 doc:

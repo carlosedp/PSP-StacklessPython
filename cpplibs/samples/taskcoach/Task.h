@@ -1,11 +1,11 @@
 
 /**
- * @file TreeCtrl.h
+ * @file Task.h
  */
 
 /**********************************************************************
 
-  Created: 13 May 2008
+  Created: 17 May 2008
 
     Copyright (C) 2008 Frank Buss, Jérôme Laheurte
 
@@ -34,41 +34,49 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **********************************************************************/
 // $Id$
 
-#ifndef _TREECTRL_H
-#define _TREECTRL_H
+#ifndef _TASK_H
+#define _TASK_H
 
-#include <imaging/Image.h>
+#include <string>
+#include <list>
 
-class TreeItem;
+#include <time.h>
+#include <stdio.h>
 
-class TreeCtrl
+class Task
 {
   public:
-    TreeCtrl();
-    ~TreeCtrl();
+    Task(const std::string&,
+         const std::string&,
+         const std::string& startDate,
+         const std::string& dueDate,
+         const std::string& completionDate,
+         bool dirty=false);
+    ~Task();
 
-    void freeze();
-    void thaw();
+    void addChild(Task*);
 
-    TreeItem* append(TreeItem *parent, TreeItem *item);
+    const std::string& subject();
+    std::list<Task*>& children();
 
-    void selectNext();
-    void selectPrev();
+    bool completed();
+    bool overdue();
+    bool inactive();
+    bool active();
+    bool dueToday();
 
-    void redraw();
+    void markCompleted();
 
-    void collapse(bool);
-
-    TreeItem* selection();
+    void write(FILE*, unsigned int);
 
   protected:
-    TreeItem *m_pRoot;
-    bool m_bFrozen;
-    int m_iFirst;
-    Imaging::Image *m_pArrow1;
-    Imaging::Image *m_pArrow2;
-    TreeItem *m_pSelected;
-    Imaging::Image *m_pSelect;
+    std::string m_ID;
+    std::string m_Subject;
+    std::string m_StartDate;
+    std::string m_DueDate;
+    std::string m_CompletionDate;
+    bool m_bDirty;
+    std::list<Task*> m_Children;
 };
 
-#endif /* _TREECTRL_H */
+#endif /* _TASK_H */

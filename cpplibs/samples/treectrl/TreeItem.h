@@ -59,9 +59,11 @@ class TreeItem
     void appendChild(TreeItem*);
     TreeItem* childAt(int);
 
-    bool hasChildren()
+    bool hasChildren();
+
+    virtual bool isVisible()
     {
-       return !m_Children.empty();
+       return true;
     }
 
   protected:

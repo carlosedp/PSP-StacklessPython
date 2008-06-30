@@ -62,8 +62,11 @@ void TreeItem::visibleChildren(int level, vector<pair<int, TreeItem*> >& result)
             k != m_Children.end();
             ++k)
        {
-          result.push_back(pair<int, TreeItem*>(level + 1, *k));
-          (*k)->visibleChildren(level + 1, result);
+          if ((*k)->isVisible())
+          {
+             result.push_back(pair<int, TreeItem*>(level + 1, *k));
+             (*k)->visibleChildren(level + 1, result);
+          }
        }
     }
 }
@@ -86,6 +89,19 @@ void TreeItem::appendChild(TreeItem *child)
 TreeItem* TreeItem::childAt(int idx)
 {
     return m_Children[idx];
+}
+
+bool TreeItem::hasChildren()
+{
+    for (vector<TreeItem*>::iterator k = m_Children.begin();
+         k != m_Children.end();
+         ++k)
+    {
+       if ((*k)->isVisible())
+          return true;
+    }
+
+    return false;
 }
 
 //==========================================================================

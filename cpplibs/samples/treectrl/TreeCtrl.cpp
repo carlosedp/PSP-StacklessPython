@@ -237,4 +237,9 @@ void TreeCtrl::collapse(bool c)
        redraw();
 }
 
+TreeItem* TreeCtrl::selection()
+{
+    return m_pSelected;
+}
+
 static const char* _rcsid_TreeCtrl __attribute__((unused)) = "$Id$";
