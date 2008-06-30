@@ -32,10 +32,10 @@ Build cpplibs in its directory and imaging in build-psp dir (both using 'make').
 
 Download the PSP Stackless Python using SVN to the chosen directory. Select the latest release from the tags directory or download directly from the maintenance branch.
 
- * https://pspstacklesspython.googlecode.com/svn/branches/pspstackless-25-maint
+ * http://pspstacklesspython.googlecode.com/svn/branches/pspstackless-25-maint
 for maintenance branch or
 
- * https://pspstacklesspython.googlecode.com/svn/tags/PSPStacklessPython2.5.2_R1
+ * http://pspstacklesspython.googlecode.com/svn/tags/PSPStacklessPython2.5.2_R1
 for Stackless Python 2.5.2 Release 1
 
 You will have a structure like this:
