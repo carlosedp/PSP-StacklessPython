@@ -1,4 +1,4 @@
-#Music Support - OGG and MP3
+#summary Music Support - OGG and MP3
 
 ==Music Support==
 
