@@ -1,0 +1,6 @@
+*.o
+PARAM.SFO
+python.elf
+EBOOT.PBP
+psperror.c
+
