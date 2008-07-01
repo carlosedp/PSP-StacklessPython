@@ -994,7 +994,6 @@ static PyObject* PyPSP_sendIR(PyObject *self, PyObject *args)
     return Py_None;
 }
 
-
 //==========================================================================
 //
 
@@ -1038,7 +1037,7 @@ static PyMethodDef pspos_functions[] = {
    //{ "setnickname", PyPSP_setnickname, METH_VARARGS, "" },
 
    { "realmem", PyPSP_realmem, METH_VARARGS, "" },
-   { "sendIR",   PyPSP_sendIR, METH_VARARGS, "" },
+//   { "sendIR",   PyPSP_sendIR, METH_VARARGS, "" },
 
    { NULL }
 };
