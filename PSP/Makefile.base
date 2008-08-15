@@ -297,11 +297,10 @@ release: distclean $(PSP_EBOOT)
 	@echo "2. Copying EBOOT to release dir."
 	@cp -pR EBOOT.PBP $(RELEASE_DIRECTORY)/
 	@echo "3. Copying Python libraries to release dir."
-	@cd ../Lib && find . -path '*/.svn*' -prune -o -path '*/plat-*' -prune -o -path './test/*' -prune -o -path '*/msilib/*' -prune -o -path '*/curses/*' -prune -o -path '*/idlelib/*' -prune -o -path '*/lib-tk/*' -prune -o -print | zip $(RELEASE_DIRECTORY)/python.zip -q@
+	@cd ../Lib && find . -path '*/.svn*' -prune -o -path '*/plat-*' -prune -o -path './test*' -prune -o -path '*/msilib*' -prune -o -path '*/curses*' -prune -o -path '*/idlelib*' -prune -o -path '*/lib-tk*' -prune -o -path '*/lib-old*' -prune -o -path '*/distutils*' -prune -o -print | zip $(RELEASE_DIRECTORY)/python.zip -q@
 	@mkdir -p site-packages
 	@cp -pR elementtree/elementtree site-packages/
-	@find site-packages/ -path "*/.svn*" -print0 | xargs -0 rm -rf
-	@zip -qr $(RELEASE_DIRECTORY)/python.zip site-packages/elementtree
+	@find ./site-packages/ -path '*/.svn*' -prune -o -print | zip $(RELEASE_DIRECTORY)/python.zip -q@
 	@rm -rf site-packages
 	@echo "4. Release dir created on $(RELEASE_DIRECTORY)."
 	@echo "###### Done ######"
