@@ -36,6 +36,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // $Id: Mask.cpp 141 2008-03-02 11:59:44Z fraca7 $
 
 #include <malloc.h>
+#include <cstdlib>
+#include <cstring>
 
 #include "../imaging/Mask.h"
 

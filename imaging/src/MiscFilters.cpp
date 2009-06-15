@@ -40,6 +40,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../imaging/Callback.h"
 
 #include <math.h>
+#include <cstdlib>
+#include <cstring>
 
 #include <stack>
 

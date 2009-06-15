@@ -41,6 +41,9 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pspgu.h>
 #endif
 
+#include <cstdlib>
+#include <cstring>
+
 #include "../imaging/Blitter.h"
 
 using namespace Imaging;

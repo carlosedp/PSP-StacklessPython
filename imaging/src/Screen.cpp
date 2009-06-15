@@ -47,6 +47,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../imaging/Screen.h"
 #include "../imaging/Blitter.h"
 
+#include <cstdlib>
 using namespace Imaging;
 using namespace std;
 
