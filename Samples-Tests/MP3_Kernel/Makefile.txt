@@ -1,0 +1,16 @@
+TARGET = mp3decoderdemo
+OBJS = main.o
+
+CFLAGS = -G0 -Wall -O2
+CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
+ASFLAGS = $(CFLAGS)
+
+LIBDIR =
+LDFLAGS =
+LIBS= -lpsppower -lpspmpeg -lpspaudiocodec -lpspaudio -lm
+
+EXTRA_TARGETS = EBOOT.PBP SCEkxploit
+PSP_EBOOT_TITLE = mp3 decoder demo
+
+PSPSDK=$(shell psp-config --pspsdk-path)
+include $(PSPSDK)/lib/build.mak
