@@ -1,0 +1,35 @@
+## Checkout and delete original vendor files
+mkdir current
+svn checkout file:///current_python_base current
+cd current
+# Remove all files
+find . -type f \! -path '*/.svn/*' -print0 |xargs -0 rm
+cd ..
+
+## Checkout and export updated vendor files
+mkdir newtree
+svn export http://vendor/repository/tag newtree
+
+## Copy updated vendor files into original vendor files working copy
+cp -R newtree/* current/
+cd current
+# Remove deleted files
+svn rm --force `svn stat | grep -e '^!' | awk '{print $2}'`
+# Add new files
+svn add `svn stat | grep -e '^?' | awk '{print $2}'`
+svn commit -m "Updated vendor branch to XXXX"
+
+## tag new version
+cd current
+svn copy . file:///REPOS/tags/new_tag
+
+## Merge vendor changes into trunk
+cd ..
+# Checkout application tree
+svn checkout file:///my_trunk mine
+cd mine
+# Merge updated vendor branch into application
+svn merge file:///revision_before_the_vendor_update
+          file:///revision_after_the_vendor_update
+svn commit -m "Merged...."
+
